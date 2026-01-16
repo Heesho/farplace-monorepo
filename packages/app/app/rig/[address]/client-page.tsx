@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, TrendingUp, Users, Clock, Share2, BarChart3 } from "lucide-react";
+import { ArrowLeft, Share2 } from "lucide-react";
 import { NavBar } from "@/components/nav-bar";
-import { Button } from "@/components/ui/button";
+
+type Timeframe = "1H" | "1D" | "1W" | "1M" | "ALL";
 
 // Mock token data
 const MOCK_TOKEN = {
@@ -13,14 +14,10 @@ const MOCK_TOKEN = {
   symbol: "DONUT",
   price: 0.00234,
   change24h: 12.5,
-  marketCap: 234000,
-  volume24h: 45000,
-  holders: 1234,
   description: "The original donut token. Mine it, earn it, love it.",
-  color: "from-amber-500 to-orange-600",
 };
 
-// Mock price history for chart
+// Mock chart data
 const MOCK_CHART_DATA = [
   { time: "9:00", price: 0.0021 },
   { time: "10:00", price: 0.00215 },
@@ -32,17 +29,30 @@ const MOCK_CHART_DATA = [
   { time: "16:00", price: 0.00234 },
 ];
 
-// Mock miner info
-const MOCK_MINER = {
-  address: "0x1234...5678",
-  name: "whale.eth",
-  avatar: null,
-  miningFor: "2h 34m",
-  earned: 1500,
+// Mock user position
+const MOCK_USER_POSITION = {
+  balance: 15420.5,
+  totalMined: 18500,
+  spentMining: 245.50,
+  earnedMining: 312.80,
+  slotsOwned: 2,
+  currentMining: 1250.5,
 };
 
-type TabOption = "mine" | "trade";
-type Timeframe = "1H" | "1D" | "1W" | "1M" | "ALL";
+// Mock global stats
+const MOCK_GLOBAL_STATS = {
+  totalMinted: 2450000,
+  treasuryRevenue: 45600,
+  miningSlots: 4,
+  currentMiner: "whale.eth",
+};
+
+// Mock launcher
+const MOCK_LAUNCHER = {
+  name: "heesho.eth",
+  avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=heesho",
+  launchDate: "Jan 15, 2025",
+};
 
 function formatPrice(price: number): string {
   if (price >= 1) return `$${price.toFixed(2)}`;
@@ -51,19 +61,17 @@ function formatPrice(price: number): string {
   return `$${price.toExponential(2)}`;
 }
 
-function formatMarketCap(mcap: number): string {
-  if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(2)}M`;
-  if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
-  return `$${mcap.toFixed(0)}`;
+function formatNumber(num: number): string {
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num.toFixed(2);
 }
 
 function TokenLogo({
   name,
-  color,
   size = "md",
 }: {
   name: string;
-  color: string;
   size?: "sm" | "md" | "lg";
 }) {
   const sizeClasses = {
@@ -71,9 +79,10 @@ function TokenLogo({
     md: "w-10 h-10 text-sm",
     lg: "w-12 h-12 text-base",
   };
+
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-semibold bg-gradient-to-br ${color} text-white shadow-lg`}
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-semibold bg-gradient-to-br from-amber-500 to-orange-600 text-white`}
     >
       {name.charAt(0)}
     </div>
@@ -101,7 +110,6 @@ function SimpleChart({
     })
     .join(" ");
 
-  // Create gradient fill path
   const fillPoints = `0,100 ${points} 100,100`;
 
   return (
@@ -139,11 +147,30 @@ function SimpleChart({
 
 export default function RigDetailPage() {
   const params = useParams();
-  const [activeTab, setActiveTab] = useState<TabOption>("mine");
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
-  const [mineAmount, setMineAmount] = useState("");
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const [showHeaderPrice, setShowHeaderPrice] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tokenInfoRef = useRef<HTMLDivElement>(null);
 
   const isPositive = MOCK_TOKEN.change24h >= 0;
+  const hasPosition = MOCK_USER_POSITION.balance > 0;
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    const tokenInfo = tokenInfoRef.current;
+
+    if (!scrollContainer || !tokenInfo) return;
+
+    const handleScroll = () => {
+      const tokenInfoBottom = tokenInfo.getBoundingClientRect().bottom;
+      const containerTop = scrollContainer.getBoundingClientRect().top;
+      setShowHeaderPrice(tokenInfoBottom < containerTop + 10);
+    };
+
+    scrollContainer.addEventListener("scroll", handleScroll);
+    return () => scrollContainer.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <main className="flex h-screen w-screen justify-center bg-zinc-800">
@@ -151,7 +178,7 @@ export default function RigDetailPage() {
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 130px)",
         }}
       >
         {/* Header */}
@@ -162,9 +189,10 @@ export default function RigDetailPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div className="flex items-center gap-2.5">
-            <TokenLogo name={MOCK_TOKEN.name} color={MOCK_TOKEN.color} size="sm" />
-            <span className="font-semibold text-[15px]">{MOCK_TOKEN.symbol}</span>
+          {/* Center - Price appears on scroll */}
+          <div className={`text-center transition-opacity duration-200 ${showHeaderPrice ? "opacity-100" : "opacity-0"}`}>
+            <div className="text-[15px] font-semibold">{formatPrice(MOCK_TOKEN.price)}</div>
+            <div className="text-[11px] text-muted-foreground">{MOCK_TOKEN.symbol}</div>
           </div>
           <button className="p-2 -mr-2 rounded-xl hover:bg-secondary transition-colors">
             <Share2 className="w-5 h-5" />
@@ -172,22 +200,31 @@ export default function RigDetailPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-4">
-          {/* Price Section */}
-          <div className="py-3">
-            <div className="price-large">{formatPrice(MOCK_TOKEN.price)}</div>
-            <div
-              className={`text-[13px] font-medium mt-0.5 ${
-                isPositive ? "text-primary" : "text-destructive"
-              }`}
-            >
-              {isPositive ? "+" : ""}
-              {MOCK_TOKEN.change24h.toFixed(2)}% today
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
+          {/* Token Info Section */}
+          <div ref={tokenInfoRef} className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <TokenLogo name={MOCK_TOKEN.name} size="lg" />
+              <div>
+                <div className="text-[13px] text-muted-foreground">{MOCK_TOKEN.symbol}</div>
+                <div className="text-[15px] font-medium">{MOCK_TOKEN.name}</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="price-large">{formatPrice(MOCK_TOKEN.price)}</div>
+              <div
+                className={`text-[13px] font-medium ${
+                  isPositive ? "text-primary" : "text-destructive"
+                }`}
+              >
+                {isPositive ? "+" : ""}
+                {MOCK_TOKEN.change24h.toFixed(2)}%
+              </div>
             </div>
           </div>
 
           {/* Chart */}
-          <div className="h-44 mb-2">
+          <div className="h-44 mb-2 -mx-4">
             <SimpleChart data={MOCK_CHART_DATA} isPositive={isPositive} />
           </div>
 
@@ -208,109 +245,172 @@ export default function RigDetailPage() {
             ))}
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-2.5 mb-5">
-            <div className="card-elevated p-3.5">
-              <div className="flex items-center gap-2 text-muted-foreground text-[12px] mb-1">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Market Cap
-              </div>
-              <div className="font-semibold text-[15px] tabular-nums">
-                {formatMarketCap(MOCK_TOKEN.marketCap)}
+          {/* User Position Section */}
+          {hasPosition && (
+            <div className="mb-6">
+              <div className="font-semibold text-[18px] mb-3">Your Position</div>
+              <div className="grid grid-cols-2 gap-y-3 gap-x-8">
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Balance</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    {formatNumber(MOCK_USER_POSITION.balance)} {MOCK_TOKEN.symbol}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Total Mined</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    {formatNumber(MOCK_USER_POSITION.totalMined)} {MOCK_TOKEN.symbol}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Spent Mining</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    ${formatNumber(MOCK_USER_POSITION.spentMining)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Earned Mining</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    ${formatNumber(MOCK_USER_POSITION.earnedMining)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Slots Mining</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    {MOCK_USER_POSITION.slotsOwned}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Currently Mining</div>
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    {formatNumber(MOCK_USER_POSITION.currentMining)} {MOCK_TOKEN.symbol}
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="card-elevated p-3.5">
-              <div className="flex items-center gap-2 text-muted-foreground text-[12px] mb-1">
-                <BarChart3 className="w-3.5 h-3.5" />
-                24h Volume
-              </div>
+          )}
+
+          {/* Global Stats Grid */}
+          <div className="mb-6">
+            <div className="font-semibold text-[18px] mb-3">Stats</div>
+            <div className="grid grid-cols-2 gap-y-3 gap-x-8">
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Total Minted</div>
               <div className="font-semibold text-[15px] tabular-nums">
-                {formatMarketCap(MOCK_TOKEN.volume24h)}
+                {formatNumber(MOCK_GLOBAL_STATS.totalMinted)} {MOCK_TOKEN.symbol}
               </div>
             </div>
-            <div className="card-elevated p-3.5">
-              <div className="flex items-center gap-2 text-muted-foreground text-[12px] mb-1">
-                <Users className="w-3.5 h-3.5" />
-                Holders
-              </div>
+            <div>
+              <div className="text-muted-foreground text-[12px] mb-0.5">Treasury Revenue</div>
               <div className="font-semibold text-[15px] tabular-nums">
-                {MOCK_TOKEN.holders.toLocaleString()}
+                ${formatNumber(MOCK_GLOBAL_STATS.treasuryRevenue)}
               </div>
             </div>
-            <div className="card-elevated p-3.5">
-              <div className="flex items-center gap-2 text-muted-foreground text-[12px] mb-1">
-                <Clock className="w-3.5 h-3.5" />
-                Current Miner
+            <div>
+              <div className="text-muted-foreground text-[12px] mb-0.5">Mining Slots</div>
+              <div className="font-semibold text-[15px] tabular-nums">
+                {MOCK_GLOBAL_STATS.miningSlots}
               </div>
-              <div className="font-semibold text-[15px]">{MOCK_MINER.name}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-[12px] mb-0.5">Current Miner</div>
+              <div className="font-semibold text-[15px]">{MOCK_GLOBAL_STATS.currentMiner}</div>
+            </div>
             </div>
           </div>
 
           {/* About Section */}
-          <div className="card-elevated p-4 mb-5">
-            <div className="font-semibold text-[15px] mb-2">About</div>
-            <p className="text-[13px] text-muted-foreground leading-relaxed">
+          <div className="mb-5">
+            <div className="font-semibold text-[18px] mb-3">About</div>
+            <p className="text-[13px] text-muted-foreground leading-relaxed mb-3">
               {MOCK_TOKEN.description}
             </p>
+
+            {/* Launcher Info */}
+            <div className="flex items-center gap-3 mt-3">
+              <img
+                src={MOCK_LAUNCHER.avatar}
+                alt={MOCK_LAUNCHER.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+              <div>
+                <div className="text-[12px] text-muted-foreground">Launched by</div>
+                <div className="text-[14px] font-medium">{MOCK_LAUNCHER.name}</div>
+              </div>
+              <div className="ml-auto text-right">
+                <div className="text-[12px] text-muted-foreground">Launch Date</div>
+                <div className="text-[14px] font-medium">{MOCK_LAUNCHER.launchDate}</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Bottom Action Bar */}
-        <div className="px-4 py-3 bg-background border-t border-border">
-          {/* Tabs */}
-          <div className="flex bg-secondary rounded-xl p-1 mb-3">
-            <button
-              onClick={() => setActiveTab("mine")}
-              className={`flex-1 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                activeTab === "mine"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
-            >
-              Mine
-            </button>
-            <button
-              onClick={() => setActiveTab("trade")}
-              className={`flex-1 py-2 rounded-lg text-[13px] font-medium transition-all ${
-                activeTab === "trade"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground"
-              }`}
-            >
-              Trade
-            </button>
-          </div>
+        {/* Darkened overlay when menu is open */}
+        {showActionMenu && (
+          <div
+            className="fixed inset-0 bg-black/70 z-40"
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
+            onClick={() => setShowActionMenu(false)}
+          />
+        )}
 
-          {activeTab === "mine" ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-muted-foreground">Mining Price</span>
-                <span className="font-medium tabular-nums">$0.50</span>
+        {/* Bottom Action Bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}>
+          <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3">
+            <div>
+              <div className="text-muted-foreground text-[12px]">Your Position</div>
+              <div className="font-semibold text-[17px] tabular-nums">
+                {formatNumber(MOCK_USER_POSITION.balance)} {MOCK_TOKEN.symbol}
               </div>
-              <Button className="w-full h-11 text-[15px] font-semibold">
-                Start Mining
-              </Button>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={mineAmount}
-                  onChange={(e) => setMineAmount(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 text-[17px] font-medium tabular-nums transition-shadow"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground font-medium">
-                  USDC
+            <div className="relative">
+              {/* Action Menu Popup - appears above button */}
+              {showActionMenu && (
+                <div className="absolute bottom-full right-0 mb-2 flex flex-col gap-1.5">
+                  <button
+                    onClick={() => setShowActionMenu(false)}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Buy
+                  </button>
+                  <button
+                    onClick={() => setShowActionMenu(false)}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Sell
+                  </button>
+                  <button
+                    onClick={() => setShowActionMenu(false)}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Mine
+                  </button>
+                  <button
+                    onClick={() => setShowActionMenu(false)}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Auction
+                  </button>
+                  <button
+                    onClick={() => setShowActionMenu(false)}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Liquidity
+                  </button>
                 </div>
-              </div>
-              <Button className="w-full h-11 text-[15px] font-semibold">
-                Buy {MOCK_TOKEN.symbol}
-              </Button>
+              )}
+              <button
+                onClick={() => setShowActionMenu(!showActionMenu)}
+                className={`w-32 h-10 text-[14px] font-semibold rounded-xl transition-all ${
+                  showActionMenu
+                    ? "bg-black border-2 border-white text-white"
+                    : "bg-primary text-primary-foreground"
+                }`}
+              >
+                {showActionMenu ? "✕" : "Actions"}
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
       <NavBar />
