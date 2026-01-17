@@ -47,7 +47,7 @@ export function AuctionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-900">
+    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
@@ -70,44 +70,44 @@ export function AuctionModal({
         <div className="flex-1 flex flex-col px-4">
           {/* Title */}
           <div className="mt-4 mb-6">
-            <h1 className="text-2xl font-bold">Buy USDC</h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Buy USDC</h1>
+            <p className="text-[13px] text-muted-foreground mt-1">
               {lpBalance.toFixed(3)} {tokenSymbol}-DONUT LP available
             </p>
           </div>
 
           {/* You Pay */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">You pay</span>
+              <span className="text-[13px] text-muted-foreground">You pay</span>
               <span className="text-lg font-semibold tabular-nums">
                 {lpBalance.toFixed(3)} LP
               </span>
             </div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-zinc-500">{tokenSymbol}-DONUT LP</span>
-              <span className="text-xs text-zinc-500 tabular-nums">
+              <span className="text-[11px] text-muted-foreground">{tokenSymbol}-DONUT LP</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
                 ~${currentLpValueUsd.toFixed(2)}
               </span>
             </div>
           </div>
 
           {/* You Receive */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">You receive</span>
+              <span className="text-[13px] text-muted-foreground">You receive</span>
               <span className="text-lg font-semibold tabular-nums">
                 ${usdcReward.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-zinc-500">USDC</span>
-              <span className="text-xs text-zinc-500"></span>
+              <span className="text-[11px] text-muted-foreground">USDC</span>
+              <span className="text-[11px] text-muted-foreground"></span>
             </div>
           </div>
 
           {/* Profit indicator */}
-          <div className="flex items-center justify-end gap-3 py-3 text-xs text-zinc-500">
+          <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
             <span className="tabular-nums">
               {profitUsd >= 0 ? "+" : ""}{profitUsd.toFixed(2)} {profitUsd >= 0 ? "profit" : "loss"}
             </span>
@@ -117,7 +117,7 @@ export function AuctionModal({
           <div className="flex-1" />
 
           {/* Info text */}
-          <p className="text-xs text-zinc-500 text-center mb-4">
+          <p className="text-[11px] text-muted-foreground text-center mb-4">
             Auction price decays over time. Buy when profitable.
           </p>
 
@@ -128,7 +128,7 @@ export function AuctionModal({
           >
             <button
               disabled={lpBalance === 0}
-              className={`w-full h-12 rounded-full font-semibold text-base transition-all ${
+              className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all ${
                 lpBalance > 0
                   ? "bg-white text-black hover:bg-zinc-200"
                   : "bg-zinc-800 text-zinc-500 cursor-not-allowed"

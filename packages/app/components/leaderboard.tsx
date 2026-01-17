@@ -31,7 +31,10 @@ function LeaderboardRow({ entry, tokenSymbol }: { entry: LeaderboardEntry; token
     ?? `https://api.dicebear.com/7.x/shapes/svg?seed=${entry.address.toLowerCase()}`;
 
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-zinc-800/50 last:border-b-0">
+    <div
+      className="flex items-center gap-3 py-3"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+    >
       {/* Rank */}
       <div className="w-6 flex justify-center flex-shrink-0">
         {getRankIcon(entry.rank)}
@@ -95,7 +98,7 @@ export function Leaderboard({
   if (isLoading) {
     return (
       <div className="px-2 mt-6">
-        <h2 className="text-base font-bold mb-3">Leaderboard</h2>
+        <h2 className="text-[18px] font-semibold mb-3">Leaderboard</h2>
         <div className="space-y-2">
           {[1, 2, 3].map(i => (
             <div key={i} className="h-12 bg-zinc-900/30 rounded-lg animate-pulse" />
@@ -112,7 +115,7 @@ export function Leaderboard({
   return (
     <div className="px-2 mt-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-bold">Leaderboard</h2>
+        <h2 className="text-[18px] font-semibold">Leaderboard</h2>
         {userRank && (
           <button
             onClick={handleShareChallenge}

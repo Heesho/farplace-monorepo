@@ -120,7 +120,7 @@ export function TradeModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-900">
+    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
@@ -143,18 +143,18 @@ export function TradeModal({
         <div className="flex-1 flex flex-col px-4">
           {/* Title */}
           <div className="mt-4 mb-6">
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-semibold tracking-tight">
               {isBuy ? "Buy" : "Sell"} {tokenSymbol}
             </h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <p className="text-[13px] text-muted-foreground mt-1">
               {availableDisplay}
             </p>
           </div>
 
           {/* Amount input display */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Amount</span>
+              <span className="text-[13px] text-muted-foreground">Amount</span>
               <span className="text-lg font-semibold tabular-nums">
                 {isBuy ? `$${amount}` : amount}
               </span>
@@ -162,28 +162,28 @@ export function TradeModal({
           </div>
 
           {/* Market price */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Market price</span>
-              <span className="text-sm font-medium tabular-nums">
+              <span className="text-[13px] text-muted-foreground">Market price</span>
+              <span className="text-[13px] font-medium tabular-nums">
                 ${marketPrice.toFixed(6)}
               </span>
             </div>
           </div>
 
           {/* Estimated output */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Est. received</span>
-              <span className="text-sm font-medium tabular-nums">
+              <span className="text-[13px] text-muted-foreground">Est. received</span>
+              <span className="text-[13px] font-medium tabular-nums">
                 {isBuy ? `${formatCoin(coinAmount)} ${tokenSymbol}` : `$${usdAmount.toFixed(2)}`}
               </span>
             </div>
           </div>
 
           {/* Price impact and minimum - below the line */}
-          <div className="flex items-center justify-end gap-3 py-3 text-xs text-zinc-500">
-            <span>-{inputAmount > 0 ? priceImpact : 0}% slippage</span>
+          <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
+            <span>{inputAmount > 0 ? priceImpact : 0}% slippage</span>
             <span>·</span>
             <span>
               {isBuy ? `${formatCoin(minReceived)} ${tokenSymbol}` : `$${minReceived.toFixed(2)}`} min
@@ -196,7 +196,7 @@ export function TradeModal({
           {/* Action button */}
           <button
             disabled={inputAmount === 0}
-            className={`w-full h-12 rounded-full font-semibold text-base transition-all mb-4 ${
+            className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all mb-4 ${
               inputAmount > 0
                 ? "bg-white text-black hover:bg-zinc-200"
                 : "bg-zinc-800 text-zinc-500 cursor-not-allowed"

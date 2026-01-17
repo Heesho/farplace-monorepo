@@ -51,8 +51,8 @@ function Slider({
   return (
     <div className="py-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm text-zinc-400">{label}</span>
-        <span className="text-sm font-medium tabular-nums">{displayValue}</span>
+        <span className="text-[13px] text-muted-foreground">{label}</span>
+        <span className="text-[13px] font-medium tabular-nums">{displayValue}</span>
       </div>
       <input
         type="range"
@@ -64,7 +64,7 @@ function Slider({
         className="w-full h-2 bg-zinc-700 rounded-full appearance-none cursor-pointer accent-white"
       />
       {description && (
-        <p className="text-xs text-zinc-500 mt-1">{description}</p>
+        <p className="text-[11px] text-muted-foreground mt-1">{description}</p>
       )}
     </div>
   );
@@ -153,7 +153,7 @@ export default function LaunchPage() {
                   onChange={handleLogoChange}
                   className="hidden"
                 />
-                <div className="w-20 h-[88px] rounded-xl ring-1 ring-zinc-700 flex items-center justify-center overflow-hidden hover:ring-zinc-500 transition-colors">
+                <div className="w-[88px] h-[88px] rounded-xl ring-1 ring-zinc-700 flex items-center justify-center overflow-hidden hover:ring-zinc-500 transition-colors">
                   {logoPreview ? (
                     <img
                       src={logoPreview}
@@ -222,7 +222,7 @@ export default function LaunchPage() {
               <div className="space-y-6 pb-4">
                 {/* Liquidity Section */}
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-1">Liquidity</h3>
+                  <h3 className="text-[13px] font-semibold text-foreground mb-1">Liquidity</h3>
                   <Slider
                     label="DONUT for LP"
                     value={donutAmount}
@@ -247,7 +247,7 @@ export default function LaunchPage() {
 
                 {/* Emission Section */}
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-1">Emission</h3>
+                  <h3 className="text-[13px] font-semibold text-foreground mb-1">Emission</h3>
                   <Slider
                     label="Starting Emission"
                     value={initialUps}
@@ -284,7 +284,7 @@ export default function LaunchPage() {
 
                 {/* Mining Section */}
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-300 mb-1">Mining</h3>
+                  <h3 className="text-[13px] font-semibold text-foreground mb-1">Mining</h3>
                   <Slider
                     label="Epoch Duration"
                     value={rigEpochPeriod}

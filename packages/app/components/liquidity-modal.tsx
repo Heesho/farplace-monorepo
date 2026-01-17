@@ -103,7 +103,7 @@ export function LiquidityModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-900">
+    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
@@ -126,19 +126,19 @@ export function LiquidityModal({
         <div className="flex-1 flex flex-col px-4">
           {/* Title */}
           <div className="mt-4 mb-6">
-            <h1 className="text-2xl font-bold">Add Liquidity</h1>
-            <p className="text-sm text-zinc-500 mt-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Add Liquidity</h1>
+            <p className="text-[13px] text-muted-foreground mt-1">
               Provide {tokenSymbol} and DONUT to get LP tokens
             </p>
           </div>
 
           {/* Token Input */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-zinc-400">You provide</span>
+              <span className="text-[13px] text-muted-foreground">You provide</span>
               <button
                 onClick={() => setTokenAmount(tokenBalance.toString())}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-[11px] text-muted-foreground hover:text-zinc-300 transition-colors"
               >
                 Balance: {tokenBalance.toLocaleString()}
               </button>
@@ -157,16 +157,16 @@ export function LiquidityModal({
           </div>
 
           {/* Required DONUT */}
-          <div className="py-4 border-b border-zinc-800">
+          <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-zinc-400">Required DONUT</span>
+              <span className="text-[13px] text-muted-foreground">Required DONUT</span>
               <button
                 onClick={() => {
                   // Calculate max token amount based on donut balance
                   const maxTokenFromDonut = (donutBalance * donutPrice) / tokenPrice;
                   setTokenAmount(Math.min(tokenBalance, maxTokenFromDonut).toFixed(2));
                 }}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-[11px] text-muted-foreground hover:text-zinc-300 transition-colors"
               >
                 Balance: {donutBalance.toLocaleString()}
               </button>
@@ -185,7 +185,7 @@ export function LiquidityModal({
           </div>
 
           {/* LP Output */}
-          <div className="flex items-center justify-end gap-3 py-3 text-xs text-zinc-500">
+          <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
             <span className="tabular-nums">
               You receive ~ {lpTokensReceived.toFixed(2)} LP tokens
             </span>
@@ -197,7 +197,7 @@ export function LiquidityModal({
           {/* Action button */}
           <button
             disabled={!canCreate}
-            className={`w-full h-12 rounded-full font-semibold text-base transition-all mb-4 ${
+            className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all mb-4 ${
               canCreate
                 ? "bg-white text-black hover:bg-zinc-200"
                 : "bg-zinc-800 text-zinc-500 cursor-not-allowed"

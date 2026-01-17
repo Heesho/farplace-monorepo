@@ -64,21 +64,22 @@ export function RigCard({ rig, donutUsdPrice = 0.01, isTopBump = false, isNewBum
     <Link href={`/rig/${rig.address}`} className="block">
       <div
         className={cn(
-          "flex items-center gap-4 p-4 rounded-2xl bg-surface-100 border border-surface-300 hover:border-primary-500/40 transition-all cursor-pointer",
+          "flex items-center gap-3 py-4 transition-colors hover:bg-white/[0.02]",
           isNewBump && "animate-bump-enter",
           isTopBump && !isNewBump && "animate-bump-glow"
         )}
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
       >
         {/* Token Logo */}
-        <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-surface-200 border border-surface-300 flex items-center justify-center overflow-hidden">
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden">
           {logoUrl ? (
             <img
               src={logoUrl}
               alt={rig.tokenSymbol}
-              className="w-12 h-12 object-cover"
+              className="w-10 h-10 object-cover"
             />
           ) : (
-            <span className="text-primary-500 font-bold text-lg">
+            <span className="text-zinc-400 font-semibold text-sm">
               {rig.tokenSymbol.slice(0, 2)}
             </span>
           )}
@@ -86,13 +87,13 @@ export function RigCard({ rig, donutUsdPrice = 0.01, isTopBump = false, isNewBum
 
         {/* Token Name & Symbol */}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-white truncate text-[15px]">
-            {rig.tokenName}
+          <div className="font-semibold text-[15px] truncate">
+            {rig.tokenSymbol}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-sm text-surface-600">{rig.tokenSymbol}</span>
+            <span className="text-[13px] text-muted-foreground truncate">{rig.tokenName}</span>
             {rig.capacity > 1n && (
-              <span className="badge badge-primary text-[10px] py-0.5 px-1.5">
+              <span className="text-[11px] text-zinc-500 bg-zinc-800 rounded-full px-1.5 py-0.5">
                 {Number(rig.capacity)} slots
               </span>
             )}
@@ -101,10 +102,10 @@ export function RigCard({ rig, donutUsdPrice = 0.01, isTopBump = false, isNewBum
 
         {/* Price & Market Cap */}
         <div className="flex-shrink-0 text-right">
-          <div className="text-[15px] font-semibold text-white">
+          <div className="text-[15px] font-medium tabular-nums">
             ${formatQuote(rig.price)}
           </div>
-          <div className="text-sm text-surface-600 mt-0.5">
+          <div className="text-[13px] text-muted-foreground mt-0.5">
             {formatUsd(marketCapUsd)}
           </div>
         </div>

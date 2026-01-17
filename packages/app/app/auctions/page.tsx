@@ -68,43 +68,46 @@ export default function AuctionsPage() {
 
         {/* Auction List */}
         <div className="flex-1 overflow-y-auto scrollbar-hide px-4">
-          <div className="space-y-2">
-            {MOCK_AUCTIONS.map((auction) => (
+          <div>
+            {MOCK_AUCTIONS.map((auction, index) => (
               <button
                 key={auction.id}
                 onClick={() => setSelectedAuction(auction)}
-                className={`w-full p-4 rounded-xl transition-all text-left ${
+                className={`w-full py-4 transition-all text-left ${
                   selectedAuction.id === auction.id
-                    ? "card-elevated ring-1 ring-primary"
-                    : "card-elevated hover:ring-1 hover:ring-border"
+                    ? "bg-white/[0.03]"
+                    : "hover:bg-white/[0.02]"
                 }`}
+                style={{
+                  borderBottom: index < MOCK_AUCTIONS.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none"
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="relative">
                       <TokenLogo name={auction.tokenName} color={auction.color} />
                       {selectedAuction.id === auction.id && (
-                        <div className="absolute -right-1 -bottom-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-3 h-3 text-white" />
+                        <div className="absolute -right-1 -bottom-1 w-5 h-5 rounded-full bg-white flex items-center justify-center">
+                          <Check className="w-3 h-3 text-black" />
                         </div>
                       )}
                     </div>
                     <div>
-                      <div className="font-medium text-[15px]">{auction.tokenName}</div>
+                      <div className="font-semibold text-[15px]">{auction.tokenSymbol}</div>
                       <div className="text-[13px] text-muted-foreground">
-                        {auction.tokenSymbol}-DONUT LP
+                        {auction.tokenName}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div
-                      className={`font-semibold text-[15px] tabular-nums ${
-                        auction.profit >= 0 ? "text-primary" : "text-destructive"
+                      className={`font-medium text-[15px] tabular-nums ${
+                        auction.profit >= 0 ? "text-zinc-300" : "text-zinc-500"
                       }`}
                     >
                       {auction.profit >= 0 ? "+" : ""}${Math.abs(auction.profit).toFixed(2)}
                     </div>
-                    <div className="text-[12px] text-muted-foreground">profit</div>
+                    <div className="text-[13px] text-muted-foreground">profit</div>
                   </div>
                 </div>
               </button>
@@ -124,13 +127,16 @@ export default function AuctionsPage() {
 
         {/* Bottom Action Bar */}
         <div
-          className="fixed left-0 right-0 bg-background border-t border-border"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)" }}
+          className="fixed left-0 right-0 bg-background"
+          style={{
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+            borderTop: "1px solid rgba(255,255,255,0.06)"
+          }}
         >
           <div className="max-w-[520px] mx-auto px-4 py-4">
             {/* Trade Summary */}
-            <div className="card-elevated p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="pb-4 mb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[12px] text-muted-foreground mb-1">You Pay</div>
                   <div className="flex items-center gap-2">
@@ -145,8 +151,8 @@ export default function AuctionsPage() {
                     </div>
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+                  <ArrowRight className="w-4 h-4 text-zinc-500" />
                 </div>
                 <div className="text-right">
                   <div className="text-[12px] text-muted-foreground mb-1">
@@ -158,22 +164,22 @@ export default function AuctionsPage() {
                   <div className="text-[11px] text-muted-foreground">USDC</div>
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between">
               <div
-                className={`text-center text-[13px] font-medium py-2 rounded-lg ${
-                  selectedAuction.profit >= 0
-                    ? "bg-primary/10 text-primary"
-                    : "bg-destructive/10 text-destructive"
+                className={`text-[15px] font-medium tabular-nums ${
+                  selectedAuction.profit >= 0 ? "text-zinc-300" : "text-zinc-500"
                 }`}
               >
                 {selectedAuction.profit >= 0
                   ? `+$${selectedAuction.profit.toFixed(2)} profit`
                   : `-$${Math.abs(selectedAuction.profit).toFixed(2)} loss`}
               </div>
+              <button className="h-10 px-6 bg-white text-black text-[14px] font-semibold rounded-xl hover:bg-zinc-200 transition-colors">
+                Buy Auction
+              </button>
             </div>
-
-            <Button className="w-full h-11 text-[15px] font-semibold">
-              Buy Auction
-            </Button>
           </div>
         </div>
       </div>

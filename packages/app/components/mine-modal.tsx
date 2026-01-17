@@ -286,10 +286,10 @@ export function MineModal({ isOpen, onClose, tokenSymbol = "DONUT", userBalance 
               </div>
 
               {/* Stats Grid - Rate, Mined, PnL, Total */}
-              <div className="grid grid-cols-4 gap-3 py-3 border-t border-zinc-800/50">
+              <div className="grid grid-cols-4 gap-3 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Rate</div>
-                  <div className="text-sm font-semibold tabular-nums mt-0.5 flex items-center gap-1">
+                  <div className="text-[12px] text-muted-foreground">Rate</div>
+                  <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
                     <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
                       {tokenSymbol.charAt(0)}
                     </span>
@@ -297,8 +297,8 @@ export function MineModal({ isOpen, onClose, tokenSymbol = "DONUT", userBalance 
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Mined</div>
-                  <div className="text-sm font-semibold tabular-nums mt-0.5 flex items-center gap-1">
+                  <div className="text-[12px] text-muted-foreground">Mined</div>
+                  <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
                     +
                     <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
                       {tokenSymbol.charAt(0)}
@@ -307,14 +307,14 @@ export function MineModal({ isOpen, onClose, tokenSymbol = "DONUT", userBalance 
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wide">PnL</div>
-                  <div className="text-sm font-semibold tabular-nums mt-0.5">
+                  <div className="text-[12px] text-muted-foreground">PnL</div>
+                  <div className="text-[13px] font-medium tabular-nums mt-0.5">
                     {(selectedSlotData.pnl ?? 0) >= 0 ? "+$" : "-$"}{Math.abs(selectedSlotData.pnl ?? 0).toFixed(2)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wide">Total</div>
-                  <div className="text-sm font-semibold tabular-nums mt-0.5">
+                  <div className="text-[12px] text-muted-foreground">Total</div>
+                  <div className="text-[13px] font-medium tabular-nums mt-0.5">
                     {(selectedSlotData.total ?? 0) >= 0 ? "+$" : "-$"}{Math.abs(selectedSlotData.total ?? 0).toFixed(2)}
                   </div>
                 </div>
