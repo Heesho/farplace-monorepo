@@ -2,7 +2,7 @@
   "mcpServers": {
     "context7": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@context7/mcp"]
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
     },
     "playwright": {
       "command": "cmd",
@@ -11,6 +11,10 @@
     "shadcn": {
       "command": "cmd",
       "args": ["/c", "npx", "shadcn@latest", "mcp"]
+    },
+    "Neynar": {
+      "type": "http",
+      "url": "https://docs.neynar.com/mcp"
     }
   }
 }
