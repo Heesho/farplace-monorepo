@@ -1,105 +1,574 @@
-# Global launchpad stats
-type Launchpad @entity(immutable: false) {
-  id: ID!
-  totalRigs: BigInt!
-  totalRevenue: BigDecimal! # Total treasury revenue across all rigs
-  totalMinted: BigDecimal!
-  protocolRevenue: BigDecimal! # Platform revenue (1% protocol fees)
-  rigs: [Rig!]! @derivedFrom(field: "launchpad")
+# =============================================================================
+# MINEPORT UNIFIED SUBGRAPH SCHEMA
+# =============================================================================
+# Central concept: Unit token is the universal entity across all rig types
+# Each Unit has an LP pair (Unit/DONUT) for price tracking
+# Rigs are specialized by type but linked to their Unit
+# =============================================================================
+
+# =============================================================================
+# GLOBAL PROTOCOL STATS
+# =============================================================================
+
+type Protocol @entity(immutable: false) {
+  id: ID!                              # "mineport"
+
+  # Counts
+  totalUnits: BigInt!                  # Total Unit tokens launched
+  totalRigs: BigInt!                   # Total rigs (same as units)
+
+  # Volume (in DONUT)
+  totalVolumeDonut: BigDecimal!        # All-time trading volume
+  totalVolume24h: BigDecimal!          # Rolling 24h volume (updated hourly)
+
+  # Liquidity
+  totalLiquidityDonut: BigDecimal!     # Current total liquidity in DONUT
+
+  # Revenue
+  totalTreasuryRevenue: BigDecimal!    # All treasury fees collected
+  totalProtocolRevenue: BigDecimal!    # Protocol fees (1%)
+
+  # Emissions
+  totalMinted: BigDecimal!             # All Unit tokens minted across all rigs
+
+  # Timestamps
+  lastUpdated: BigInt!
 }
 
-# A mining rig instance deployed via the launchpad
-type Rig @entity(immutable: false) {
-  id: ID!
-  launchpad: Launchpad!
+# =============================================================================
+# UNIT TOKEN - The Universal Entity (Explore Page)
+# =============================================================================
+
+type Unit @entity(immutable: false) {
+  id: ID!                              # Unit token address
+
+  # Basic info
+  name: String!
+  symbol: String!
+  decimals: Int!
+
+  # Supply
+  totalSupply: BigDecimal!             # Current total supply
+  totalMinted: BigDecimal!             # Total ever minted by rig
+
+  # Associated contracts
+  lpPair: Bytes!                       # LP pair address (Unit/DONUT)
+  donutToken: Bytes!                   # DONUT address (constant)
   launcher: Account!
-  unit: Bytes!
-  quoteToken: Bytes! # Payment token (e.g., USDC)
-  auction: Bytes!
-  lpToken: Bytes!
-  tokenName: String!
-  tokenSymbol: String!
-  uri: String!
-  # Launch parameters
-  initialUps: BigInt!
-  tailUps: BigInt!
-  halvingAmount: BigInt! # Token supply threshold for halving
-  rigEpochPeriod: BigInt!
-  rigPriceMultiplier: BigDecimal!
-  rigMinInitPrice: BigDecimal!
-  # Runtime state
-  capacity: BigInt! # Number of slots
-  revenue: BigDecimal! # Treasury revenue (15% fees to auction)
-  teamRevenue: BigDecimal! # Team revenue (4% fees)
-  minted: BigDecimal!
-  lastMined: BigInt!
+
+  # ==========================================================================
+  # PRICE DATA (from LP Sync events)
+  # ==========================================================================
+
+  # Current price
+  price: BigDecimal!                   # Current price in DONUT (reserve_donut / reserve_unit)
+  priceUSD: BigDecimal!                # Price in USD (if DONUT price available)
+
+  # Market metrics
+  marketCap: BigDecimal!               # price * totalSupply (in DONUT)
+  marketCapUSD: BigDecimal!            # Market cap in USD
+  liquidity: BigDecimal!               # Total DONUT in LP
+  liquidityUSD: BigDecimal!            # Liquidity in USD
+
+  # LP reserves (from Sync)
+  reserveUnit: BigDecimal!             # Unit tokens in LP
+  reserveDonut: BigDecimal!            # DONUT in LP
+
+  # ==========================================================================
+  # VOLUME DATA (from LP Swap events)
+  # ==========================================================================
+
+  volume24h: BigDecimal!               # 24h volume in DONUT
+  volume7d: BigDecimal!                # 7d volume in DONUT
+  volumeTotal: BigDecimal!             # All-time volume in DONUT
+  txCount: BigInt!                     # Total swap transactions
+  txCount24h: BigInt!                  # 24h transaction count
+
+  # ==========================================================================
+  # PRICE CHANGE
+  # ==========================================================================
+
+  priceChange1h: BigDecimal!           # % change
+  priceChange24h: BigDecimal!          # % change
+  priceChange7d: BigDecimal!           # % change
+
+  priceHigh24h: BigDecimal!            # 24h high
+  priceLow24h: BigDecimal!             # 24h low
+
+  # For calculating 24h change
+  price1hAgo: BigDecimal!              # Price snapshot
+  price24hAgo: BigDecimal!             # Price snapshot
+  price7dAgo: BigDecimal!              # Price snapshot
+
+  # ==========================================================================
+  # ACTIVITY (for "bump" sorting)
+  # ==========================================================================
+
+  lastSwapAt: BigInt!                  # Last LP swap timestamp
+  lastRigActivityAt: BigInt!           # Last rig event (mine, spin, etc)
+  lastActivityAt: BigInt!              # Max of swap and rig activity
+
+  # ==========================================================================
+  # HOLDER DATA (optional - from Transfer events)
+  # ==========================================================================
+
+  holderCount: BigInt!                 # Unique holders
+
+  # ==========================================================================
+  # TIMESTAMPS
+  # ==========================================================================
+
   createdAt: BigInt!
   createdAtBlock: BigInt!
-  slots: [Slot!]! @derivedFrom(field: "rig")
-  rigAccounts: [RigAccount!]! @derivedFrom(field: "rig")
+
+  # ==========================================================================
+  # RELATIONS
+  # ==========================================================================
+
+  rig: Rig!                            # The rig that mints this token
+  swaps: [Swap!]! @derivedFrom(field: "unit")
+  hourData: [UnitHourData!]! @derivedFrom(field: "unit")
+  dayData: [UnitDayData!]! @derivedFrom(field: "unit")
 }
 
-# A mining slot within a rig (each rig can have multiple slots)
-type Slot @entity(immutable: false) {
-  id: ID! # {rigAddress}-{slotIndex}
+# =============================================================================
+# PRICE CHART DATA
+# =============================================================================
+
+# Hourly OHLCV candles
+type UnitHourData @entity(immutable: false) {
+  id: ID!                              # {unitAddress}-{hourTimestamp}
+  unit: Unit!
+
+  # Time
+  timestamp: BigInt!                   # Hour start (unix)
+  hourIndex: Int!                      # Hours since epoch
+
+  # OHLC (in DONUT)
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+
+  # Volume
+  volumeUnit: BigDecimal!              # Unit volume this hour
+  volumeDonut: BigDecimal!             # DONUT volume this hour
+  txCount: BigInt!                     # Swaps this hour
+
+  # Liquidity snapshot
+  liquidity: BigDecimal!               # DONUT in LP at hour end
+}
+
+# Daily OHLCV candles
+type UnitDayData @entity(immutable: false) {
+  id: ID!                              # {unitAddress}-{dayTimestamp}
+  unit: Unit!
+
+  # Time
+  timestamp: BigInt!                   # Day start (unix)
+  dayIndex: Int!                       # Days since epoch
+
+  # OHLC (in DONUT)
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+
+  # Volume
+  volumeUnit: BigDecimal!
+  volumeDonut: BigDecimal!
+  txCount: BigInt!
+
+  # Liquidity snapshot
+  liquidity: BigDecimal!
+
+  # Supply snapshot
+  totalSupply: BigDecimal!
+  totalMinted: BigDecimal!
+}
+
+# =============================================================================
+# SWAP EVENTS (Buy/Sell activity)
+# =============================================================================
+
+type Swap @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  unit: Unit!
+  account: Account!
+
+  # Swap details
+  type: String!                        # "buy" or "sell"
+  amountUnit: BigDecimal!              # Unit tokens swapped
+  amountDonut: BigDecimal!             # DONUT swapped
+  price: BigDecimal!                   # Execution price (donut/unit)
+
+  # Transaction
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+  logIndex: BigInt!
+}
+
+# =============================================================================
+# RIG - General Entity (links to specialized types)
+# =============================================================================
+
+type Rig @entity(immutable: false) {
+  id: ID!                              # Rig contract address
+  unit: Unit!                          # The Unit token this rig mints
+  rigType: String!                     # "seat", "spin", "content", "charity"
+
+  # Common fields
+  launcher: Account!
+  auction: Bytes!
+  quoteToken: Bytes!                   # Payment token for rig actions
+  uri: String!
+
+  # Emission config (common to most)
+  initialUps: BigInt!                  # Starting units per second
+  tailUps: BigInt!                     # Minimum units per second
+  halvingPeriod: BigInt!               # Time between halvings (seconds)
+
+  # Revenue tracking (in quoteToken)
+  treasuryRevenue: BigDecimal!         # Fees sent to auction/treasury
+  teamRevenue: BigDecimal!             # Fees to team
+  protocolRevenue: BigDecimal!         # Fees to protocol
+
+  # Emission tracking
+  totalMinted: BigDecimal!             # Total Unit tokens minted by this rig
+
+  # Activity
+  lastActivityAt: BigInt!              # Last rig-specific event
+
+  # Timestamps
+  createdAt: BigInt!
+  createdAtBlock: BigInt!
+
+  # ==========================================================================
+  # Specialized data (ONE of these will be set based on rigType)
+  # ==========================================================================
+
+  mineRig: MineRig
+  slotRig: SlotRig
+  contentRig: ContentRig
+  fundRig: FundRig
+}
+
+# =============================================================================
+# SEAT RIG - Mining seat competition
+# =============================================================================
+
+type MineRig @entity(immutable: false) {
+  id: ID!                              # Same as Rig id
   rig: Rig!
+
+  # Config
+  capacity: BigInt!                    # Number of slots
+  epochPeriod: BigInt!                 # Dutch auction epoch duration
+  priceMultiplier: BigDecimal!         # Price multiplier after sale
+  minInitPrice: BigDecimal!            # Minimum starting price
+
+  # State
+  activeMiners: BigInt!                # Current occupied slots
+  totalMines: BigInt!                  # All-time mine count
+
+  # Relations
+  slots: [SeatSlot!]! @derivedFrom(field: "mineRig")
+  mines: [SeatMine!]! @derivedFrom(field: "mineRig")
+}
+
+type SeatSlot @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{slotIndex}
+  mineRig: MineRig!
   index: BigInt!
+
+  # Current state
   epochId: BigInt!
   currentMiner: Account
   uri: String!
-  # Runtime state per slot
-  minted: BigDecimal!
+  initPrice: BigDecimal!               # Current epoch starting price
+  startTime: BigInt!                   # Current epoch start
+
+  # Stats
+  minted: BigDecimal!                  # Total minted on this slot
   lastMined: BigInt!
-  epochs: [Epoch!]! @derivedFrom(field: "slot")
 }
 
-# User account (global identity)
-type Account @entity(immutable: false) {
-  id: ID!
-  rigsLaunched: [Rig!]! @derivedFrom(field: "launcher")
-  rigAccounts: [RigAccount!]! @derivedFrom(field: "account")
-  currentSlots: [Slot!]! @derivedFrom(field: "currentMiner")
-}
+type SeatMine @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  mineRig: MineRig!
+  slot: SeatSlot!
 
-# User participation on a specific rig
-type RigAccount @entity(immutable: false) {
-  id: ID! # {rigAddress}-{accountAddress}
-  rig: Rig!
-  account: Account!
-  spent: BigDecimal! # Quote tokens spent mining on this rig
-  earned: BigDecimal! # Quote tokens earned from miner fees
-  mined: BigDecimal! # Unit tokens minted on this rig
-  epochs: [Epoch!]! @derivedFrom(field: "rigAccount")
-}
+  miner: Account!
+  prevMiner: Account
 
-# A single mining epoch on a slot
-type Epoch @entity(immutable: false) {
-  id: ID! # {rigAddress}-{slotIndex}-{epochId}
-  rig: Rig!
-  slot: Slot!
-  rigAccount: RigAccount!
-  index: BigInt! # Slot index
-  epochId: BigInt!
-  uri: String!
-  startTime: BigInt!
-  mined: BigDecimal! # Unit tokens minted this epoch
-  spent: BigDecimal! # Quote tokens spent this epoch
-  earned: BigDecimal! # Quote tokens earned this epoch (miner fee)
-}
-
-# Mine event for activity feed (tracks each mine action with aggregated data)
-type Mine @entity(immutable: false) {
-  id: ID! # {rigAddress}-{slotIndex}-{epochId}
-  rig: Rig!
-  miner: Account! # New miner who took the slot
-  prevMiner: Account # Previous miner who got displaced (if any)
   slotIndex: BigInt!
   epochId: BigInt!
   uri: String!
-  price: BigDecimal! # What the new miner paid (spent)
-  mined: BigDecimal! # Tokens minted for previous miner
-  earned: BigDecimal! # Fee earned by previous miner
-  upsMultiplier: BigInt # UPS multiplier at time of mine (if set)
+
+  price: BigDecimal!                   # What miner paid
+  minted: BigDecimal!                  # Tokens minted to prev miner
+  earned: BigDecimal!                  # Fee earned by prev miner
+
   timestamp: BigInt!
   blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# =============================================================================
+# SPIN RIG - Slot machine with VRF
+# =============================================================================
+
+type SlotRig @entity(immutable: false) {
+  id: ID!
+  rig: Rig!
+
+  # Config (immutable)
+  epochPeriod: BigInt!                 # Duration of each price decay epoch
+  priceMultiplier: BigDecimal!         # Price multiplier after each spin
+  minInitPrice: BigDecimal!            # Minimum starting price
+
+  # Dutch Auction State
+  currentEpochId: BigInt!              # Current epoch ID
+  initPrice: BigDecimal!               # Current epoch's starting price
+  slotStartTime: BigInt!               # When current epoch started
+
+  # Prize Pool
+  prizePool: BigDecimal!               # Current prize pool (Unit tokens from emissions)
+  currentOdds: [BigInt!]!              # Current odds array (basis points for payout %)
+
+  # Stats
+  totalSpins: BigInt!
+  totalWins: BigInt!
+  totalWonAmount: BigDecimal!          # Total Unit won from prize pool
+  totalSpent: BigDecimal!              # Total quoteToken spent on spins
+
+  # Relations
+  spins: [Spin!]! @derivedFrom(field: "slotRig")
+}
+
+type Spin @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  slotRig: SlotRig!
+  spinner: Account!
+
+  epochId: BigInt!
+  price: BigDecimal!                   # Spin cost
+
+  # Result (filled after VRF callback)
+  won: Boolean!
+  winAmount: BigDecimal!               # Amount won (0 if lost)
+  oddsBps: BigInt!                     # Odds that were hit
+
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# =============================================================================
+# CONTENT RIG - NFT collection with staking
+# =============================================================================
+
+type ContentRig @entity(immutable: false) {
+  id: ID!
+  rig: Rig!
+
+  # Config
+  minInitPrice: BigDecimal!
+  isModerated: Boolean!
+
+  # Associated contracts
+  minter: Bytes!
+  rewarder: Bytes!
+
+  # Stats
+  totalContent: BigInt!                # Total NFTs created
+  totalCollections: BigInt!            # Total collection events
+  totalStaked: BigDecimal!             # Total quote tokens staked
+
+  # Relations
+  contents: [Content!]! @derivedFrom(field: "contentRig")
+  collections: [Collection!]! @derivedFrom(field: "contentRig")
+  claims: [ContentClaim!]! @derivedFrom(field: "contentRig")
+}
+
+type Content @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{tokenId}
+  contentRig: ContentRig!
+  tokenId: BigInt!
+
+  creator: Account!
+  currentOwner: Account!
+  uri: String!
+
+  # Current state
+  stake: BigDecimal!                   # Current stake determining rewards
+  epochId: BigInt!
+  initPrice: BigDecimal!
+
+  # Stats
+  totalCollections: BigInt!
+  totalStaked: BigDecimal!             # All-time stake on this content
+
+  createdAt: BigInt!
+
+  collections: [Collection!]! @derivedFrom(field: "content")
+}
+
+type Collection @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  contentRig: ContentRig!
+  content: Content!
+
+  collector: Account!
+  prevOwner: Account
+
+  tokenId: BigInt!
+  epochId: BigInt!
+  price: BigDecimal!                   # Collection price
+
+  # Fee breakdown
+  prevOwnerFee: BigDecimal!            # 80% to prev owner
+  creatorFee: BigDecimal!              # 3% to creator
+  treasuryFee: BigDecimal!             # 12% to treasury (remainder)
+  teamFee: BigDecimal!                 # 4% to team
+  protocolFee: BigDecimal!             # 1% to protocol
+
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# Claim record for ContentRig pull pattern (prevOwner + creator fees)
+type ContentClaim @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  contentRig: ContentRig!
+
+  account: Account!                    # Account that claimed
+  amount: BigDecimal!                  # Amount claimed (in quote token)
+
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# =============================================================================
+# CHARITY RIG - Daily donation pool mining
+# =============================================================================
+
+type FundRig @entity(immutable: false) {
+  id: ID!
+  rig: Rig!
+
+  # Config (from Rig.initialUps/tailUps for emission)
+  # Emission halves every 30 days, with a floor
+
+  # State
+  currentDay: BigInt!                  # Current day number
+
+  # Stats
+  totalDonated: BigDecimal!            # Total donations received
+  totalMinted: BigDecimal!             # Total Unit tokens minted to donors
+  uniqueDonors: BigInt!                # Unique donor count
+
+  # Relations
+  donations: [Donation!]! @derivedFrom(field: "fundRig")
+  recipients: [CharityRecipient!]! @derivedFrom(field: "fundRig")
+  dayData: [CharityDayData!]! @derivedFrom(field: "fundRig")
+}
+
+# Whitelisted recipient for FundRig
+type CharityRecipient @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{recipientAddress}
+  fundRig: FundRig!
+  recipient: Bytes!                    # Recipient address
+  isActive: Boolean!                   # Whether currently whitelisted
+  totalReceived: BigDecimal!           # Total donations received
+  addedAt: BigInt!
+}
+
+# Daily donation pool data
+type CharityDayData @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{day}
+  fundRig: FundRig!
+  day: BigInt!                         # Day number (days since rig start)
+
+  totalDonated: BigDecimal!            # Total donated this day
+  donorCount: BigInt!                  # Number of unique donors this day
+  emission: BigDecimal!                # Unit emission for this day
+
+  # Timestamps
+  timestamp: BigInt!                   # Day start timestamp
+}
+
+type Donation @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  fundRig: FundRig!
+
+  donor: Account!
+  recipient: Bytes!                    # Which whitelisted recipient received funds
+
+  day: BigInt!                         # Day number
+  amount: BigDecimal!                  # Donation amount
+
+  # Fee split (calculated from amount)
+  recipientAmount: BigDecimal!         # 50% to recipient
+  treasuryAmount: BigDecimal!          # 45% to treasury
+  teamAmount: BigDecimal!              # 4% to team
+
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# Claim record (when donor claims their Unit tokens)
+type CharityClaim @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  fundRig: FundRig!
+
+  claimer: Account!
+  day: BigInt!                         # Day being claimed
+  amount: BigDecimal!                  # Unit tokens minted
+
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
+}
+
+# =============================================================================
+# ACCOUNT - User wallet
+# =============================================================================
+
+type Account @entity(immutable: false) {
+  id: ID!                              # Wallet address
+
+  # Aggregate stats
+  totalSwapVolume: BigDecimal!         # Volume traded in DONUT
+  totalRigSpend: BigDecimal!           # Spent on rig actions
+  totalMined: BigDecimal!              # Unit tokens earned
+  totalWon: BigDecimal!                # Unit tokens won (spin)
+
+  # Activity
+  lastActivityAt: BigInt!
+
+  # Relations
+  unitsLaunched: [Unit!]! @derivedFrom(field: "launcher")
+  swaps: [Swap!]! @derivedFrom(field: "account")
+  seatMines: [SeatMine!]! @derivedFrom(field: "miner")
+  seatSlots: [SeatSlot!]! @derivedFrom(field: "currentMiner")
+  spins: [Spin!]! @derivedFrom(field: "spinner")
+  contents: [Content!]! @derivedFrom(field: "currentOwner")
+  contentsCreated: [Content!]! @derivedFrom(field: "creator")
+  collections: [Collection!]! @derivedFrom(field: "collector")
+  donations: [Donation!]! @derivedFrom(field: "donor")
+}
+
+# =============================================================================
+# DONUT TOKEN (for USD conversion - optional)
+# =============================================================================
+
+type DonutToken @entity(immutable: false) {
+  id: ID!                              # "donut" or donut address
+  priceUSD: BigDecimal!                # Current DONUT/USD price
+  lastUpdated: BigInt!
 }

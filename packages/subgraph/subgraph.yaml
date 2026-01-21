@@ -4,68 +4,307 @@ indexerHints:
 schema:
   file: ./schema.graphql
 dataSources:
+  # ==========================================================================
+  # SEAT CORE - Launches MineRigs
+  # ==========================================================================
   - kind: ethereum
-    name: Core
+    name: MineCore
     network: base
     source:
-      address: "0xF837F616Fe1fd33Cd8290759D3ae1FB09230d73b"
-      abi: Core
-      startBlock: 40863798
+      address: "0x0000000000000000000000000000000000000001" # TODO: Update after deployment
+      abi: MineCore
+      startBlock: 1
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
-        - Launchpad
+        - Protocol
+        - Unit
         - Rig
+        - MineRig
         - Account
       abis:
-        - name: Core
-          file: ./abis/Core.json
-        - name: Rig
-          file: ./abis/Rig.json
+        - name: MineCore
+          file: ./abis/MineCore.json
+        - name: ERC20
+          file: ./abis/ERC20.json
       eventHandlers:
         - event: Core__Launched(address,address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
-          handler: handleCoreLaunched
-      file: ./src/core.ts
-templates:
+          handler: handleMineCoreLaunched
+      file: ./src/cores/mineCore.ts
+
+  # ==========================================================================
+  # SPIN CORE - Launches SlotRigs
+  # ==========================================================================
   - kind: ethereum
-    name: Rig
+    name: SlotCore
     network: base
     source:
-      abi: Rig
+      address: "0x0000000000000000000000000000000000000002" # TODO: Update after deployment
+      abi: SlotCore
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Protocol
+        - Unit
+        - Rig
+        - SlotRig
+        - Account
+      abis:
+        - name: SlotCore
+          file: ./abis/SlotCore.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: SlotCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleSlotCoreLaunched
+      file: ./src/cores/slotCore.ts
+
+  # ==========================================================================
+  # CONTENT CORE - Launches ContentRigs
+  # ==========================================================================
+  - kind: ethereum
+    name: ContentCore
+    network: base
+    source:
+      address: "0x0000000000000000000000000000000000000003" # TODO: Update after deployment
+      abi: ContentCore
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Protocol
+        - Unit
+        - Rig
+        - ContentRig
+        - Account
+      abis:
+        - name: ContentCore
+          file: ./abis/ContentCore.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: ContentCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,bool,uint256,uint256,uint256,uint256)
+          handler: handleContentCoreLaunched
+      file: ./src/cores/contentCore.ts
+
+  # ==========================================================================
+  # CHARITY CORE - Launches FundRigs
+  # ==========================================================================
+  - kind: ethereum
+    name: FundCore
+    network: base
+    source:
+      address: "0x0000000000000000000000000000000000000004" # TODO: Update after deployment
+      abi: FundCore
+      startBlock: 1
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Protocol
+        - Unit
+        - Rig
+        - FundRig
+        - Account
+      abis:
+        - name: FundCore
+          file: ./abis/FundCore.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleFundCoreLaunched
+      file: ./src/cores/fundCore.ts
+
+templates:
+  # ==========================================================================
+  # UNISWAP V2 PAIR - Price and Volume tracking
+  # ==========================================================================
+  - kind: ethereum
+    name: UniswapV2Pair
+    network: base
+    source:
+      abi: UniswapV2Pair
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Unit
+        - UnitHourData
+        - UnitDayData
+        - Swap
+        - Account
+      abis:
+        - name: UniswapV2Pair
+          file: ./abis/UniswapV2Pair.json
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Swap(indexed address,uint256,uint256,uint256,uint256,indexed address)
+          handler: handleSwap
+        - event: Sync(uint112,uint112)
+          handler: handleSync
+      file: ./src/pair.ts
+
+  # ==========================================================================
+  # SEAT RIG - Mining events
+  # ==========================================================================
+  - kind: ethereum
+    name: MineRig
+    network: base
+    source:
+      abi: MineRig
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
         - Rig
-        - Slot
+        - MineRig
+        - SeatSlot
+        - SeatMine
         - Account
-        - Epoch
-        - Mine
+        - Unit
       abis:
-        - name: Rig
-          file: ./abis/Rig.json
+        - name: MineRig
+          file: ./abis/MineRig.json
       eventHandlers:
         - event: Rig__Mine(address,indexed address,indexed uint256,indexed uint256,uint256,string)
-          handler: handleRigMine
+          handler: handleSeatMine
         - event: Rig__MinerFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleRigMinerFee
+          handler: handleSeatMinerFee
         - event: Rig__Mint(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleRigMint
+          handler: handleSeatMint
         - event: Rig__TreasuryFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleRigTreasuryFee
+          handler: handleSeatTreasuryFee
         - event: Rig__TeamFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleRigTeamFee
+          handler: handleSeatTeamFee
         - event: Rig__ProtocolFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleRigProtocolFee
-        - event: Rig__TreasurySet(indexed address)
-          handler: handleRigTreasurySet
-        - event: Rig__TeamSet(indexed address)
-          handler: handleRigTeamSet
+          handler: handleSeatProtocolFee
         - event: Rig__CapacitySet(uint256)
-          handler: handleRigCapacitySet
-        - event: Rig__UriSet(string)
-          handler: handleRigUriSet
-      file: ./src/rig.ts
+          handler: handleSeatCapacitySet
+      file: ./src/rigs/mineRig.ts
+
+  # ==========================================================================
+  # SPIN RIG - Spin and Win events
+  # ==========================================================================
+  - kind: ethereum
+    name: SlotRig
+    network: base
+    source:
+      abi: SlotRig
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Rig
+        - SlotRig
+        - Spin
+        - Account
+        - Unit
+      abis:
+        - name: SlotRig
+          file: ./abis/SlotRig.json
+      eventHandlers:
+        - event: SlotRig__Spin(indexed address,indexed address,indexed uint256,uint256)
+          handler: handleSpin
+        - event: SlotRig__Win(indexed address,indexed uint256,uint256,uint256)
+          handler: handleWin
+        - event: SlotRig__TreasuryFee(indexed address,indexed uint256,uint256)
+          handler: handleSpinTreasuryFee
+        - event: SlotRig__TeamFee(indexed address,indexed uint256,uint256)
+          handler: handleSpinTeamFee
+      file: ./src/rigs/slotRig.ts
+
+  # ==========================================================================
+  # CONTENT RIG - Content and Collection events
+  # ==========================================================================
+  - kind: ethereum
+    name: ContentRig
+    network: base
+    source:
+      abi: ContentRig
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Rig
+        - ContentRig
+        - Content
+        - Collection
+        - ContentClaim
+        - Account
+        - Unit
+      abis:
+        - name: ContentRig
+          file: ./abis/ContentRig.json
+      eventHandlers:
+        - event: ContentRig__Created(indexed address,indexed address,indexed uint256,string)
+          handler: handleContentCreated
+        - event: ContentRig__Collected(indexed address,indexed address,indexed uint256,uint256,uint256)
+          handler: handleContentCollected
+        - event: ContentRig__Claimed(indexed address,uint256)
+          handler: handleContentClaimed
+      file: ./src/rigs/contentRig.ts
+
+  # ==========================================================================
+  # CHARITY RIG - Donation events
+  # ==========================================================================
+  - kind: ethereum
+    name: FundRig
+    network: base
+    source:
+      abi: FundRig
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Rig
+        - FundRig
+        - Donation
+        - Account
+        - Unit
+      abis:
+        - name: FundRig
+          file: ./abis/FundRig.json
+      eventHandlers:
+        - event: FundRig__Donated(indexed address,indexed address,uint256,uint256)
+          handler: handleDonation
+        - event: FundRig__Claimed(indexed address,uint256,uint256)
+          handler: handleCharityClaimed
+      file: ./src/rigs/fundRig.ts
+
+  # ==========================================================================
+  # UNIT TOKEN - Transfer events for holder tracking (optional)
+  # ==========================================================================
+  - kind: ethereum
+    name: Unit
+    network: base
+    source:
+      abi: ERC20
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      entities:
+        - Unit
+        - Account
+      abis:
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleUnitTransfer
+      file: ./src/unit.ts

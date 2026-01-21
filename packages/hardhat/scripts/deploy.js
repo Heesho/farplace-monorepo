@@ -32,6 +32,7 @@ const MULTISIG_ADDRESS = "0xeE0CB49D2805DA6bC0A979ddAd87bb793fbB765E";
 const MIN_DONUT_FOR_LAUNCH = convert("1000", 18); // 1000 DONUT minimum
 
 // Deployed Contract Addresses (paste after deployment)
+const REGISTRY = ""; // Deploy first, then paste address here
 const UNIT_FACTORY = "0xD7980Db9048d4d7411D8f3d236f200aE1519E3cc";
 const RIG_FACTORY = "0xCcC0eb8E2809F0D03CBA12E3E0687298A2022fbd";
 const AUCTION_FACTORY = "0x9F7dddaCF5f82d6A0D010584f06Bc1243E74DbE6";
@@ -39,7 +40,7 @@ const CORE = "0xF837F616Fe1fd33Cd8290759D3ae1FB09230d73b";
 const MULTICALL = "0x9EEbEe08C3823290E7A17F27D4c644380E978cA8";
 
 // Contract Variables
-let usdc, donut, unitFactory, rigFactory, auctionFactory, core, multicall;
+let usdc, donut, registry, unitFactory, rigFactory, auctionFactory, core, multicall;
 
 // =============================================================================
 // GET CONTRACTS
@@ -56,6 +57,13 @@ async function getContracts() {
     DONUT_ADDRESS
   );
 
+  if (REGISTRY) {
+    registry = await ethers.getContractAt(
+      "contracts/Registry.sol:Registry",
+      REGISTRY
+    );
+  }
+
   if (UNIT_FACTORY) {
     unitFactory = await ethers.getContractAt(
       "contracts/UnitFactory.sol:UnitFactory",
@@ -65,7 +73,7 @@ async function getContracts() {
 
   if (RIG_FACTORY) {
     rigFactory = await ethers.getContractAt(
-      "contracts/RigFactory.sol:RigFactory",
+      "contracts/MineRigFactory.sol:MineRigFactory",
       RIG_FACTORY
     );
   }
@@ -78,7 +86,7 @@ async function getContracts() {
   }
 
   if (CORE) {
-    core = await ethers.getContractAt("contracts/Core.sol:Core", CORE);
+    core = await ethers.getContractAt("contracts/rigs/mine/MineCore.sol:MineCore", CORE);
   }
 
   if (MULTICALL) {
@@ -95,6 +103,15 @@ async function getContracts() {
 // DEPLOY FUNCTIONS
 // =============================================================================
 
+async function deployRegistry() {
+  console.log("Starting Registry Deployment");
+  const artifact = await ethers.getContractFactory("Registry");
+  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
+  registry = await contract.deployed();
+  await sleep(5000);
+  console.log("Registry Deployed at:", registry.address);
+}
+
 async function deployUnitFactory() {
   console.log("Starting UnitFactory Deployment");
   const artifact = await ethers.getContractFactory("UnitFactory");
@@ -104,13 +121,13 @@ async function deployUnitFactory() {
   console.log("UnitFactory Deployed at:", unitFactory.address);
 }
 
-async function deployRigFactory() {
-  console.log("Starting RigFactory Deployment");
-  const artifact = await ethers.getContractFactory("RigFactory");
+async function deployMineRigFactory() {
+  console.log("Starting MineRigFactory Deployment");
+  const artifact = await ethers.getContractFactory("MineRigFactory");
   const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
   rigFactory = await contract.deployed();
   await sleep(5000);
-  console.log("RigFactory Deployed at:", rigFactory.address);
+  console.log("MineRigFactory Deployed at:", rigFactory.address);
 }
 
 async function deployAuctionFactory() {
@@ -131,9 +148,15 @@ async function deployCore() {
   if (!DONUT_ADDRESS) {
     throw new Error("DONUT_ADDRESS must be set before deployment");
   }
+  if (!registry?.address && !REGISTRY) {
+    throw new Error("Registry must be deployed before Core");
+  }
 
-  const artifact = await ethers.getContractFactory("Core");
+  const registryAddress = registry?.address || REGISTRY;
+
+  const artifact = await ethers.getContractFactory("MineCore");
   const contract = await artifact.deploy(
+    registryAddress,
     DONUT_ADDRESS,
     UNISWAP_V2_FACTORY,
     UNISWAP_V2_ROUTER,
@@ -148,6 +171,14 @@ async function deployCore() {
   core = await contract.deployed();
   await sleep(5000);
   console.log("Core Deployed at:", core.address);
+}
+
+async function approveCore() {
+  console.log("Approving Core as factory in Registry...");
+  const coreAddress = core?.address || CORE;
+  const tx = await registry.setFactoryApproval(coreAddress, true);
+  await tx.wait();
+  console.log("Core approved in Registry");
 }
 
 async function deployMulticall() {
@@ -165,6 +196,16 @@ async function deployMulticall() {
 // VERIFY FUNCTIONS
 // =============================================================================
 
+async function verifyRegistry() {
+  console.log("Starting Registry Verification");
+  await hre.run("verify:verify", {
+    address: registry?.address || REGISTRY,
+    contract: "contracts/Registry.sol:Registry",
+    constructorArguments: [],
+  });
+  console.log("Registry Verified");
+}
+
 async function verifyUnitFactory() {
   console.log("Starting UnitFactory Verification");
   await hre.run("verify:verify", {
@@ -175,14 +216,14 @@ async function verifyUnitFactory() {
   console.log("UnitFactory Verified");
 }
 
-async function verifyRigFactory() {
-  console.log("Starting RigFactory Verification");
+async function verifyMineRigFactory() {
+  console.log("Starting MineRigFactory Verification");
   await hre.run("verify:verify", {
     address: rigFactory?.address || RIG_FACTORY,
-    contract: "contracts/RigFactory.sol:RigFactory",
+    contract: "contracts/MineRigFactory.sol:MineRigFactory",
     constructorArguments: [],
   });
-  console.log("RigFactory Verified");
+  console.log("MineRigFactory Verified");
 }
 
 async function verifyAuctionFactory() {
@@ -199,8 +240,9 @@ async function verifyCore() {
   console.log("Starting Core Verification");
   await hre.run("verify:verify", {
     address: core?.address || CORE,
-    contract: "contracts/Core.sol:Core",
+    contract: "contracts/rigs/mine/MineCore.sol:MineCore",
     constructorArguments: [
+      registry?.address || REGISTRY,
       DONUT_ADDRESS,
       UNISWAP_V2_FACTORY,
       UNISWAP_V2_ROUTER,
@@ -278,7 +320,7 @@ async function getUnitVerificationInfo(rigIndex) {
 
 async function verifyRigByIndex(rigIndex) {
   const rigAddress = await core.deployedRigs(rigIndex);
-  const rig = await ethers.getContractAt("contracts/Rig.sol:Rig", rigAddress);
+  const rig = await ethers.getContractAt("contracts/rigs/mine/MineRig.sol:MineRig", rigAddress);
 
   // Read all constructor args from the deployed contract
   const unitAddress = await rig.unit();
@@ -311,7 +353,7 @@ async function verifyRigByIndex(rigIndex) {
 
   await hre.run("verify:verify", {
     address: rigAddress,
-    contract: "contracts/Rig.sol:Rig",
+    contract: "contracts/rigs/mine/MineRig.sol:MineRig",
     constructorArguments: [
       unitAddress,
       quoteAddress,
@@ -427,11 +469,15 @@ async function printDeployment() {
 
   console.log("\n--- Deployed Contracts ---");
   console.log(
+    "Registry:            ",
+    registry?.address || REGISTRY || "NOT DEPLOYED"
+  );
+  console.log(
     "UnitFactory:         ",
     unitFactory?.address || UNIT_FACTORY || "NOT DEPLOYED"
   );
   console.log(
-    "RigFactory:          ",
+    "MineRigFactory:          ",
     rigFactory?.address || RIG_FACTORY || "NOT DEPLOYED"
   );
   console.log(
@@ -499,10 +545,12 @@ async function main() {
   //===================================================================
 
   // console.log("Starting Deployment...");
+  // await deployRegistry();    // Deploy first - central registry for all rig types
   // await deployUnitFactory();
-  // await deployRigFactory();
+  // await deployMineRigFactory();
   // await deployAuctionFactory();
   // await deployCore();
+  // await approveCore();       // Approve Core as a factory in Registry
   // await deployMulticall();
 
   //===================================================================
@@ -510,9 +558,11 @@ async function main() {
   //===================================================================
 
   // console.log("Starting Verification...");
+  // await verifyRegistry();
+  // await sleep(5000);
   // await verifyUnitFactory();
   // await sleep(5000);
-  // await verifyRigFactory();
+  // await verifyMineRigFactory();
   // await sleep(5000);
   // await verifyAuctionFactory();
   // await sleep(5000);

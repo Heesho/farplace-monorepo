@@ -93,10 +93,10 @@ contract MockEntropy {
 
         _fulfilled[sequenceNumber] = true;
 
-        // Call the entropyCallback on the consumer
+        // Call the _entropyCallback on the consumer (external wrapper that calls internal entropyCallback)
         (bool success,) = consumer.call(
             abi.encodeWithSignature(
-                "entropyCallback(uint64,address,bytes32)",
+                "_entropyCallback(uint64,address,bytes32)",
                 sequenceNumber,
                 address(this),
                 randomNumber

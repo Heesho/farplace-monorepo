@@ -1,0 +1,431 @@
+const convert = (amount, decimals) => ethers.utils.parseUnits(amount, decimals);
+const divDec = (amount, decimals = 18) => amount / 10 ** decimals;
+const { expect } = require("chai");
+const { ethers, network } = require("hardhat");
+
+const AddressZero = "0x0000000000000000000000000000000000000000";
+const AddressDead = "0x000000000000000000000000000000000000dEaD";
+
+let owner, protocol, user0, user1, user2;
+let usdc, donut, registry, core;
+let fundRig, auction, unit, lpToken;
+let unitFactory, fundRigFactory, auctionFactory;
+let uniswapFactory, uniswapRouter;
+
+describe("FundCore Launch Tests", function () {
+  before("Initial set up", async function () {
+    await network.provider.send("hardhat_reset");
+    console.log("Begin Initialization");
+
+    [owner, protocol, user0, user1, user2] = await ethers.getSigners();
+
+    // Deploy USDC (6 decimals) as quote token
+    const usdcArtifact = await ethers.getContractFactory("MockUSDC");
+    usdc = await usdcArtifact.deploy();
+    console.log("- USDC Initialized");
+
+    // Deploy mock DONUT token
+    const donutArtifact = await ethers.getContractFactory("MockWETH");
+    donut = await donutArtifact.deploy();
+    console.log("- DONUT Initialized");
+
+    // Deploy mock Uniswap V2 Factory and Router
+    const mockUniswapFactoryArtifact = await ethers.getContractFactory("MockUniswapV2Factory");
+    uniswapFactory = await mockUniswapFactoryArtifact.deploy();
+    console.log("- Uniswap V2 Factory Initialized");
+
+    const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
+    uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
+    console.log("- Uniswap V2 Router Initialized");
+
+    // Deploy Registry
+    const registryArtifact = await ethers.getContractFactory("Registry");
+    registry = await registryArtifact.deploy();
+    console.log("- Registry Initialized");
+
+    // Deploy factories
+    const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
+    unitFactory = await unitFactoryArtifact.deploy();
+    console.log("- UnitFactory Initialized");
+
+    const fundRigFactoryArtifact = await ethers.getContractFactory("FundRigFactory");
+    fundRigFactory = await fundRigFactoryArtifact.deploy();
+    console.log("- FundRigFactory Initialized");
+
+    const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
+    auctionFactory = await auctionFactoryArtifact.deploy();
+    console.log("- AuctionFactory Initialized");
+
+    // Deploy FundCore
+    const coreArtifact = await ethers.getContractFactory("FundCore");
+    core = await coreArtifact.deploy(
+      registry.address,
+      donut.address,
+      uniswapFactory.address,
+      uniswapRouter.address,
+      unitFactory.address,
+      fundRigFactory.address,
+      auctionFactory.address,
+      protocol.address,
+      convert("100", 18) // minDonutForLaunch
+    );
+    console.log("- FundCore Initialized");
+
+    // Approve FundCore as factory in Registry
+    await registry.setFactoryApproval(core.address, true);
+    console.log("- FundCore approved in Registry");
+
+    // Mint DONUT to user0 for launching
+    await donut.connect(user0).deposit({ value: convert("1000", 18) });
+    console.log("- DONUT minted to user0");
+
+    console.log("Initialization Complete\n");
+  });
+
+  it("Core state is correct", async function () {
+    console.log("******************************************************");
+    expect(await core.protocolFeeAddress()).to.equal(protocol.address);
+    expect(await core.donutToken()).to.equal(donut.address);
+    expect(await core.minDonutForLaunch()).to.equal(convert("100", 18));
+    expect(await core.deployedRigsLength()).to.equal(0);
+    expect(await core.RIG_TYPE()).to.equal("fund");
+    console.log("Core state verified");
+  });
+
+  it("Launch a new fund rig", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit",
+      tokenSymbol: "TUNIT",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18), // 345,600 per day
+      minEmission: convert("864", 18), // 864 per day
+      minDonation: convert("0.01", 6), // 0.01 USDC (ensures non-zero fees)
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400, // 1 day
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    // Approve DONUT
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    // Launch
+    const tx = await core.connect(user0).launch(launchParams);
+    const receipt = await tx.wait();
+
+    // Get deployed addresses from event
+    const launchEvent = receipt.events.find((e) => e.event === "FundCore__Launched");
+    fundRig = launchEvent.args.rig;
+    unit = launchEvent.args.unit;
+    auction = launchEvent.args.auction;
+    lpToken = launchEvent.args.lpToken;
+
+    console.log("FundRig deployed at:", fundRig);
+    console.log("Unit token deployed at:", unit);
+    console.log("Auction deployed at:", auction);
+    console.log("LP Token at:", lpToken);
+
+    // Verify registry
+    expect(await core.isDeployedRig(fundRig)).to.equal(true);
+    expect(await core.rigToLauncher(fundRig)).to.equal(user0.address);
+    expect(await core.rigToUnit(fundRig)).to.equal(unit);
+    expect(await core.rigToAuction(fundRig)).to.equal(auction);
+    expect(await core.rigToLP(fundRig)).to.equal(lpToken);
+    expect(await core.rigToQuote(fundRig)).to.equal(usdc.address);
+    expect(await core.deployedRigsLength()).to.equal(1);
+  });
+
+  it("FundRig ownership transferred to launcher", async function () {
+    console.log("******************************************************");
+    const rigContract = await ethers.getContractAt("FundRig", fundRig);
+    expect(await rigContract.owner()).to.equal(user0.address);
+    console.log("FundRig owner:", await rigContract.owner());
+  });
+
+  it("Unit minting rights transferred to FundRig", async function () {
+    console.log("******************************************************");
+    const unitContract = await ethers.getContractAt("Unit", unit);
+    expect(await unitContract.rig()).to.equal(fundRig);
+    console.log("Unit rig:", await unitContract.rig());
+  });
+
+  it("LP tokens burned", async function () {
+    console.log("******************************************************");
+    const lpContract = await ethers.getContractAt("IERC20", lpToken);
+    const deadBalance = await lpContract.balanceOf(AddressDead);
+    console.log("LP tokens burned (in dead address):", divDec(deadBalance));
+    expect(deadBalance).to.be.gt(0);
+  });
+
+  it("FundRig parameters correct", async function () {
+    console.log("******************************************************");
+    const rigContract = await ethers.getContractAt("FundRig", fundRig);
+
+    expect(await rigContract.unit()).to.equal(unit);
+    expect(await rigContract.paymentToken()).to.equal(usdc.address);
+    expect(await rigContract.treasury()).to.equal(auction); // treasury = auction
+    expect(await rigContract.team()).to.equal(user0.address); // team = launcher
+    expect(await rigContract.core()).to.equal(core.address);
+    expect(await rigContract.initialEmission()).to.equal(convert("345600", 18));
+    expect(await rigContract.minEmission()).to.equal(convert("864", 18));
+
+    console.log("FundRig parameters verified");
+  });
+
+  it("Cannot launch with insufficient DONUT", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("50", 18), // Less than minDonutForLaunch (100)
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__InsufficientDonut()"
+    );
+    console.log("Launch correctly reverted with insufficient DONUT");
+  });
+
+  it("Cannot launch with zero launcher address", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: AddressZero,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__ZeroLauncher()"
+    );
+    console.log("Launch correctly reverted with zero launcher address");
+  });
+
+  it("Cannot launch with zero quote token", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: AddressZero,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__ZeroQuoteToken()"
+    );
+    console.log("Launch correctly reverted with zero quote token");
+  });
+
+  it("Cannot launch with empty token name", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__EmptyTokenName()"
+    );
+    console.log("Launch correctly reverted with empty token name");
+  });
+
+  it("Cannot launch with empty token symbol", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__EmptyTokenSymbol()"
+    );
+    console.log("Launch correctly reverted with empty token symbol");
+  });
+
+  it("Cannot launch with zero unit amount", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("500", 18),
+      unitAmount: 0,
+      initialEmission: convert("345600", 18),
+      minEmission: convert("864", 18),
+      minDonation: convert("0.01", 6), // 0.01 USDC
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__ZeroUnitAmount()"
+    );
+    console.log("Launch correctly reverted with zero unit amount");
+  });
+
+  it("Cannot launch with invalid emission parameters", async function () {
+    console.log("******************************************************");
+
+    // minEmission > initialEmission
+    const launchParams = {
+      launcher: user0.address,
+      quoteToken: usdc.address,
+      tokenName: "Test Unit 2",
+      tokenSymbol: "TUNIT2",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("1000000", 18),
+      initialEmission: convert("100", 18),
+      minEmission: convert("200", 18), // greater than initial
+      minDonation: convert("0.01", 6),
+      auctionInitPrice: convert("1000", 6),
+      auctionEpochPeriod: 86400,
+      auctionPriceMultiplier: convert("1.5", 18),
+      auctionMinInitPrice: convert("1", 6),
+    };
+
+    await donut.connect(user0).approve(core.address, launchParams.donutAmount);
+
+    await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
+      "FundCore__MinEmissionOutOfRange()"
+    );
+    console.log("Launch correctly reverted with invalid emission");
+  });
+
+  it("Protocol owner can change protocol fee address", async function () {
+    console.log("******************************************************");
+
+    // Only core owner can change protocol fee address
+    await expect(
+      core.connect(user0).setProtocolFeeAddress(user0.address)
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+
+    // Core owner can change
+    await core.connect(owner).setProtocolFeeAddress(user2.address);
+    expect(await core.protocolFeeAddress()).to.equal(user2.address);
+    console.log("Protocol fee address changed to:", await core.protocolFeeAddress());
+
+    // Change back
+    await core.connect(owner).setProtocolFeeAddress(protocol.address);
+  });
+
+  it("Protocol owner can change min DONUT for launch", async function () {
+    console.log("******************************************************");
+
+    await expect(
+      core.connect(user0).setMinDonutForLaunch(convert("200", 18))
+    ).to.be.revertedWith("Ownable: caller is not the owner");
+
+    await core.connect(owner).setMinDonutForLaunch(convert("200", 18));
+    expect(await core.minDonutForLaunch()).to.equal(convert("200", 18));
+    console.log("Min DONUT for launch:", divDec(await core.minDonutForLaunch()));
+
+    // Change back
+    await core.connect(owner).setMinDonutForLaunch(convert("100", 18));
+  });
+
+  it("Can launch multiple fund rigs", async function () {
+    console.log("******************************************************");
+
+    const launchParams = {
+      launcher: user1.address,
+      quoteToken: usdc.address,
+      tokenName: "Second Unit",
+      tokenSymbol: "SUNIT",
+      donutAmount: convert("500", 18),
+      unitAmount: convert("2000000", 18),
+      initialEmission: convert("172800", 18), // different emission
+      minEmission: convert("432", 18),
+      minDonation: convert("0.01", 6),
+      auctionInitPrice: convert("2000", 6),
+      auctionEpochPeriod: 86400 * 2,
+      auctionPriceMultiplier: convert("2", 18),
+      auctionMinInitPrice: convert("10", 6),
+    };
+
+    // Mint and approve DONUT for user1
+    await donut.connect(user1).deposit({ value: convert("1000", 18) });
+    await donut.connect(user1).approve(core.address, launchParams.donutAmount);
+
+    const tx = await core.connect(user1).launch(launchParams);
+    await tx.wait();
+
+    expect(await core.deployedRigsLength()).to.equal(2);
+    console.log("Second fund rig launched. Total:", (await core.deployedRigsLength()).toString());
+  });
+});
