@@ -472,11 +472,11 @@ User calls collect(to, tokenId, epochId, deadline, maxPrice)
         |
         +---> Protocol (1%)  --> protocolFeeAddress
         |
-        +---> Treasury (14%) --> Auction contract
+        +---> Treasury (15%) --> Auction contract
         |
         +---> Team (2%)      --> team address
         |
-        +---> Creator (3%)   --> original creator
+        +---> Creator (2%)   --> original creator
         |
         +---> Owner (80%)    --> previous owner (PUSH)
         |

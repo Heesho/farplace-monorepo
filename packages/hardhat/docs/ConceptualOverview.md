@@ -59,7 +59,7 @@ NFT collection with a "steal" mechanic where collectors earn staking rewards.
 
 - **Mechanism**: Create content as NFTs. Others can "collect" (steal) your NFT by paying the Dutch auction price.
 - **Earning**: Hold NFTs to earn staking rewards. Get paid when someone collects from you.
-- **Fee split**: 80% to previous owner, 14% treasury, 3% creator, 2% team, 1% protocol
+- **Fee split**: 80% to previous owner, 15% treasury, 2% creator, 2% team, 1% protocol
 - **Use case**: Art, memes, and creative content
 
 ## 4) The Launch Process
@@ -126,7 +126,7 @@ Initial LP tokens are sent to an unreachable address:
 
 ## 7) The Treasury Auction
 
-Mining fees accumulate in a treasury (held as the quote token, typically WETH). This treasury can be purchased through a separate Dutch auction:
+Mining fees accumulate in a treasury (held as the quote token, typically USDC). This treasury can be purchased through a separate Dutch auction:
 
 1. Treasury fees accumulate from rig activity
 2. Anyone with LP tokens can buy the treasury
