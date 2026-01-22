@@ -21,6 +21,10 @@ const SPARKLINES = {
 
 // Mock data for coins
 const INITIAL_COINS = [
+  // Demo tokens for each rig type (at top for easy testing)
+  { address: "0xmine", name: "[Mine Rig Demo]", symbol: "MINE", price: 0.00234, change24h: 12.5, marketCap: 234000, color: "from-emerald-500 to-green-600", sparkline: SPARKLINES.up1, lastBumped: 100000 },
+  { address: "0xcontentc", name: "[Content Rig Demo]", symbol: "CONTENT", price: 0.0567, change24h: 34.2, marketCap: 456000, color: "from-pink-500 to-purple-600", sparkline: SPARKLINES.up4, lastBumped: 99000 },
+  // Regular tokens
   { address: "0x1234", name: "Donut", symbol: "DONUT", price: 0.00234, change24h: 12.5, marketCap: 234000, color: "from-amber-500 to-orange-600", sparkline: SPARKLINES.up1, lastBumped: 1000 },
   { address: "0x2345", name: "PepeCoin", symbol: "PEPE", price: 0.00000123, change24h: -5.2, marketCap: 89000, color: "from-green-500 to-emerald-600", sparkline: SPARKLINES.down1, lastBumped: 2000 },
   { address: "0x3456", name: "Moon Token", symbol: "MOON", price: 0.0456, change24h: 45.8, marketCap: 567000, color: "from-purple-500 to-violet-600", sparkline: SPARKLINES.up2, lastBumped: 3000 },

@@ -5,15 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Share2, Copy, Check } from "lucide-react";
 import { NavBar } from "@/components/nav-bar";
-import { Leaderboard } from "@/components/leaderboard";
-import { MineHistoryItem } from "@/components/mine-history-item";
 import { MineModal } from "@/components/mine-modal";
+import { ContentModal } from "@/components/content-modal";
 import { TradeModal } from "@/components/trade-modal";
 import { AuctionModal } from "@/components/auction-modal";
 import { LiquidityModal } from "@/components/liquidity-modal";
 // import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { useFarcaster } from "@/hooks/useFarcaster";
-import { useRigLeaderboard } from "@/hooks/useRigLeaderboard";
 // import { useFriendActivity, getFriendActivityMessage } from "@/hooks/useFriendActivity";
 
 type Timeframe = "1H" | "1D" | "1W" | "1M" | "ALL";
@@ -49,17 +46,6 @@ const MOCK_USER_POSITION = {
   earned: 267.52,
 };
 
-// Mock current mining session
-const MOCK_MINING_SESSION = {
-  slotsOwned: 2,
-  mineRate: 4.0,
-  mineRateUsd: 0.0000,
-  minedSession: 7032,
-  minedSessionUsd: 0.09,
-  total: 0.17,
-  pnl: 0.09,
-};
-
 // Mock global stats
 const MOCK_GLOBAL_STATS = {
   marketCap: 123.00,
@@ -80,51 +66,34 @@ const MOCK_LAUNCHER = {
   launchDate: "2d ago",
 };
 
+// Mock rig configs for different rig types
+const MINE_RIG_CONFIG = {
+  rigType: "Mine Rig",
+  initialUps: 4.0,
+  tailUps: 0.5,
+  halvingAmount: 1000000,
+  capacity: 9,
+  epochPeriod: 3600,
+  priceMultiplier: 2.0,
+  minInitPrice: 0.01,
+};
+
+const CONTENT_RIG_CONFIG = {
+  rigType: "Content Rig",
+  initialUps: 2.0,
+  tailUps: 0.25,
+  halvingPeriod: 604800, // 1 week
+  capacity: 12,
+  epochPeriod: 86400, // 1 day
+  priceMultiplier: 2.0,
+  minInitPrice: 0.001,
+};
+
 // Mock links
 const MOCK_LINKS = {
   tokenAddress: "0x1234...5678",
   lpAddress: "0xabcd...ef01",
 };
-
-// Mock leaderboard (top 10 miners)
-const MOCK_LEADERBOARD = [
-  { rank: 1, address: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", mined: BigInt(182500n * 10n**18n), minedFormatted: "182,500", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 2, address: "0x1234567890abcdef1234567890abcdef12345678", mined: BigInt(156200n * 10n**18n), minedFormatted: "156,200", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 3, address: "0xabcdef1234567890abcdef1234567890abcdef12", mined: BigInt(134800n * 10n**18n), minedFormatted: "134,800", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 4, address: "0x9876543210fedcba9876543210fedcba98765432", mined: BigInt(98400n * 10n**18n), minedFormatted: "98,400", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 5, address: "0xcafebabecafebabecafebabecafebabecafebabe", mined: BigInt(76500n * 10n**18n), minedFormatted: "76,500", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: true, isFriend: false, profile: null },
-  { rank: 6, address: "0xfeedfacefeedfacefeedfacefeedfacefeedface", mined: BigInt(54200n * 10n**18n), minedFormatted: "54,200", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 7, address: "0x1111222233334444555566667777888899990000", mined: BigInt(42100n * 10n**18n), minedFormatted: "42,100", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 8, address: "0xaaaa5555bbbb6666cccc7777dddd8888eeee9999", mined: BigInt(31800n * 10n**18n), minedFormatted: "31,800", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 9, address: "0x0000111122223333444455556666777788889999", mined: BigInt(24600n * 10n**18n), minedFormatted: "24,600", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 10, address: "0xbeef0000beef0000beef0000beef0000beef0000", mined: BigInt(18900n * 10n**18n), minedFormatted: "18,900", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-];
-
-// Mock mine history (last 10 mines)
-const MOCK_MINES = [
-  { id: "1", miner: "0x1234567890abcdef1234567890abcdef12345678", uri: "gm frens", price: BigInt(2_500_000), spent: BigInt(2_500_000), earned: BigInt(1_200_000), mined: BigInt(4500n * 10n**18n), multiplier: 2, timestamp: Math.floor(Date.now() / 1000) - 120 },
-  { id: "2", miner: "0xabcdef1234567890abcdef1234567890abcdef12", uri: "to the moon", price: BigInt(1_800_000), spent: BigInt(1_800_000), earned: BigInt(890_000), mined: BigInt(3200n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 340 },
-  { id: "3", miner: "0x9876543210fedcba9876543210fedcba98765432", uri: "", price: BigInt(3_200_000), spent: BigInt(3_200_000), earned: BigInt(1_580_000), mined: BigInt(5800n * 10n**18n), multiplier: 3, timestamp: Math.floor(Date.now() / 1000) - 890 },
-  { id: "4", miner: "0x1111222233334444555566667777888899990000", uri: "wagmi", price: BigInt(950_000), spent: BigInt(950_000), earned: BigInt(420_000), mined: BigInt(1800n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 1800 },
-  { id: "5", miner: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", uri: "lfg", price: BigInt(4_100_000), spent: BigInt(4_100_000), earned: BigInt(2_050_000), mined: BigInt(7200n * 10n**18n), multiplier: 4, timestamp: Math.floor(Date.now() / 1000) - 3600 },
-  { id: "6", miner: "0x1234567890abcdef1234567890abcdef12345678", uri: "mining is fun", price: BigInt(2_100_000), spent: BigInt(2_100_000), earned: BigInt(980_000), mined: BigInt(3900n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 7200 },
-  { id: "7", miner: "0xfeedfacefeedfacefeedfacefeedfacefeedface", uri: "", price: BigInt(1_500_000), spent: BigInt(1_500_000), earned: BigInt(720_000), mined: BigInt(2800n * 10n**18n), multiplier: 2, timestamp: Math.floor(Date.now() / 1000) - 14400 },
-  { id: "8", miner: "0xabcdef1234567890abcdef1234567890abcdef12", uri: "donut gang", price: BigInt(2_800_000), spent: BigInt(2_800_000), earned: BigInt(1_350_000), mined: BigInt(5100n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 28800 },
-  { id: "9", miner: "0xcafebabecafebabecafebabecafebabecafebabe", uri: "first mine!", price: BigInt(500_000), spent: BigInt(500_000), earned: BigInt(230_000), mined: BigInt(950n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 43200 },
-  { id: "10", miner: "0x9876543210fedcba9876543210fedcba98765432", uri: "", price: BigInt(1_200_000), spent: BigInt(1_200_000), earned: BigInt(580_000), mined: BigInt(2200n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 86400 },
-];
-
-// Helper to format time ago
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor(Date.now() / 1000 - timestamp);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 function formatPrice(price: number): string {
   if (price >= 1) return `$${price.toFixed(2)}`;
@@ -221,13 +190,16 @@ function SimpleChart({
 export default function RigDetailPage() {
   const params = useParams();
   const rigAddress = (params.address as string) || "";
-  const isValidAddress = rigAddress.length > 0 && rigAddress.startsWith("0x");
+
+  // Use ContentRig config if address ends with 'c' or contains 'content'
+  const isContentRig = rigAddress.toLowerCase().endsWith('c') || rigAddress.toLowerCase().includes('content');
+  const MOCK_RIG_CONFIG = isContentRig ? CONTENT_RIG_CONFIG : MINE_RIG_CONFIG;
 
   const [timeframe, setTimeframe] = useState<Timeframe>("1D");
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showHeaderPrice, setShowHeaderPrice] = useState(false);
-  const [minedAmount, setMinedAmount] = useState(MOCK_MINING_SESSION.minedSession);
   const [showMineModal, setShowMineModal] = useState(false);
+  const [showContentModal, setShowContentModal] = useState(false);
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
   const [showAuctionModal, setShowAuctionModal] = useState(false);
@@ -235,69 +207,9 @@ export default function RigDetailPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tokenInfoRef = useRef<HTMLDivElement>(null);
 
-  // Farcaster context for social features
-  const { user, address: userAddress } = useFarcaster();
-
-  // Leaderboard data - only fetch if we have a valid address
-  const { entries: leaderboardEntries, userRank, isLoading: leaderboardLoading } = useRigLeaderboard(
-    isValidAddress ? rigAddress : "",
-    userAddress,
-    undefined, // friendFids - could be populated from user's following list
-    10
-  );
-
-  // Mine history for activity feed - DISABLED until subgraph is redeployed with Epoch entity
-  // const { mines, isLoading: historyLoading } = useMineHistory(
-  //   isValidAddress ? (rigAddress as `0x${string}`) : undefined,
-  //   10 // Last 10 mines
-  // );
-
-  // Friend activity - disabled for now to debug freeze
-  // TODO: Re-enable once we confirm it's not causing issues
-  const friendActivity: { friends: Array<{ fid: number; displayName?: string; username?: string; pfpUrl?: string }> } | null = null;
-  const friendMessage: string | null = null;
-
-  /*
-  // Get unique miner addresses for friend activity lookup - use stable string key
-  const minerAddressesKey = useMemo(() => {
-    if (!mines.length && !leaderboardEntries.length) return "";
-    const addresses = new Set<string>();
-    mines.forEach(m => addresses.add(m.miner.toLowerCase()));
-    leaderboardEntries.forEach(e => addresses.add(e.address.toLowerCase()));
-    return Array.from(addresses).sort().join(",");
-  }, [mines, leaderboardEntries]);
-
-  // Convert back to array only when key changes
-  const minerAddresses = useMemo(() => {
-    return minerAddressesKey ? minerAddressesKey.split(",") : [];
-  }, [minerAddressesKey]);
-
-  // Friend activity - who you follow that has mined this rig
-  // Only fetch when we have addresses AND a user FID
-  const shouldFetchFriends = minerAddresses.length > 0 && !!user?.fid;
-  const { data: friendActivity } = useFriendActivity(
-    shouldFetchFriends ? minerAddresses : [],
-    user?.fid
-  );
-  const friendMessage = friendActivity ? getFriendActivityMessage(friendActivity.friends) : null;
-  */
-
-  // Rig URL for sharing
-  const rigUrl = typeof window !== "undefined" ? `${window.location.origin}/rig/${rigAddress}` : "";
 
   const isPositive = MOCK_TOKEN.change24h >= 0;
   const hasPosition = MOCK_USER_POSITION.balance > 0;
-
-  // Tick up mined amount based on mine rate
-  useEffect(() => {
-    if (MOCK_MINING_SESSION.slotsOwned === 0) return;
-
-    const interval = setInterval(() => {
-      setMinedAmount(prev => prev + MOCK_MINING_SESSION.mineRate / 10);
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -393,119 +305,25 @@ export default function RigDetailPage() {
             <div className="mb-6">
               <div className="font-semibold text-[18px] mb-3">Your position</div>
               <div className="grid grid-cols-2 gap-y-4 gap-x-8">
-                {/* Mining stats - only show if actively mining */}
-                {MOCK_MINING_SESSION.slotsOwned > 0 && (
-                  <>
-                    <div>
-                      <div className="text-muted-foreground text-[12px] mb-0.5">Mine rate</div>
-                      <div className="font-semibold text-[15px] tabular-nums text-white">
-                        {MOCK_MINING_SESSION.mineRate.toFixed(2)}/s <span className="text-muted-foreground font-normal">({MOCK_MINING_SESSION.slotsOwned} slot{MOCK_MINING_SESSION.slotsOwned > 1 ? 's' : ''})</span>
-                      </div>
-                      <div className="text-muted-foreground/60 text-[11px] tabular-nums">
-                        ${MOCK_MINING_SESSION.mineRateUsd.toFixed(4)}/s
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-[12px] mb-0.5">Mined</div>
-                      <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1">
-                        <span className="text-zinc-400">+</span>
-                        <TokenLogo name={MOCK_TOKEN.name} size="sm" />
-                        <span>{formatNumber(minedAmount)}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-[12px] mb-0.5">Total</div>
-                      <div className="font-semibold text-[15px] tabular-nums text-white">
-                        +${MOCK_MINING_SESSION.total.toFixed(2)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground text-[12px] mb-0.5">PnL</div>
-                      <div className="font-semibold text-[15px] tabular-nums text-white">
-                        +${MOCK_MINING_SESSION.pnl.toFixed(2)}
-                      </div>
-                    </div>
-                  </>
-                )}
-                {/* Overall position */}
                 <div>
-                  <div className="text-muted-foreground text-[12px] mb-0.5">Balance</div>
-                  <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1">
+                  <div className="text-muted-foreground text-[12px] mb-1">Balance</div>
+                  <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                     <TokenLogo name={MOCK_TOKEN.name} size="sm" />
                     <span>{formatNumber(MOCK_USER_POSITION.balance)}</span>
                   </div>
-                  <div className="text-muted-foreground/60 text-[11px] tabular-nums">
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-1">Value</div>
+                  <div className="font-semibold text-[15px] tabular-nums text-white">
                     ${MOCK_USER_POSITION.balanceUsd.toFixed(2)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-[12px] mb-0.5">Mined</div>
-                  <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1">
-                    <TokenLogo name={MOCK_TOKEN.name} size="sm" />
-                    <span>{formatNumber(MOCK_USER_POSITION.totalMined)}</span>
-                  </div>
-                  <div className="text-muted-foreground/60 text-[11px] tabular-nums">
-                    ${MOCK_USER_POSITION.totalMinedUsd.toFixed(2)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-[12px] mb-0.5">Spent</div>
-                  <div className="font-semibold text-[15px] tabular-nums">
-                    ${MOCK_USER_POSITION.spent.toFixed(2)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-[12px] mb-0.5">Earned</div>
-                  <div className="font-semibold text-[15px] tabular-nums">
-                    ${MOCK_USER_POSITION.earned.toFixed(2)}
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* About Section */}
-          <div className="mb-6">
-            <div className="font-semibold text-[18px] mb-3">About</div>
-
-            {/* Deployed by row */}
-            <div className="flex items-center gap-2 text-[13px] text-muted-foreground mb-2">
-              <span>Deployed by</span>
-              <img
-                src={MOCK_LAUNCHER.avatar}
-                alt={MOCK_LAUNCHER.name}
-                className="w-5 h-5 rounded-full object-cover"
-              />
-              <span className="text-foreground font-medium">{MOCK_LAUNCHER.name}</span>
-              <span className="text-muted-foreground/60">{MOCK_LAUNCHER.launchDate}</span>
-            </div>
-
-            {/* Description */}
-            <p className="text-[13px] text-muted-foreground leading-relaxed mb-4">
-              {MOCK_TOKEN.description}
-            </p>
-
-            {/* Link buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigator.clipboard.writeText(MOCK_LINKS.tokenAddress)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-[12px] text-muted-foreground hover:bg-secondary/80 transition-colors"
-              >
-                {MOCK_TOKEN.symbol}
-                <Copy className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => navigator.clipboard.writeText(MOCK_LINKS.lpAddress)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-[12px] text-muted-foreground hover:bg-secondary/80 transition-colors"
-              >
-                {MOCK_TOKEN.symbol}-DONUT LP
-                <Copy className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
           {/* Global Stats Grid */}
-          <div className="mb-5">
+          <div className="mb-6">
             <div className="font-semibold text-[18px] mb-3">Stats</div>
             <div className="grid grid-cols-2 gap-y-4 gap-x-8">
               <div>
@@ -544,70 +362,93 @@ export default function RigDetailPage() {
                   ${MOCK_GLOBAL_STATS.teamRevenue.toFixed(2)}
                 </div>
               </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-0.5">Mining slots</div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  {MOCK_GLOBAL_STATS.miningSlots}
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-0.5">Emission rate</div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  {MOCK_GLOBAL_STATS.emissionRate.toFixed(2)}/s
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Friend Activity Banner - Social Proof (disabled for debugging)
-          {friendActivity?.friends && friendActivity.friends.length > 0 && friendMessage && (
-            <div className="mb-6 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  {friendActivity.friends.slice(0, 3).map((friend) => (
-                    <Avatar key={friend.fid} className="h-7 w-7 border-2 border-background">
-                      <AvatarImage src={friend.pfpUrl} alt={friend.displayName || friend.username} />
-                      <AvatarFallback className="bg-blue-500/20 text-blue-400 text-[10px]">
-                        {(friend.displayName || friend.username || "?").slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-1.5 text-[13px] text-blue-400">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{friendMessage}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          */}
+          {/* About Section */}
+          <div className="mb-6">
+            <div className="font-semibold text-[18px] mb-3">About</div>
 
-          {/* Leaderboard Section */}
-          <Leaderboard
-            entries={MOCK_LEADERBOARD}
-            userRank={5}
-            tokenSymbol={MOCK_TOKEN.symbol}
-            tokenName={MOCK_TOKEN.name}
-            rigUrl={rigUrl}
-            isLoading={false}
-          />
-
-          {/* Recent Activity Feed */}
-          <div className="mt-6 mb-6">
-            <div className="font-semibold text-[18px] mb-3">Recent Mines</div>
-            <div>
-              {MOCK_MINES.map((mine) => (
-                <MineHistoryItem
-                  key={mine.id}
-                  mine={mine}
-                  timeAgo={timeAgo}
-                  tokenSymbol={MOCK_TOKEN.symbol}
+            {/* Deployed by row with rig type badge on right */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                <span>Deployed by</span>
+                <img
+                  src={MOCK_LAUNCHER.avatar}
+                  alt={MOCK_LAUNCHER.name}
+                  className="w-5 h-5 rounded-full object-cover"
                 />
-              ))}
+                <span className="text-foreground font-medium">{MOCK_LAUNCHER.name}</span>
+                <span className="text-muted-foreground/60">{MOCK_LAUNCHER.launchDate}</span>
+              </div>
+              <span className="text-[12px] font-medium text-zinc-300 bg-zinc-700 px-2 py-1 rounded">
+                {MOCK_RIG_CONFIG.rigType}
+              </span>
+            </div>
+
+            {/* Description */}
+            <p className="text-[13px] text-muted-foreground leading-relaxed mb-2">
+              {MOCK_TOKEN.description}
+            </p>
+
+            {/* Link buttons */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => navigator.clipboard.writeText(MOCK_LINKS.tokenAddress)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-[12px] text-muted-foreground hover:bg-secondary/80 transition-colors"
+              >
+                {MOCK_TOKEN.symbol}
+                <Copy className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => navigator.clipboard.writeText(MOCK_LINKS.lpAddress)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary text-[12px] text-muted-foreground hover:bg-secondary/80 transition-colors"
+              >
+                {MOCK_TOKEN.symbol}-DONUT LP
+                <Copy className="w-3 h-3" />
+              </button>
+            </div>
+
+            {/* Launch parameters */}
+            <div className="grid grid-cols-2 gap-y-3 gap-x-8">
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">{isContentRig ? "Items" : "Slots"}</div>
+                <div className="font-medium text-[13px]">{MOCK_RIG_CONFIG.capacity}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Initial rate</div>
+                <div className="font-medium text-[13px]">{MOCK_RIG_CONFIG.initialUps}/s</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Floor rate</div>
+                <div className="font-medium text-[13px]">{MOCK_RIG_CONFIG.tailUps}/s</div>
+              </div>
+              {'halvingAmount' in MOCK_RIG_CONFIG ? (
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Halving at</div>
+                  <div className="font-medium text-[13px]">{formatNumber(MOCK_RIG_CONFIG.halvingAmount)}</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-muted-foreground text-[12px] mb-0.5">Halving period</div>
+                  <div className="font-medium text-[13px]">{(MOCK_RIG_CONFIG as typeof CONTENT_RIG_CONFIG).halvingPeriod / 86400}d</div>
+                </div>
+              )}
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Epoch</div>
+                <div className="font-medium text-[13px]">{MOCK_RIG_CONFIG.epochPeriod / 3600}h</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Price multiplier</div>
+                <div className="font-medium text-[13px]">{MOCK_RIG_CONFIG.priceMultiplier}x</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-0.5">Min price</div>
+                <div className="font-medium text-[13px]">${MOCK_RIG_CONFIG.minInitPrice}</div>
+              </div>
             </div>
           </div>
+
         </div>
 
         {/* Darkened overlay when menu is open */}
@@ -655,7 +496,11 @@ export default function RigDetailPage() {
                   <button
                     onClick={() => {
                       setShowActionMenu(false);
-                      setShowMineModal(true);
+                      if (isContentRig) {
+                        setShowContentModal(true);
+                      } else {
+                        setShowMineModal(true);
+                      }
                     }}
                     className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
                   >
@@ -702,6 +547,15 @@ export default function RigDetailPage() {
         isOpen={showMineModal}
         onClose={() => setShowMineModal(false)}
         tokenSymbol={MOCK_TOKEN.symbol}
+        userBalance={12.45}
+      />
+
+      {/* Content Modal (for ContentRig) */}
+      <ContentModal
+        isOpen={showContentModal}
+        onClose={() => setShowContentModal(false)}
+        tokenSymbol={MOCK_TOKEN.symbol}
+        tokenName={MOCK_TOKEN.name}
         userBalance={12.45}
       />
 
