@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NavBar } from "@/components/nav-bar";
+import { Leaderboard } from "@/components/leaderboard";
 
 type SpinModalProps = {
   isOpen: boolean;
@@ -51,6 +52,16 @@ export function SpinModal({
     spins: 47,
     net: -441.23,
   };
+
+  const rigUrl = typeof window !== "undefined" ? `${window.location.origin}/rig/${rigAddress}` : "";
+
+  const mockLeaderboard = [
+    { rank: 1, address: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", mined: BigInt(892000n * 10n**18n), minedFormatted: "892K", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
+    { rank: 2, address: "0x1234567890abcdef1234567890abcdef12345678", mined: BigInt(654000n * 10n**18n), minedFormatted: "654K", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
+    { rank: 3, address: "0xabcdef1234567890abcdef1234567890abcdef12", mined: BigInt(421000n * 10n**18n), minedFormatted: "421K", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
+    { rank: 4, address: "0x9876543210fedcba9876543210fedcba98765432", mined: BigInt(287000n * 10n**18n), minedFormatted: "287K", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
+    { rank: 5, address: "0xcafebabecafebabecafebabecafebabecafebabe", mined: BigInt(156000n * 10n**18n), minedFormatted: "156K", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: true, isFriend: false, profile: null },
+  ];
 
   // Prize pool ticking effect
   useEffect(() => {
@@ -217,6 +228,16 @@ export function SpinModal({
               </div>
             </div>
           </div>
+
+          {/* Leaderboard */}
+          <Leaderboard
+            entries={mockLeaderboard}
+            userRank={5}
+            tokenSymbol={tokenSymbol}
+            tokenName={tokenName}
+            rigUrl={rigUrl}
+            isLoading={false}
+          />
 
           {/* Placeholder for remaining sections */}
           <div className="text-center text-zinc-600 py-4">
