@@ -10,6 +10,7 @@ import { TradeModal } from "@/components/trade-modal";
 import { AuctionModal } from "@/components/auction-modal";
 import { LiquidityModal } from "@/components/liquidity-modal";
 import { SpinModal } from "@/components/spin-modal";
+import { FundModal } from "@/components/fund-modal";
 // import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 // import { useFriendActivity, getFriendActivityMessage } from "@/hooks/useFriendActivity";
 
@@ -189,6 +190,7 @@ export default function RigDetailPage() {
   const [showAuctionModal, setShowAuctionModal] = useState(false);
   const [showLiquidityModal, setShowLiquidityModal] = useState(false);
   const [showSpinModal, setShowSpinModal] = useState(false);
+  const [showFundModal, setShowFundModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tokenInfoRef = useRef<HTMLDivElement>(null);
 
@@ -492,6 +494,15 @@ export default function RigDetailPage() {
                   <button
                     onClick={() => {
                       setShowActionMenu(false);
+                      setShowFundModal(true);
+                    }}
+                    className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                  >
+                    Fund
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowActionMenu(false);
                       setShowAuctionModal(true);
                     }}
                     className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
@@ -569,6 +580,15 @@ export default function RigDetailPage() {
       <SpinModal
         isOpen={showSpinModal}
         onClose={() => setShowSpinModal(false)}
+        tokenSymbol={MOCK_TOKEN.symbol}
+        tokenName={MOCK_TOKEN.name}
+        userBalance={45.73}
+      />
+
+      {/* Fund Modal (for FundRig) */}
+      <FundModal
+        isOpen={showFundModal}
+        onClose={() => setShowFundModal(false)}
         tokenSymbol={MOCK_TOKEN.symbol}
         tokenName={MOCK_TOKEN.name}
         userBalance={45.73}
