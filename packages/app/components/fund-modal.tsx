@@ -69,6 +69,11 @@ export function FundModal({
 
   const parsedAmount = parseFloat(donationAmount) || 0;
 
+  // Calculate estimated tokens for current input
+  const estimatedTokens = parsedAmount > 0 && todayEmission > 0
+    ? (parsedAmount / (todayDonated + parsedAmount)) * todayEmission
+    : 0;
+
   return (
     <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
@@ -134,6 +139,32 @@ export function FundModal({
             </div>
             <div className="text-sm text-zinc-500">
               Day ends in <span className="text-white font-medium">{formatCountdown(dayEndsIn)}</span>
+            </div>
+          </div>
+
+          {/* Donate Section */}
+          <div className="mb-6">
+            <div className="font-semibold text-[18px] mb-3">Donate</div>
+            <div className="bg-zinc-900 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl text-zinc-400">$</span>
+                <input
+                  type="number"
+                  value={donationAmount}
+                  onChange={(e) => setDonationAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-zinc-600 tabular-nums"
+                />
+              </div>
+              <div className="text-sm text-zinc-500 mb-2">
+                Balance: ${userBalance.toFixed(2)}
+              </div>
+              {parsedAmount > 0 && (
+                <div className="text-sm text-zinc-400">
+                  You'll receive ~{estimatedTokens.toLocaleString(undefined, { maximumFractionDigits: 0 })} {tokenSymbol}
+                  <span className="text-zinc-600 ml-1">(based on current pool)</span>
+                </div>
+              )}
             </div>
           </div>
 
