@@ -35,6 +35,16 @@ export function FundModal({
     unclaimedDays: 3,
   };
 
+  // Mock user stats
+  const userStats = {
+    totalDonated: 2456.78,
+    todayDonation: 50.00,
+    pendingTokens: 12456,
+    pendingUsd: 124.56,
+    claimedTokens: 45230,
+    claimedUsd: 452.30,
+  };
+
   // Mock recipient data
   const recipient = {
     address: "0xcharity1234567890abcdef1234567890abcdef",
@@ -208,6 +218,47 @@ export function FundModal({
               </div>
             </div>
           )}
+
+          {/* Your Position */}
+          <div className="mb-6">
+            <div className="font-semibold text-[18px] mb-3">Your Position</div>
+            <div className="bg-zinc-900 rounded-xl p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs text-zinc-500 mb-1">Total Donated</div>
+                  <div className="text-lg font-bold tabular-nums">
+                    ${userStats.totalDonated.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-zinc-500 mb-1">Today</div>
+                  <div className="text-lg font-bold tabular-nums">
+                    ${userStats.todayDonation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-zinc-500 mb-1">Pending</div>
+                  <div className="text-lg font-bold tabular-nums flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[8px] text-white font-semibold">
+                      {tokenSymbol.charAt(0)}
+                    </span>
+                    {userStats.pendingTokens.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-zinc-500">${userStats.pendingUsd.toFixed(2)}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-zinc-500 mb-1">Claimed</div>
+                  <div className="text-lg font-bold tabular-nums flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[8px] text-white font-semibold">
+                      {tokenSymbol.charAt(0)}
+                    </span>
+                    {userStats.claimedTokens.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-zinc-500">${userStats.claimedUsd.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Placeholder for remaining sections */}
           <div className="text-center text-zinc-600 py-4">
