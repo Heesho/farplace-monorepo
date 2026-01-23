@@ -128,7 +128,7 @@ contract MineCore is Ownable, ReentrancyGuard {
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event Core__Launched(
+    event MineCore__Launched(
         address launcher,
         address quoteToken,
         address unit,
@@ -151,8 +151,8 @@ contract MineCore is Ownable, ReentrancyGuard {
         uint256 auctionPriceMultiplier,
         uint256 auctionMinInitPrice
     );
-    event Core__ProtocolFeeAddressSet(address protocolFeeAddress);
-    event Core__MinDonutForLaunchSet(uint256 minDonutForLaunch);
+    event MineCore__ProtocolFeeAddressSet(address protocolFeeAddress);
+    event MineCore__MinDonutForLaunchSet(uint256 minDonutForLaunch);
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
 
@@ -299,7 +299,7 @@ contract MineCore is Ownable, ReentrancyGuard {
         // Register with central registry
         IRegistry(registry).register(rig, RIG_TYPE, unit, params.launcher);
 
-        emit Core__Launched(
+        emit MineCore__Launched(
             params.launcher,
             params.quoteToken,
             unit,
@@ -335,7 +335,7 @@ contract MineCore is Ownable, ReentrancyGuard {
      */
     function setProtocolFeeAddress(address _protocolFeeAddress) external onlyOwner {
         protocolFeeAddress = _protocolFeeAddress;
-        emit Core__ProtocolFeeAddressSet(_protocolFeeAddress);
+        emit MineCore__ProtocolFeeAddressSet(_protocolFeeAddress);
     }
 
     /**
@@ -344,7 +344,7 @@ contract MineCore is Ownable, ReentrancyGuard {
      */
     function setMinDonutForLaunch(uint256 _minDonutForLaunch) external onlyOwner {
         minDonutForLaunch = _minDonutForLaunch;
-        emit Core__MinDonutForLaunchSet(_minDonutForLaunch);
+        emit MineCore__MinDonutForLaunchSet(_minDonutForLaunch);
     }
 
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/

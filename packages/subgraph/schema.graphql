@@ -224,11 +224,6 @@ type Rig @entity(immutable: false) {
   quoteToken: Bytes!                   # Payment token for rig actions
   uri: String!
 
-  # Emission config (common to most)
-  initialUps: BigInt!                  # Starting units per second
-  tailUps: BigInt!                     # Minimum units per second
-  halvingPeriod: BigInt!               # Time between halvings (seconds)
-
   # Revenue tracking (in quoteToken)
   treasuryRevenue: BigDecimal!         # Fees sent to auction/treasury
   teamRevenue: BigDecimal!             # Fees to team
@@ -262,7 +257,12 @@ type MineRig @entity(immutable: false) {
   id: ID!                              # Same as Rig id
   rig: Rig!
 
-  # Config
+  # Emission config
+  initialUps: BigInt!                  # Starting units per second
+  tailUps: BigInt!                     # Minimum units per second (floor)
+  halvingAmount: BigInt!               # Token supply threshold for halving
+
+  # Rig config
   capacity: BigInt!                    # Number of slots
   epochPeriod: BigInt!                 # Dutch auction epoch duration
   priceMultiplier: BigDecimal!         # Price multiplier after sale
@@ -323,7 +323,12 @@ type SlotRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
-  # Config (immutable)
+  # Emission config
+  initialUps: BigInt!                  # Starting units per second
+  tailUps: BigInt!                     # Minimum units per second (floor)
+  halvingPeriod: BigInt!               # Time between halvings (seconds)
+
+  # Rig config (immutable)
   epochPeriod: BigInt!                 # Duration of each price decay epoch
   priceMultiplier: BigDecimal!         # Price multiplier after each spin
   minInitPrice: BigDecimal!            # Minimum starting price
@@ -373,7 +378,12 @@ type ContentRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
-  # Config
+  # Emission config
+  initialUps: BigInt!                  # Starting units per second
+  tailUps: BigInt!                     # Minimum units per second (floor)
+  halvingPeriod: BigInt!               # Time between halvings (seconds)
+
+  # Rig config
   minInitPrice: BigDecimal!
   isModerated: Boolean!
 
@@ -460,8 +470,10 @@ type FundRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
-  # Config (from Rig.initialUps/tailUps for emission)
-  # Emission halves every 30 days, with a floor
+  # Emission config
+  initialEmission: BigInt!             # Starting daily emission
+  minEmission: BigInt!                 # Minimum daily emission (floor)
+  minDonation: BigInt!                 # Minimum donation amount
 
   # State
   currentDay: BigInt!                  # Current day number

@@ -2,6 +2,7 @@ import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { fallback, http, createStorage, cookieStorage } from "wagmi";
 import { base } from "wagmi/chains";
 import { createConfig } from "wagmi";
+import { injected } from "wagmi/connectors";
 
 // Backup RPC endpoints for Base mainnet with automatic fallback
 // Order: Primary (env) -> Alchemy (env) -> Public RPCs
@@ -31,10 +32,14 @@ const baseTransports = BASE_RPC_ENDPOINTS.map((url) =>
   })
 );
 
+// Use injected connector for local dev, farcaster for production
+const isLocalDev = process.env.NODE_ENV === "development";
+const connectors = isLocalDev ? [injected()] : [farcasterMiniApp()];
+
 export const wagmiConfig = createConfig({
   chains: [base],
   ssr: true,
-  connectors: [farcasterMiniApp()],
+  connectors,
   transports: {
     // Fallback transport: tries each RPC in order until one succeeds
     // rank: true means it will prefer faster RPCs over time
