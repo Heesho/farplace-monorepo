@@ -62,6 +62,9 @@ contract FundRig is ReentrancyGuard, Ownable {
     mapping(uint256 => mapping(address => uint256)) public dayAccountToDonation;
     mapping(uint256 => mapping(address => bool)) public dayAccountToHasClaimed;
 
+    // Metadata URI for the rig
+    string public uri;
+
     /*----------  ERRORS  -----------------------------------------------*/
 
     error FundRig__ZeroAmount();
@@ -83,6 +86,7 @@ contract FundRig is ReentrancyGuard, Ownable {
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
     event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);
+    event FundRig__UriSet(string uri);
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
 
@@ -240,6 +244,15 @@ contract FundRig is ReentrancyGuard, Ownable {
     function setTeam(address _team) external onlyOwner {
         team = _team;
         emit FundRig__TeamSet(_team);
+    }
+
+    /**
+     * @notice Update the metadata URI for the rig.
+     * @param _uri New metadata URI (e.g., for logo, branding)
+     */
+    function setUri(string calldata _uri) external onlyOwner {
+        uri = _uri;
+        emit FundRig__UriSet(_uri);
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

@@ -217,6 +217,9 @@ contract SpinMulticall {
             state.unitPrice = unitInLP == 0 ? 0 : donutInLP * 1e18 / unitInLP;
         }
 
+        // Rig metadata
+        state.rigUri = ISpinRig(rig).uri();
+
         // User balances
         address quoteToken = ISpinRig(rig).quote();
         state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);

@@ -31,6 +31,7 @@ interface IFundRig {
     function dayToTotalDonated(uint256 day) external view returns (uint256);
     function dayAccountToDonation(uint256 day, address account) external view returns (uint256);
     function dayAccountToHasClaimed(uint256 day, address account) external view returns (bool);
+    function uri() external view returns (string memory);
 
     // External functions
     function fund(address account, address recipient, uint256 amount) external;
@@ -41,6 +42,7 @@ interface IFundRig {
     function removeRecipient(address _recipient) external;
     function setTreasury(address _treasury) external;
     function setTeam(address _team) external;
+    function setUri(string calldata _uri) external;
     function transferOwnership(address newOwner) external;
 
     // View functions
@@ -58,4 +60,5 @@ interface IFundRig {
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
     event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);
+    event FundRig__UriSet(string uri);
 }

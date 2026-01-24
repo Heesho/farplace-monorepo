@@ -43,6 +43,7 @@ contract FundMulticall {
         address team;
         // Global rig state
         uint256 unitPrice;
+        string rigUri;
         // User balances
         uint256 accountPaymentTokenBalance;
         uint256 accountDonutBalance;
@@ -238,6 +239,9 @@ contract FundMulticall {
             uint256 unitInLP = IERC20(unitToken).balanceOf(lpToken);
             state.unitPrice = unitInLP == 0 ? 0 : donutInLP * 1e18 / unitInLP;
         }
+
+        // Rig metadata
+        state.rigUri = IFundRig(rig).uri();
 
         // User balances
         address paymentToken = IFundRig(rig).paymentToken();

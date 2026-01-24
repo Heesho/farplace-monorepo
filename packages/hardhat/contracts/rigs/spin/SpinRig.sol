@@ -94,6 +94,9 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     mapping(uint64 => address) public sequenceToSpinner;
     mapping(uint64 => uint256) public sequenceToEpoch;
 
+    // Metadata URI for the rig
+    string public uri;
+
     /*----------  ERRORS  -----------------------------------------------*/
 
     error SpinRig__InvalidSpinner();
@@ -133,6 +136,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     event SpinRig__TreasurySet(address indexed treasury);
     event SpinRig__TeamSet(address indexed team);
     event SpinRig__OddsSet(uint256[] odds);
+    event SpinRig__UriSet(string uri);
 
     /*----------  STRUCTS  ----------------------------------------------*/
 
@@ -392,6 +396,15 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      */
     function setOdds(uint256[] calldata _odds) external onlyOwner {
         _validateAndSetOdds(_odds);
+    }
+
+    /**
+     * @notice Update the metadata URI for the rig.
+     * @param _uri New metadata URI (e.g., for logo, branding)
+     */
+    function setUri(string calldata _uri) external onlyOwner {
+        uri = _uri;
+        emit SpinRig__UriSet(_uri);
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

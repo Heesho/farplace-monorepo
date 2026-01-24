@@ -47,6 +47,7 @@ interface ISpinRig {
     function odds(uint256 index) external view returns (uint256);
     function sequenceToSpinner(uint64 sequenceNumber) external view returns (address);
     function sequenceToEpoch(uint64 sequenceNumber) external view returns (uint256);
+    function uri() external view returns (string memory);
 
     // Functions
     function spin(
@@ -60,6 +61,7 @@ interface ISpinRig {
     function setTreasury(address _treasury) external;
     function setTeam(address _team) external;
     function setOdds(uint256[] calldata _odds) external;
+    function setUri(string calldata _uri) external;
     function transferOwnership(address newOwner) external;
 
     // View functions
@@ -95,4 +97,5 @@ interface ISpinRig {
     event SpinRig__TreasurySet(address indexed treasury);
     event SpinRig__TeamSet(address indexed team);
     event SpinRig__OddsSet(uint256[] odds);
+    event SpinRig__UriSet(string uri);
 }
