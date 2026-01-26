@@ -24,13 +24,15 @@ export function NavBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
-      style={{
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
-        paddingTop: "12px",
-      }}
+      className="fixed bottom-0 left-0 right-0 z-50 flex justify-center bg-zinc-800"
     >
-      <div className="flex justify-around items-center w-full max-w-[520px] bg-background px-8">
+      <div
+        className="flex justify-around items-center w-full max-w-[520px] bg-background px-8"
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+          paddingTop: "12px",
+        }}
+      >
         {navItems.map((item) => (
           <Link
             key={item.href}

@@ -11,9 +11,31 @@ import { FundModal } from "@/components/fund-modal";
 import { TradeModal } from "@/components/trade-modal";
 import { AuctionModal } from "@/components/auction-modal";
 import { LiquidityModal } from "@/components/liquidity-modal";
+import { AdminModal } from "@/components/admin-modal";
 
 type Timeframe = "1H" | "1D" | "1W" | "1M" | "ALL";
 type RigType = "mine" | "spin" | "fund";
+
+// Helper to truncate address for display
+function truncateAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// Clickable address component
+function AddressLink({ address }: { address: string | null }) {
+  if (!address) return <span>None</span>;
+  return (
+    <a
+      href={`https://basescan.org/address/${address}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:underline hover:text-white transition-colors"
+    >
+      {truncateAddress(address)}
+    </a>
+  );
+}
 
 // Mock data for different rig types
 type MineConfig = {
@@ -54,7 +76,6 @@ type FundConfig = {
   // Immutable (launch) parameters
   initialEmission: number;
   minEmission: number;
-  minDonation: number;
   halvingPeriod: number;
   // Settable parameters
   recipient: string | null;
@@ -90,8 +111,8 @@ const RIG_DATA: Record<RigType, {
       priceMultiplier: 2.0,
       minInitPrice: 0.01,
       // Settable
-      treasury: "0x1234...5678",
-      team: "0xabcd...ef01",
+      treasury: "0x1234567890123456789012345678901234567890",
+      team: "0xabcdef0123456789abcdef0123456789abcdef01",
       randomnessEnabled: true,
       upsMultipliers: [1, 1, 1, 2, 2, 5, 10], // 1x, 1x, 1x, 2x, 2x, 5x, 10x
       upsMultiplierDuration: 86400, // 24 hours
@@ -125,8 +146,8 @@ const RIG_DATA: Record<RigType, {
       priceMultiplier: 1.5,
       minInitPrice: 0.05,
       // Settable
-      treasury: "0x1234...5678",
-      team: "0xabcd...ef01",
+      treasury: "0x1234567890123456789012345678901234567890",
+      team: "0xabcdef0123456789abcdef0123456789abcdef01",
       odds: [10, 10, 10, 50, 50, 100, 500, 1000], // basis points (0.1%, 0.5%, 1%, 5%, 10%)
     },
     stats: {
@@ -153,12 +174,11 @@ const RIG_DATA: Record<RigType, {
       // Immutable
       initialEmission: 50000,
       minEmission: 5000,
-      minDonation: 1.0,
       halvingPeriod: 2592000, // 30 days
       // Settable
-      recipient: "0x9876...5432",
-      treasury: "0x1234...5678",
-      team: "0xabcd...ef01",
+      recipient: "0x9876543210987654321098765432109876543210",
+      treasury: "0x1234567890123456789012345678901234567890",
+      team: "0xabcdef0123456789abcdef0123456789abcdef01",
     },
     stats: {
       marketCap: 189000,
@@ -321,8 +341,12 @@ export default function RigDetailPage() {
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
   const [showAuctionModal, setShowAuctionModal] = useState(false);
   const [showLiquidityModal, setShowLiquidityModal] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tokenInfoRef = useRef<HTMLDivElement>(null);
+
+  // Mock owner check - in real implementation, compare connected wallet to rig owner
+  const isOwner = true; // TODO: Replace with real ownership check
 
   const isPositive = token.change24h >= 0;
   const hasPosition = position.balance > 0;
@@ -569,11 +593,11 @@ export default function RigDetailPage() {
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
-                    <div className="font-medium text-[13px] font-mono">{config.treasury}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.treasury} /></div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
-                    <div className="font-medium text-[13px] font-mono">{config.team || "None"}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.team} /></div>
                   </div>
                   {config.randomnessEnabled && config.upsMultipliers.length > 0 && (
                     <div className="col-span-2">
@@ -632,11 +656,11 @@ export default function RigDetailPage() {
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
-                    <div className="font-medium text-[13px] font-mono">{config.treasury}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.treasury} /></div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
-                    <div className="font-medium text-[13px] font-mono">{config.team || "None"}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.team} /></div>
                   </div>
                   {config.odds.length > 0 && (
                     <div className="col-span-2">
@@ -679,24 +703,20 @@ export default function RigDetailPage() {
                     <div className="font-medium text-[13px]">{formatNumber(config.minEmission)}/day</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground text-[12px] mb-0.5">Min donation</div>
-                    <div className="font-medium text-[13px]">${config.minDonation}</div>
-                  </div>
-                  <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Halving</div>
                     <div className="font-medium text-[13px]">{config.halvingPeriod / 86400}d</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Recipient</div>
-                    <div className="font-medium text-[13px] font-mono">{config.recipient || "Not set"}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.recipient} /></div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
-                    <div className="font-medium text-[13px] font-mono">{config.treasury}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.treasury} /></div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
-                    <div className="font-medium text-[13px] font-mono">{config.team || "None"}</div>
+                    <div className="font-medium text-[13px] font-mono"><AddressLink address={config.team} /></div>
                   </div>
                 </>
               )}
@@ -708,15 +728,17 @@ export default function RigDetailPage() {
         {/* Darkened overlay when menu is open */}
         {showActionMenu && (
           <div
-            className="fixed inset-0 bg-black/70 z-40"
+            className="fixed inset-0 z-40 flex justify-center"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
             onClick={() => setShowActionMenu(false)}
-          />
+          >
+            <div className="w-full max-w-[520px] h-full bg-black/50" />
+          </div>
         )}
 
         {/* Bottom Action Bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}>
-          <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}>
+          <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3 bg-background">
             <div>
               <div className="text-muted-foreground text-[12px]">Market Cap</div>
               <div className="font-semibold text-[17px] tabular-nums">
@@ -774,6 +796,17 @@ export default function RigDetailPage() {
                   >
                     Liquidity
                   </button>
+                  {isOwner && (
+                    <button
+                      onClick={() => {
+                        setShowActionMenu(false);
+                        setShowAdminModal(true);
+                      }}
+                      className="w-32 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-[14px] transition-colors"
+                    >
+                      Admin
+                    </button>
+                  )}
                 </div>
               )}
               <button
@@ -849,6 +882,32 @@ export default function RigDetailPage() {
         donutBalance={1186.38}
         tokenPrice={token.price}
         donutPrice={0.001}
+      />
+
+      {/* Admin Modal */}
+      <AdminModal
+        isOpen={showAdminModal}
+        onClose={() => setShowAdminModal(false)}
+        rigType={rigType}
+        tokenSymbol={token.symbol}
+        tokenName={token.name}
+        currentConfig={{
+          treasury: config.treasury,
+          team: config.team,
+          uri: "", // Not in mock data yet
+          ...(config.rigType === "Mine" && {
+            capacity: config.capacity,
+            randomnessEnabled: config.randomnessEnabled,
+            upsMultipliers: config.upsMultipliers,
+            upsMultiplierDuration: config.upsMultiplierDuration,
+          }),
+          ...(config.rigType === "Spin" && {
+            odds: config.odds,
+          }),
+          ...(config.rigType === "Fund" && {
+            recipient: config.recipient,
+          }),
+        }}
       />
 
     </main>

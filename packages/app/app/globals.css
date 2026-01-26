@@ -47,7 +47,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-zinc-800 text-foreground;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
