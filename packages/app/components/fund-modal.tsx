@@ -3,11 +3,13 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { X } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NavBar } from "@/components/nav-bar";
 import { Leaderboard } from "@/components/leaderboard";
 import { LeaderboardEntry } from "@/hooks/useRigLeaderboard";
 import { DonationHistoryItem } from "@/components/donation-history-item";
+
+// Preset funding amounts
+const PRESET_AMOUNTS = [5, 10, 25, 50];
 
 type FundModalProps = {
   isOpen: boolean;
@@ -22,17 +24,40 @@ export function FundModal({
   onClose,
   tokenSymbol = "TOKEN",
   tokenName = "Token",
-  userBalance = 0,
+  userBalance = 45.73,
 }: FundModalProps) {
   const params = useParams();
   const rigAddress = (params?.address as string) || "";
 
   // Mock data - will be replaced with real data
-  const [fundAmount, setFundAmount] = useState("");
+  // Pre-select $5 by default so rate always shows
+  const [fundAmount, setFundAmount] = useState("5");
+  const [selectedPreset, setSelectedPreset] = useState<number | null>(5);
+  const [isCustom, setIsCustom] = useState(false);
   const [message, setMessage] = useState("");
   const [isFunding, setIsFunding] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const defaultMessage = "for the cause"; // Default message set by rig owner
+
+  // Handle preset selection
+  const handlePresetSelect = (amount: number) => {
+    setSelectedPreset(amount);
+    setFundAmount(amount.toString());
+    setIsCustom(false);
+  };
+
+  // Handle custom selection
+  const handleCustomSelect = () => {
+    setSelectedPreset(null);
+    setIsCustom(true);
+    setFundAmount("");
+  };
+
+  // Handle custom input change
+  const handleCustomChange = (value: string) => {
+    setFundAmount(value);
+    setSelectedPreset(null);
+  };
 
   const pendingClaims = {
     totalTokens: 12456.78,
@@ -82,12 +107,10 @@ export function FundModal({
     return `${days}d ago`;
   }
 
-  // Mock recipient data
+  // Mock recipient data - from rig URI, not Farcaster
   const recipient = {
     address: "0xcharity1234567890abcdef1234567890abcdef",
     name: "Ocean Cleanup Foundation",
-    avatar: "https://api.dicebear.com/7.x/shapes/svg?seed=ocean",
-    handle: "@oceancleanup",
   };
 
   // Mock today's pool data
@@ -149,133 +172,184 @@ export function FundModal({
           <div className="w-9" />
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
-          {/* Hero: Current Recipient */}
-          <div className="text-center py-4">
-            <div className="text-[12px] text-muted-foreground mb-2">CURRENT RECIPIENT</div>
-            <div className="flex items-center justify-center gap-3 mb-1">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={recipient.avatar} alt={recipient.name} />
-                <AvatarFallback className="bg-zinc-700 text-sm">
-                  {recipient.name.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-left">
-                <div className="text-lg font-semibold">{recipient.name}</div>
-                <div className="text-[13px] text-muted-foreground">{recipient.handle}</div>
+        {/* Sticky Top Section - Compact */}
+        <div className="px-4 pb-3 bg-background">
+          {/* Recipient - single line */}
+          <div className="flex items-center justify-between py-2">
+            <div className="text-[15px] font-semibold">{recipient.name}</div>
+            <a
+              href={`https://basescan.org/address/${recipient.address}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-muted-foreground font-mono hover:text-white transition-colors underline underline-offset-2"
+            >
+              {recipient.address.slice(0, 6)}...{recipient.address.slice(-4)}
+            </a>
+          </div>
+
+          {/* Pool Stats - compact 2x2 grid */}
+          <div className="grid grid-cols-4 gap-2 py-2 mb-2">
+            <div>
+              <div className="text-muted-foreground text-[10px]">Pool</div>
+              <div className="font-semibold text-[13px] tabular-nums">
+                ${todayFunded.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-[10px]">Emission</div>
+              <div className="font-semibold text-[13px] tabular-nums flex items-center gap-1">
+                <span className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[8px] text-white font-semibold">
+                  {tokenSymbol.charAt(0)}
+                </span>
+                {(todayEmission / 1000).toFixed(0)}K
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-[10px]">Price</div>
+              <div className="font-semibold text-[13px] tabular-nums">
+                ${currentPricePerToken.toFixed(4)}
+              </div>
+            </div>
+            <div>
+              <div className="text-muted-foreground text-[10px]">Ends in</div>
+              <div className="font-semibold text-[13px] tabular-nums">
+                {formatCountdown(dayEndsIn)}
               </div>
             </div>
           </div>
 
-          {/* Today's Pool Stats */}
-          <div className="mb-6">
-            <div className="font-semibold text-[18px] mb-3">Today's Pool</div>
-            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-3">
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Funded</div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  ${todayFunded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
+          {/* Fund Preset Amounts - no header */}
+          <div className="mb-1">
+            {!isCustom ? (
+              <div className="flex gap-1.5">
+                {PRESET_AMOUNTS.map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => handlePresetSelect(amount)}
+                    className={`
+                      flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all
+                      ${selectedPreset === amount
+                        ? "bg-white text-black"
+                        : "bg-zinc-800 text-white hover:bg-zinc-700"
+                      }
+                    `}
+                  >
+                    ${amount}
+                  </button>
+                ))}
+                <button
+                  onClick={handleCustomSelect}
+                  className="flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all bg-zinc-800 text-white hover:bg-zinc-700"
+                >
+                  Other
+                </button>
               </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Emission</div>
-                <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
-                    {tokenSymbol.charAt(0)}
-                  </span>
-                  {todayEmission.toLocaleString()}
+            ) : (
+              <div className="flex gap-1.5 items-center">
+                <button
+                  onClick={() => {
+                    setIsCustom(false);
+                    setFundAmount("5");
+                    setSelectedPreset(5);
+                  }}
+                  className="px-3 py-2 rounded-lg text-[13px] font-semibold bg-zinc-800 text-white hover:bg-zinc-700 transition-all"
+                >
+                  ✕
+                </button>
+                <div className="flex-1 flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-1.5">
+                  <span className="text-base text-muted-foreground">$</span>
+                  <input
+                    type="number"
+                    value={fundAmount}
+                    onChange={(e) => handleCustomChange(e.target.value)}
+                    placeholder="0.00"
+                    autoFocus
+                    className="flex-1 bg-transparent text-base font-semibold outline-none placeholder:text-zinc-600 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
-              </div>
-            </div>
-            <div className="text-[13px] text-muted-foreground mb-1">
-              Current price: {currentPricePerToken > 0 ? `$${currentPricePerToken.toFixed(6)}/token` : "Be first!"}
-            </div>
-            <div className="text-[13px] text-muted-foreground">
-              Day ends in <span className="text-foreground font-medium">{formatCountdown(dayEndsIn)}</span>
-            </div>
-          </div>
-
-          {/* Fund Input */}
-          <div className="mb-6">
-            <div className="font-semibold text-[18px] mb-3">Fund</div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl text-muted-foreground">$</span>
-              <input
-                type="number"
-                value={fundAmount}
-                onChange={(e) => setFundAmount(e.target.value)}
-                placeholder="0.00"
-                className="flex-1 bg-transparent text-2xl font-semibold outline-none placeholder:text-zinc-600 tabular-nums"
-              />
-            </div>
-            <div className="text-[13px] text-muted-foreground mb-1">
-              Balance: ${userBalance.toFixed(2)}
-            </div>
-            {parsedAmount > 0 && (
-              <div className="text-[13px] text-muted-foreground">
-                You'll receive ~{estimatedTokens.toLocaleString(undefined, { maximumFractionDigits: 0 })} {tokenSymbol}
-                <span className="text-zinc-600 ml-1">(based on current pool)</span>
               </div>
             )}
+            {/* Estimate - always show */}
+            <div className="text-[12px] text-muted-foreground mt-1.5 text-center">
+              ≈ {estimatedTokens.toLocaleString(undefined, { maximumFractionDigits: 0 })} {tokenSymbol}
+              <span className="text-zinc-600 ml-1">@ current rate</span>
+            </div>
           </div>
+        </div>
 
-          {/* Pending Claims */}
-          {pendingClaims.unclaimedDays > 0 && (
-            <div className="mb-6">
-              <div className="font-semibold text-[18px] mb-3">Pending Claims</div>
-              <div className="flex items-center justify-between">
+        {/* Scrollable Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
+
+          {/* Your Position */}
+          <div className="mb-6">
+            <div className="font-semibold text-[18px] mb-3">Your position</div>
+
+            {/* Pending Claims */}
+            {pendingClaims.unclaimedDays > 0 && (
+              <div className="flex items-center justify-between mb-4">
                 <div>
+                  <div className="text-muted-foreground text-[12px] mb-1">Pending</div>
                   <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                     <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
                       {tokenSymbol.charAt(0)}
                     </span>
-                    {pendingClaims.totalTokens.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {(pendingClaims.totalTokens / 1000).toFixed(1)}K
+                    <span className="text-[12px] text-muted-foreground font-normal">
+                      ${pendingClaims.totalUsd.toFixed(2)} · {pendingClaims.unclaimedDays}d
+                    </span>
                   </div>
-                  <div className="text-[12px] text-muted-foreground">${pendingClaims.totalUsd.toFixed(2)} · {pendingClaims.unclaimedDays} days</div>
                 </div>
                 <button
                   onClick={() => setIsClaiming(true)}
                   disabled={isClaiming}
                   className={`
-                    px-6 py-2.5 text-[14px] font-semibold rounded-xl transition-all
+                    px-5 py-2 text-[13px] font-semibold rounded-xl transition-all
                     ${isClaiming
                       ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                       : "bg-white text-black hover:bg-zinc-200"
                     }
                   `}
                 >
-                  {isClaiming ? "Claiming..." : "Claim All"}
+                  {isClaiming ? "Claiming..." : "Claim"}
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Your Position */}
-          <div className="mb-6">
-            <div className="font-semibold text-[18px] mb-3">Your position</div>
-            <div className="grid grid-cols-2 gap-y-4 gap-x-8">
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Total funded</div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  ${userStats.totalFunded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-              </div>
+            {/* Today + Est. */}
+            <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-4">
               <div>
                 <div className="text-muted-foreground text-[12px] mb-1">Today</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  ${userStats.todayFunding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${userStats.todayFunding.toFixed(2)}
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Pending</div>
+                <div className="text-muted-foreground text-[12px] mb-1">Est.</div>
                 <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                   <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
                     {tokenSymbol.charAt(0)}
                   </span>
-                  {userStats.pendingTokens.toLocaleString()}
+                  ~{((userStats.todayFunding / (todayFunded + 0.01)) * todayEmission / 1000).toFixed(1)}K
                 </div>
-                <div className="text-[12px] text-muted-foreground">${userStats.pendingUsd.toFixed(2)}</div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-y-4 gap-x-8">
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
+                <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
+                    {tokenSymbol.charAt(0)}
+                  </span>
+                  {((userStats.pendingTokens + userStats.claimedTokens) / 1000).toFixed(1)}K
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-1">Value</div>
+                <div className="font-semibold text-[15px] tabular-nums">
+                  ${(userStats.pendingUsd + userStats.claimedUsd).toFixed(2)}
+                </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-1">Claimed</div>
@@ -283,9 +357,14 @@ export function FundModal({
                   <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
                     {tokenSymbol.charAt(0)}
                   </span>
-                  {userStats.claimedTokens.toLocaleString()}
+                  {(userStats.claimedTokens / 1000).toFixed(1)}K
                 </div>
-                <div className="text-[12px] text-muted-foreground">${userStats.claimedUsd.toFixed(2)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground text-[12px] mb-1">Funded</div>
+                <div className="font-semibold text-[15px] tabular-nums">
+                  ${userStats.totalFunded.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
               </div>
             </div>
           </div>
@@ -330,19 +409,19 @@ export function FundModal({
               maxLength={100}
               className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-[15px] outline-none placeholder:text-zinc-500 mb-3"
             />
-            {/* Balance, Amount, Mine Button */}
+            {/* Amount, Balance, Mine Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
-                <div>
-                  <div className="text-muted-foreground text-[12px]">Balance</div>
-                  <div className="font-semibold text-[17px] tabular-nums">
-                    ${userBalance.toFixed(2)}
-                  </div>
-                </div>
                 <div>
                   <div className="text-muted-foreground text-[12px]">Amount</div>
                   <div className="font-semibold text-[17px] tabular-nums">
                     ${parsedAmount.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground text-[12px]">Balance</div>
+                  <div className="font-semibold text-[17px] tabular-nums">
+                    ${userBalance.toFixed(2)}
                   </div>
                 </div>
               </div>

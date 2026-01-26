@@ -79,8 +79,8 @@ export const DonationHistoryItem = memo(function DonationHistoryItem({
           <div className="text-[13px] font-medium">${amount.toFixed(2)}</div>
         </div>
         <div>
-          <div className="text-[12px] text-muted-foreground">Mined</div>
-          <div className="text-[13px] font-medium">{formatNumber(tokens)}</div>
+          <div className="text-[12px] text-muted-foreground">Est.</div>
+          <div className="text-[13px] font-medium text-zinc-400">~{formatNumber(tokens)}</div>
         </div>
       </div>
     </div>
