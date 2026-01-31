@@ -14,7 +14,7 @@ export const ONE_BD = BigDecimal.fromString('1')
 // ============================================================================
 
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
-export const PROTOCOL_ID = 'mineport'
+export const PROTOCOL_ID = 'farplace'
 
 // DONUT token address on Base (update after deployment)
 export const DONUT_ADDRESS = '0x0000000000000000000000000000000000000000' // TODO: Update

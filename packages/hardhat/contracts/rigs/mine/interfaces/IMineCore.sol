@@ -21,6 +21,8 @@ interface IMineCore {
         uint256 rigEpochPeriod;
         uint256 rigPriceMultiplier;
         uint256 rigMinInitPrice;
+        uint256[] upsMultipliers;
+        uint256 upsMultiplierDuration;
         uint256 auctionInitPrice;
         uint256 auctionEpochPeriod;
         uint256 auctionPriceMultiplier;

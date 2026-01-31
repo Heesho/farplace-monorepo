@@ -42,6 +42,8 @@ async function launchFreshRig(launcher, params = {}) {
     rigEpochPeriod: 3600,
     rigPriceMultiplier: convert("2", 18),
     rigMinInitPrice: convert("0.0001", 18),
+    upsMultipliers: [],
+    upsMultiplierDuration: 86400,
     auctionInitPrice: convert("1", 18),
     auctionEpochPeriod: 86400,
     auctionPriceMultiplier: convert("1.2", 18),
@@ -52,7 +54,7 @@ async function launchFreshRig(launcher, params = {}) {
   await donut.connect(launcher).approve(core.address, launchParams.donutAmount);
   const tx = await core.connect(launcher).launch(launchParams);
   const receipt = await tx.wait();
-  const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+  const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
 
   return {
     rig: launchEvent.args.rig,
@@ -143,7 +145,7 @@ describe("Rigorous Tests", function () {
     await registry.setFactoryApproval(core.address, true);
 
     // Deploy Multicall
-    const multicallArtifact = await ethers.getContractFactory("Multicall");
+    const multicallArtifact = await ethers.getContractFactory("MineMulticall");
     multicall = await multicallArtifact.deploy(core.address, donut.address);
 
     // Mint tokens to users

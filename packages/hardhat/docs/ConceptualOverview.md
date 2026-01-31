@@ -1,8 +1,8 @@
-# Mineport Conceptual Overview
+# Farplace Conceptual Overview
 
-## 1) What is Mineport?
+## 1) What is Farplace?
 
-Mineport is a token launchpad on Base that distributes tokens through mining mechanisms instead of traditional sales. Rather than buying tokens directly, users earn them by participating in various "rigs" - smart contracts that reward specific behaviors over time.
+Farplace is a token launchpad on Base that distributes tokens through mining mechanisms instead of traditional sales. Rather than buying tokens directly, users earn them by participating in various "rigs" - smart contracts that reward specific behaviors over time.
 
 The core principle: **work is verified, then rewarded**. There's no presale to frontrun, no bundle to snipe. Everyone competes on equal terms through transparent mechanisms.
 
@@ -24,7 +24,7 @@ Mining inverts this:
 
 ## 3) The Three Rig Types
 
-Mineport supports three distinct rig architectures, each designed to incentivize different behaviors:
+Farplace supports three distinct rig architectures, each designed to incentivize different behaviors:
 
 ### MineRig - Classic Mining
 
@@ -55,7 +55,7 @@ Daily donation pools where contributors claim proportional token rewards.
 
 ## 4) The Launch Process
 
-When someone launches a token through Mineport:
+When someone launches a token through Farplace:
 
 1. **Seed liquidity** - Launcher provides DONUT to create the initial trading pool
 2. **Deploy contracts** - Unit token, Rig, and Auction are deployed

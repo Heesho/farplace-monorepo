@@ -14,7 +14,7 @@ const INFO_SECTIONS = [
     ],
   },
   {
-    title: "What is Mineport?",
+    title: "What is Farplace?",
     content:
       "A launchpad where anyone can create their own mineable token. You set the rules - emission rate, halving schedule, auction timing - and let the community mine.",
     bullets: [

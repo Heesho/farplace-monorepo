@@ -98,13 +98,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address, // recipient receives 50% of donations
       tokenName: "Test Unit",
       tokenSymbol: "TUNIT",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18), // 345,600 per day
       minEmission: convert("864", 18), // 864 per day
-      minDonation: convert("0.01", 6), // 0.01 USDC (ensures non-zero fees)
+      halvingPeriod: 30, // 30 days
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400, // 1 day
       auctionPriceMultiplier: convert("1.5", 18),
@@ -183,13 +184,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("50", 18), // Less than minDonutForLaunch (100)
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -210,13 +212,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: AddressZero,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -237,13 +240,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: AddressZero,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -264,13 +268,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -291,13 +296,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -318,13 +324,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("500", 18),
       unitAmount: 0,
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
-      minDonation: convert("0.01", 6), // 0.01 USDC
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -346,13 +353,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user0.address,
       quoteToken: usdc.address,
+      recipient: user1.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
       donutAmount: convert("500", 18),
       unitAmount: convert("1000000", 18),
       initialEmission: convert("100", 18),
       minEmission: convert("200", 18), // greater than initial
-      minDonation: convert("0.01", 6),
+      halvingPeriod: 30,
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -362,7 +370,7 @@ describe("FundCore Launch Tests", function () {
     await donut.connect(user0).approve(core.address, launchParams.donutAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "FundCore__MinEmissionOutOfRange()"
+      "FundRig__InvalidEmission()"
     );
     console.log("Launch correctly reverted with invalid emission");
   });
@@ -405,13 +413,14 @@ describe("FundCore Launch Tests", function () {
     const launchParams = {
       launcher: user1.address,
       quoteToken: usdc.address,
+      recipient: user2.address,
       tokenName: "Second Unit",
       tokenSymbol: "SUNIT",
       donutAmount: convert("500", 18),
       unitAmount: convert("2000000", 18),
       initialEmission: convert("172800", 18), // different emission
       minEmission: convert("432", 18),
-      minDonation: convert("0.01", 6),
+      halvingPeriod: 30,
       auctionInitPrice: convert("2000", 6),
       auctionEpochPeriod: 86400 * 2,
       auctionPriceMultiplier: convert("2", 18),

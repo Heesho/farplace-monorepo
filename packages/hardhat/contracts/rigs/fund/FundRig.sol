@@ -22,7 +22,7 @@ import {IFundCore} from "./interfaces/IFundCore.sol";
  *      - Floor: configurable minimum emission per day
  *
  *      Fund Split:
- *      - 50% to Recipient (user-selected from whitelist)
+ *      - 50% to Recipient (single address set by owner)
  *      - 45% to Treasury (remainder)
  *      - 4% to Team
  *      - 1% to Protocol
@@ -32,14 +32,23 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  CONSTANTS  --------------------------------------------*/
 
-    uint256 public constant HALVING_PERIOD = 30 days;
     uint256 public constant DAY_DURATION = 1 days;
+    uint256 public constant MIN_HALVING_PERIOD = 7; // minimum 7 days
+    uint256 public constant MAX_HALVING_PERIOD = 365; // maximum 365 days
+
+    // Emission bounds (defense in depth - matches FundCore)
+    uint256 public constant MIN_INITIAL_EMISSION = 1e18; // minimum 1 Unit per day
+    uint256 public constant MAX_INITIAL_EMISSION = 1e30; // maximum emission per day
 
     uint256 public constant RECIPIENT_BPS = 5_000; // 50%
     uint256 public constant TEAM_BPS = 400; // 4%
     uint256 public constant PROTOCOL_BPS = 100; // 1%
     // Treasury receives remainder (45%)
     uint256 public constant DIVISOR = 10_000;
+
+    // Minimum donation amount (ensures non-zero fee splits)
+    // For USDC (6 decimals): 10,000 = $0.01
+    uint256 public constant MIN_DONATION = 10_000;
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
@@ -49,12 +58,11 @@ contract FundRig is ReentrancyGuard, Ownable {
     uint256 public immutable startTime;
     uint256 public immutable initialEmission;
     uint256 public immutable minEmission;
-    uint256 public immutable minDonation;
+    uint256 public immutable halvingPeriod; // in days
 
     /*----------  STATE  ------------------------------------------------*/
 
-    mapping(address => bool) public accountToIsRecipient;
-
+    address public recipient;
     address public treasury;
     address public team;
 
@@ -72,17 +80,16 @@ contract FundRig is ReentrancyGuard, Ownable {
     error FundRig__AlreadyClaimed();
     error FundRig__NoDonation();
     error FundRig__InvalidAddress();
-    error FundRig__NotRecipient();
+    error FundRig__RecipientNotSet();
     error FundRig__InvalidEmission();
     error FundRig__BelowMinDonation();
-    error FundRig__InvalidMinDonation();
+    error FundRig__InvalidHalvingPeriod();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event FundRig__Funded(address indexed account, address indexed recipient, uint256 amount, uint256 day);
+    event FundRig__Funded(address indexed account, uint256 amount, uint256 day);
     event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
-    event FundRig__RecipientAdded(address indexed recipient);
-    event FundRig__RecipientRemoved(address indexed recipient);
+    event FundRig__RecipientSet(address indexed recipient);
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
     event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);
@@ -94,39 +101,47 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @notice Deploy a new FundRig contract.
      * @param _paymentToken The ERC-20 token accepted for donations
      * @param _unit The Unit token that will be minted to donors
+     * @param _recipient Address to receive 50% of donations (required)
      * @param _treasury Address to receive treasury portion of donations
      * @param _team Address to receive team portion of donations
      * @param _core Core contract address
      * @param _initialEmission Initial Unit emission per day
      * @param _minEmission Minimum Unit emission per day (floor)
-     * @param _minDonation Minimum donation amount (must be >= 100 to ensure non-zero fee splits)
+     * @param _halvingPeriod Number of days between emission halvings (must be >= 1)
      */
     constructor(
         address _paymentToken,
         address _unit,
+        address _recipient,
         address _treasury,
         address _team,
         address _core,
         uint256 _initialEmission,
         uint256 _minEmission,
-        uint256 _minDonation
+        uint256 _halvingPeriod
     ) {
         if (_paymentToken == address(0)) revert FundRig__InvalidAddress();
         if (_unit == address(0)) revert FundRig__InvalidAddress();
+        if (_recipient == address(0)) revert FundRig__InvalidAddress();
         if (_treasury == address(0)) revert FundRig__InvalidAddress();
         if (_core == address(0)) revert FundRig__InvalidAddress();
-        if (_initialEmission == 0) revert FundRig__InvalidEmission();
+        if (_initialEmission < MIN_INITIAL_EMISSION || _initialEmission > MAX_INITIAL_EMISSION) {
+            revert FundRig__InvalidEmission();
+        }
         if (_minEmission == 0 || _minEmission > _initialEmission) revert FundRig__InvalidEmission();
-        if (_minDonation < DIVISOR / PROTOCOL_BPS) revert FundRig__InvalidMinDonation();
+        if (_halvingPeriod < MIN_HALVING_PERIOD || _halvingPeriod > MAX_HALVING_PERIOD) {
+            revert FundRig__InvalidHalvingPeriod();
+        }
 
         paymentToken = _paymentToken;
         unit = _unit;
+        recipient = _recipient;
         treasury = _treasury;
         team = _team;
         core = _core;
         initialEmission = _initialEmission;
         minEmission = _minEmission;
-        minDonation = _minDonation;
+        halvingPeriod = _halvingPeriod;
         startTime = block.timestamp;
     }
 
@@ -137,13 +152,12 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @dev Requires msg.sender to have approved this contract for `amount`.
      *      Transfers `amount` from msg.sender, splits it, and credits `account`.
      * @param account The account to credit for this funding (receives Unit on claim)
-     * @param recipient The whitelisted recipient address to receive 50% of funding
      * @param amount The amount of payment tokens to fund
      */
-    function fund(address account, address recipient, uint256 amount) external nonReentrant {
+    function fund(address account, uint256 amount) external nonReentrant {
         if (account == address(0)) revert FundRig__InvalidAddress();
-        if (amount < minDonation) revert FundRig__BelowMinDonation();
-        if (!accountToIsRecipient[recipient]) revert FundRig__NotRecipient();
+        if (amount < MIN_DONATION) revert FundRig__BelowMinDonation();
+        if (recipient == address(0)) revert FundRig__RecipientNotSet();
 
         uint256 day = currentDay();
 
@@ -172,7 +186,7 @@ contract FundRig is ReentrancyGuard, Ownable {
         dayToTotalDonated[day] += amount;
         dayAccountToDonation[day][account] += amount;
 
-        emit FundRig__Funded(account, recipient, amount, day);
+        emit FundRig__Funded(account, amount, day);
     }
 
     /**
@@ -208,22 +222,13 @@ contract FundRig is ReentrancyGuard, Ownable {
     /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
 
     /**
-     * @notice Add an address to the recipient whitelist.
-     * @param _recipient Address to whitelist
+     * @notice Set the recipient address that receives 50% of donations.
+     * @param _recipient Address to receive donations
      */
-    function addRecipient(address _recipient) external onlyOwner {
+    function setRecipient(address _recipient) external onlyOwner {
         if (_recipient == address(0)) revert FundRig__InvalidAddress();
-        accountToIsRecipient[_recipient] = true;
-        emit FundRig__RecipientAdded(_recipient);
-    }
-
-    /**
-     * @notice Remove an address from the recipient whitelist.
-     * @param _recipient Address to remove from whitelist
-     */
-    function removeRecipient(address _recipient) external onlyOwner {
-        accountToIsRecipient[_recipient] = false;
-        emit FundRig__RecipientRemoved(_recipient);
+        recipient = _recipient;
+        emit FundRig__RecipientSet(_recipient);
     }
 
     /**
@@ -267,12 +272,12 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /**
      * @notice Get the Unit emission for a specific day.
-     * @dev Emission halves every 30 days with a floor of minEmission.
+     * @dev Emission halves every halvingPeriod days with a floor of minEmission.
      * @param day The day number to query
      * @return The Unit emission for that day
      */
     function getDayEmission(uint256 day) public view returns (uint256) {
-        uint256 halvings = day / 30; // Number of 30-day periods
+        uint256 halvings = day / halvingPeriod; // Number of halving periods
         uint256 emission = initialEmission >> halvings; // Right shift = divide by 2^halvings
 
         if (emission < minEmission) {

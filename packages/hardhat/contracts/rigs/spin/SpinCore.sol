@@ -36,25 +36,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
     string public constant RIG_TYPE = "spin";
     address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    // Rig parameter bounds (mirrored from SpinRig.sol for early validation)
-    uint256 public constant RIG_MIN_EPOCH_PERIOD = 10 minutes;
-    uint256 public constant RIG_MAX_EPOCH_PERIOD = 365 days;
-    uint256 public constant RIG_MIN_PRICE_MULTIPLIER = 1.1e18;
-    uint256 public constant RIG_MAX_PRICE_MULTIPLIER = 3e18;
-    uint256 public constant RIG_ABS_MIN_INIT_PRICE = 1e6;
-    uint256 public constant RIG_ABS_MAX_INIT_PRICE = type(uint192).max;
-    uint256 public constant RIG_MAX_INITIAL_UPS = 1e24;
-    uint256 public constant RIG_MIN_HALVING_PERIOD = 7 days;
-    uint256 public constant RIG_MAX_HALVING_PERIOD = 365 days;
-
-    // Auction parameter bounds (mirrored from Auction.sol for early validation)
-    uint256 public constant AUCTION_MIN_EPOCH_PERIOD = 1 hours;
-    uint256 public constant AUCTION_MAX_EPOCH_PERIOD = 365 days;
-    uint256 public constant AUCTION_MIN_PRICE_MULTIPLIER = 1.1e18;
-    uint256 public constant AUCTION_MAX_PRICE_MULTIPLIER = 3e18;
-    uint256 public constant AUCTION_ABS_MIN_INIT_PRICE = 1e6;
-    uint256 public constant AUCTION_ABS_MAX_INIT_PRICE = type(uint192).max;
-
     /*----------  IMMUTABLES  -------------------------------------------*/
 
     address public immutable registry; // central registry for all rig types
@@ -98,6 +79,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         uint256 rigEpochPeriod; // rig auction epoch duration
         uint256 rigPriceMultiplier; // rig price multiplier
         uint256 rigMinInitPrice; // rig minimum starting price
+        uint256[] odds; // spin payout odds in basis points
         uint256 auctionInitPrice; // auction starting price
         uint256 auctionEpochPeriod; // auction epoch duration
         uint256 auctionPriceMultiplier; // auction price multiplier
@@ -113,18 +95,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
     error SpinCore__EmptyTokenSymbol();
     error SpinCore__ZeroUnitAmount();
     error SpinCore__ZeroAddress();
-    // Rig parameter errors
-    error SpinCore__RigEpochPeriodOutOfRange();
-    error SpinCore__RigPriceMultiplierOutOfRange();
-    error SpinCore__RigMinInitPriceOutOfRange();
-    error SpinCore__RigInitialUpsOutOfRange();
-    error SpinCore__RigTailUpsOutOfRange();
-    error SpinCore__RigHalvingPeriodOutOfRange();
-    // Auction parameter errors
-    error SpinCore__AuctionEpochPeriodOutOfRange();
-    error SpinCore__AuctionPriceMultiplierOutOfRange();
-    error SpinCore__AuctionInitPriceOutOfRange();
-    error SpinCore__AuctionMinInitPriceOutOfRange();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
@@ -271,7 +241,8 @@ contract SpinCore is Ownable, ReentrancyGuard {
             params.rigMinInitPrice,
             params.initialUps,
             params.halvingPeriod,
-            params.tailUps
+            params.tailUps,
+            params.odds
         );
 
         // Transfer Unit minting rights to SpinRig (permanently locked)
@@ -342,52 +313,17 @@ contract SpinCore is Ownable, ReentrancyGuard {
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
-     * @notice Validate all launch parameters upfront to fail fast.
-     * @dev Mirrors validation from SpinRig and Auction constructors for early revert.
+     * @notice Validate Core-specific launch parameters.
+     * @dev Rig and Auction parameters are validated by their respective constructors.
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        // Basic validations
         if (params.launcher == address(0)) revert SpinCore__ZeroLauncher();
         if (params.quoteToken == address(0)) revert SpinCore__ZeroQuoteToken();
         if (params.donutAmount < minDonutForLaunch) revert SpinCore__InsufficientDonut();
         if (bytes(params.tokenName).length == 0) revert SpinCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert SpinCore__EmptyTokenSymbol();
         if (params.unitAmount == 0) revert SpinCore__ZeroUnitAmount();
-
-        // Rig parameter validations
-        if (params.rigEpochPeriod < RIG_MIN_EPOCH_PERIOD || params.rigEpochPeriod > RIG_MAX_EPOCH_PERIOD) {
-            revert SpinCore__RigEpochPeriodOutOfRange();
-        }
-        if (params.rigPriceMultiplier < RIG_MIN_PRICE_MULTIPLIER || params.rigPriceMultiplier > RIG_MAX_PRICE_MULTIPLIER) {
-            revert SpinCore__RigPriceMultiplierOutOfRange();
-        }
-        if (params.rigMinInitPrice < RIG_ABS_MIN_INIT_PRICE || params.rigMinInitPrice > RIG_ABS_MAX_INIT_PRICE) {
-            revert SpinCore__RigMinInitPriceOutOfRange();
-        }
-        if (params.initialUps == 0 || params.initialUps > RIG_MAX_INITIAL_UPS) {
-            revert SpinCore__RigInitialUpsOutOfRange();
-        }
-        if (params.tailUps == 0 || params.tailUps > params.initialUps) {
-            revert SpinCore__RigTailUpsOutOfRange();
-        }
-        if (params.halvingPeriod < RIG_MIN_HALVING_PERIOD || params.halvingPeriod > RIG_MAX_HALVING_PERIOD) {
-            revert SpinCore__RigHalvingPeriodOutOfRange();
-        }
-
-        // Auction parameter validations
-        if (params.auctionEpochPeriod < AUCTION_MIN_EPOCH_PERIOD || params.auctionEpochPeriod > AUCTION_MAX_EPOCH_PERIOD) {
-            revert SpinCore__AuctionEpochPeriodOutOfRange();
-        }
-        if (params.auctionPriceMultiplier < AUCTION_MIN_PRICE_MULTIPLIER || params.auctionPriceMultiplier > AUCTION_MAX_PRICE_MULTIPLIER) {
-            revert SpinCore__AuctionPriceMultiplierOutOfRange();
-        }
-        if (params.auctionMinInitPrice < AUCTION_ABS_MIN_INIT_PRICE || params.auctionMinInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert SpinCore__AuctionMinInitPriceOutOfRange();
-        }
-        if (params.auctionInitPrice < params.auctionMinInitPrice || params.auctionInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert SpinCore__AuctionInitPriceOutOfRange();
-        }
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

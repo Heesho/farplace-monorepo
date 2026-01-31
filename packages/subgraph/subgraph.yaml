@@ -5,15 +5,15 @@ schema:
   file: ./schema.graphql
 dataSources:
   # ==========================================================================
-  # SEAT CORE - Launches MineRigs
+  # MINE CORE - Launches MineRigs
   # ==========================================================================
   - kind: ethereum
     name: MineCore
     network: base
     source:
-      address: "0x0000000000000000000000000000000000000001" # TODO: Update after deployment
+      address: "0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1"
       abi: MineCore
-      startBlock: 1
+      startBlock: 41520035
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -30,20 +30,20 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: Core__Launched(address,address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: MineCore__Launched(address,address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleMineCoreLaunched
       file: ./src/cores/mineCore.ts
 
   # ==========================================================================
-  # SPIN CORE - Launches SlotRigs
+  # SPIN CORE - Launches SpinRigs
   # ==========================================================================
   - kind: ethereum
-    name: SlotCore
+    name: SpinCore
     network: base
     source:
-      address: "0x0000000000000000000000000000000000000002" # TODO: Update after deployment
-      abi: SlotCore
-      startBlock: 1
+      address: "0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631"
+      abi: SpinCore
+      startBlock: 41520035
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -55,25 +55,25 @@ dataSources:
         - SlotRig
         - Account
       abis:
-        - name: SlotCore
-          file: ./abis/SlotCore.json
+        - name: SpinCore
+          file: ./abis/SpinCore.json
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: SlotCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
-          handler: handleSlotCoreLaunched
-      file: ./src/cores/slotCore.ts
+        - event: SpinCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+          handler: handleSpinCoreLaunched
+      file: ./src/cores/spinCore.ts
 
   # ==========================================================================
-  # CHARITY CORE - Launches FundRigs
+  # FUND CORE - Launches FundRigs
   # ==========================================================================
   - kind: ethereum
     name: FundCore
     network: base
     source:
-      address: "0x0000000000000000000000000000000000000004" # TODO: Update after deployment
+      address: "0x85f3e3135329272820ADC27F2561241f4b4e90db"
       abi: FundCore
-      startBlock: 1
+      startBlock: 41520035
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -90,7 +90,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleFundCoreLaunched
       file: ./src/cores/fundCore.ts
 
@@ -126,7 +126,7 @@ templates:
       file: ./src/pair.ts
 
   # ==========================================================================
-  # SEAT RIG - Mining events
+  # MINE RIG - Mining events
   # ==========================================================================
   - kind: ethereum
     name: MineRig
@@ -153,25 +153,25 @@ templates:
         - event: Rig__MinerFee(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleSeatMinerFee
         - event: Rig__Mint(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleSeatMint
+          handler: handleMineMint
         - event: Rig__TreasuryFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleSeatTreasuryFee
+          handler: handleMineTreasuryFee
         - event: Rig__TeamFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleSeatTeamFee
+          handler: handleMineTeamFee
         - event: Rig__ProtocolFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleSeatProtocolFee
+          handler: handleMineProtocolFee
         - event: Rig__CapacitySet(uint256)
-          handler: handleSeatCapacitySet
+          handler: handleMineCapacitySet
       file: ./src/rigs/mineRig.ts
 
   # ==========================================================================
   # SPIN RIG - Spin and Win events
   # ==========================================================================
   - kind: ethereum
-    name: SlotRig
+    name: SpinRig
     network: base
     source:
-      abi: SlotRig
+      abi: SpinRig
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -183,21 +183,23 @@ templates:
         - Account
         - Unit
       abis:
-        - name: SlotRig
-          file: ./abis/SlotRig.json
+        - name: SpinRig
+          file: ./abis/SpinRig.json
       eventHandlers:
-        - event: SlotRig__Spin(indexed address,indexed address,indexed uint256,uint256)
+        - event: SpinRig__Spin(indexed address,indexed address,indexed uint256,uint256)
           handler: handleSpin
-        - event: SlotRig__Win(indexed address,indexed uint256,uint256,uint256)
+        - event: SpinRig__Win(indexed address,indexed uint256,uint256,uint256)
           handler: handleWin
-        - event: SlotRig__TreasuryFee(indexed address,indexed uint256,uint256)
+        - event: SpinRig__TreasuryFee(indexed address,indexed uint256,uint256)
           handler: handleSpinTreasuryFee
-        - event: SlotRig__TeamFee(indexed address,indexed uint256,uint256)
+        - event: SpinRig__TeamFee(indexed address,indexed uint256,uint256)
           handler: handleSpinTeamFee
-      file: ./src/rigs/slotRig.ts
+        - event: SpinRig__ProtocolFee(indexed address,indexed uint256,uint256)
+          handler: handleSpinProtocolFee
+      file: ./src/rigs/spinRig.ts
 
   # ==========================================================================
-  # CHARITY RIG - Donation events
+  # FUND RIG - Donation events
   # ==========================================================================
   - kind: ethereum
     name: FundRig
@@ -218,10 +220,12 @@ templates:
         - name: FundRig
           file: ./abis/FundRig.json
       eventHandlers:
-        - event: FundRig__Donated(indexed address,indexed address,uint256,uint256)
-          handler: handleDonation
+        - event: FundRig__Funded(indexed address,uint256,uint256)
+          handler: handleFunded
         - event: FundRig__Claimed(indexed address,uint256,uint256)
           handler: handleCharityClaimed
+        - event: FundRig__ProtocolFee(indexed address,uint256,uint256)
+          handler: handleFundProtocolFee
       file: ./src/rigs/fundRig.ts
 
   # ==========================================================================

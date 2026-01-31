@@ -105,6 +105,8 @@ describe("MineRig Invariant Tests", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.001", 18),
+      upsMultipliers: [],
+      upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -115,7 +117,7 @@ describe("MineRig Invariant Tests", function () {
     const tx = await core.connect(user0).launch(launchParams);
     const receipt = await tx.wait();
 
-    const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+    const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
     rig = launchEvent.args.rig;
     unit = launchEvent.args.unit;
     auction = launchEvent.args.auction;
@@ -727,6 +729,8 @@ describe("MineRig Business Logic Tests", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.001", 18),
+      upsMultipliers: [],
+      upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -737,7 +741,7 @@ describe("MineRig Business Logic Tests", function () {
     const tx = await core.connect(user0).launch(launchParams);
     const receipt = await tx.wait();
 
-    const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+    const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
     rig = launchEvent.args.rig;
     unit = launchEvent.args.unit;
     auction = launchEvent.args.auction;

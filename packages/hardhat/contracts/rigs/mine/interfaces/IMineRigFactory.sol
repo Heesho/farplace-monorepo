@@ -18,6 +18,8 @@ interface IMineRigFactory {
         uint256 _minInitPrice,
         uint256 _initialUps,
         uint256 _halvingAmount,
-        uint256 _tailUps
+        uint256 _tailUps,
+        uint256[] calldata _upsMultipliers,
+        uint256 _upsMultiplierDuration
     ) external returns (address);
 }

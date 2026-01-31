@@ -1,16 +1,16 @@
 {
   "mcpServers": {
     "context7": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
     },
     "playwright": {
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp"]
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
     },
     "shadcn": {
-      "command": "cmd",
-      "args": ["/c", "npx", "shadcn@latest", "mcp"]
+      "command": "npx",
+      "args": ["-y", "shadcn@latest", "mcp"]
     },
     "Neynar": {
       "type": "http",

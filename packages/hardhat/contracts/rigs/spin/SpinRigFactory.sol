@@ -34,7 +34,8 @@ contract SpinRigFactory {
         uint256 _minInitPrice,
         uint256 _initialUps,
         uint256 _halvingPeriod,
-        uint256 _tailUps
+        uint256 _tailUps,
+        uint256[] calldata _odds
     ) external returns (address) {
         SpinRig.Config memory config = SpinRig.Config({
             epochPeriod: _epochPeriod,
@@ -42,7 +43,8 @@ contract SpinRigFactory {
             minInitPrice: _minInitPrice,
             initialUps: _initialUps,
             halvingPeriod: _halvingPeriod,
-            tailUps: _tailUps
+            tailUps: _tailUps,
+            odds: _odds
         });
 
         SpinRig rig = new SpinRig(

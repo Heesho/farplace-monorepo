@@ -25,7 +25,7 @@ interface IFundRig {
     function minDonation() external view returns (uint256);
 
     // State
-    function accountToIsRecipient(address recipient) external view returns (bool);
+    function recipient() external view returns (address);
     function treasury() external view returns (address);
     function team() external view returns (address);
     function dayToTotalDonated(uint256 day) external view returns (uint256);
@@ -34,12 +34,11 @@ interface IFundRig {
     function uri() external view returns (string memory);
 
     // External functions
-    function fund(address account, address recipient, uint256 amount) external;
+    function fund(address account, uint256 amount) external;
     function claim(address account, uint256 day) external;
 
     // Restricted functions
-    function addRecipient(address _recipient) external;
-    function removeRecipient(address _recipient) external;
+    function setRecipient(address _recipient) external;
     function setTreasury(address _treasury) external;
     function setTeam(address _team) external;
     function setUri(string calldata _uri) external;
@@ -53,10 +52,9 @@ interface IFundRig {
     function getDayTotal(uint256 day) external view returns (uint256);
 
     // Events
-    event FundRig__Funded(address indexed account, address indexed recipient, uint256 amount, uint256 day);
+    event FundRig__Funded(address indexed account, uint256 amount, uint256 day);
     event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
-    event FundRig__RecipientAdded(address indexed recipient);
-    event FundRig__RecipientRemoved(address indexed recipient);
+    event FundRig__RecipientSet(address indexed recipient);
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
     event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);

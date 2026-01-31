@@ -60,7 +60,6 @@ interface ISpinRig {
     // Restricted functions
     function setTreasury(address _treasury) external;
     function setTeam(address _team) external;
-    function setOdds(uint256[] calldata _odds) external;
     function setUri(string calldata _uri) external;
     function transferOwnership(address newOwner) external;
 
@@ -96,6 +95,5 @@ interface ISpinRig {
     event SpinRig__EmissionMinted(uint256 indexed epochId, uint256 amount);
     event SpinRig__TreasurySet(address indexed treasury);
     event SpinRig__TeamSet(address indexed team);
-    event SpinRig__OddsSet(uint256[] odds);
     event SpinRig__UriSet(string uri);
 }

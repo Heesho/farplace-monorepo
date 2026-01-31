@@ -1,5 +1,5 @@
 import { Address } from '@graphprotocol/graph-ts'
-import { Core__Launched as CoreLaunchedEvent } from '../../generated/MineCore/MineCore'
+import { MineCore__Launched as CoreLaunchedEvent } from '../../generated/MineCore/MineCore'
 import {
   UniswapV2Pair as PairTemplate,
   MineRig as MineRigTemplate,
@@ -76,6 +76,9 @@ export function handleMineCoreLaunched(event: CoreLaunchedEvent): void {
   // Create MineRig specialized entity
   let mineRig = new MineRig(rigAddress.toHexString())
   mineRig.rig = rig.id
+  mineRig.initialUps = event.params.initialUps
+  mineRig.tailUps = event.params.tailUps
+  mineRig.halvingAmount = event.params.halvingAmount
   mineRig.capacity = ONE_BI // Default, updated via CapacitySet event
   mineRig.epochPeriod = event.params.rigEpochPeriod
   mineRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)

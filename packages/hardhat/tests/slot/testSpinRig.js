@@ -18,7 +18,7 @@ const ONE_HOUR = 3600;
 const ONE_DAY = 86400;
 const THIRTY_DAYS = ONE_DAY * 30;
 
-describe("SlotRig Tests", function () {
+describe("SpinRig Tests", function () {
   before("Initial set up", async function () {
     await network.provider.send("hardhat_reset");
     console.log("Begin Initialization");
@@ -40,13 +40,13 @@ describe("SlotRig Tests", function () {
     mockCore = await mockCoreArtifact.deploy(protocol.address);
     console.log("- MockCore Initialized");
 
-    // Deploy Unit token
+    // Deploy Unit token (owner is initial rig, will transfer to SpinRig)
     const unitArtifact = await ethers.getContractFactory("Unit");
-    unitToken = await unitArtifact.deploy("Test Unit", "TUNIT");
+    unitToken = await unitArtifact.deploy("Test Unit", "TUNIT", owner.address);
     console.log("- Unit Token Initialized");
 
-    // Deploy SlotRig
-    const rigArtifact = await ethers.getContractFactory("SlotRig");
+    // Deploy SpinRig
+    const rigArtifact = await ethers.getContractFactory("SpinRig");
     const config = {
       epochPeriod: ONE_HOUR, // 1 hour epochs
       priceMultiplier: convert("2", 18), // 2x
@@ -54,6 +54,7 @@ describe("SlotRig Tests", function () {
       initialUps: convert("4", 18), // 4 tokens per second
       halvingPeriod: THIRTY_DAYS, // 30 days
       tailUps: convert("0.01", 18), // 0.01 tokens per second
+      odds: [10], // 0.1% default odds
     };
 
     rig = await rigArtifact.deploy(
@@ -64,11 +65,11 @@ describe("SlotRig Tests", function () {
       mockCore.address, // core
       config
     );
-    console.log("- SlotRig Initialized");
+    console.log("- SpinRig Initialized");
 
     // Transfer minting rights to Rig
     await unitToken.setRig(rig.address);
-    console.log("- Minting rights transferred to SlotRig");
+    console.log("- Minting rights transferred to SpinRig");
 
     // Mint payment tokens to users
     await paymentToken.mint(user0.address, convert("10000", 6));
@@ -79,7 +80,7 @@ describe("SlotRig Tests", function () {
     console.log("Initialization Complete\n");
   });
 
-  describe("SlotRig Configuration Tests", function () {
+  describe("SpinRig Configuration Tests", function () {
     it("Should have correct initial state", async function () {
       expect(await rig.unit()).to.equal(unitToken.address);
       expect(await rig.quote()).to.equal(paymentToken.address);
@@ -92,8 +93,8 @@ describe("SlotRig Tests", function () {
       expect(await rig.PROTOCOL_BPS()).to.equal(100); // 1%
       // Treasury receives remainder (95%)
       expect(await rig.DIVISOR()).to.equal(10000);
-      expect(await rig.MIN_ODDS_BPS()).to.equal(100); // 1%
-      expect(await rig.MAX_ODDS_BPS()).to.equal(10000); // 100%
+      expect(await rig.MIN_ODDS_BPS()).to.equal(10); // 0.1%
+      expect(await rig.MAX_ODDS_BPS()).to.equal(8000); // 80%
     });
 
     it("Should have correct configured parameters", async function () {
@@ -105,38 +106,94 @@ describe("SlotRig Tests", function () {
       expect(await rig.tailUps()).to.equal(convert("0.01", 18));
     });
 
-    it("Should have default odds of 1%", async function () {
+    it("Should have default odds of 0.1%", async function () {
       const odds = await rig.getOdds();
       expect(odds.length).to.equal(1);
-      expect(odds[0]).to.equal(100); // 1% = 100 basis points
+      expect(odds[0]).to.equal(10); // 0.1% = 10 basis points
     });
 
-    it("Should allow owner to set odds", async function () {
-      await rig.connect(owner).setOdds([100, 500, 1000, 2000]); // 1%, 5%, 10%, 20%
-      const odds = await rig.getOdds();
+    it("Should support multiple odds values set at deploy time", async function () {
+      // Deploy a new SpinRig with multiple odds
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const multiOddsConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("4", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("0.01", 18),
+        odds: [10, 500, 1000, 2000],
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
+      const rig2 = await rigArtifact.deploy(
+        unitToken.address,
+        paymentToken.address,
+        mockEntropy.address,
+        treasury.address,
+        mockCore2.address,
+        multiOddsConfig
+      );
+      const odds = await rig2.getOdds();
       expect(odds.length).to.equal(4);
-      expect(odds[0]).to.equal(100);
+      expect(odds[0]).to.equal(10);
       expect(odds[1]).to.equal(500);
       expect(odds[2]).to.equal(1000);
       expect(odds[3]).to.equal(2000);
     });
 
-    it("Should prevent setting odds below minimum", async function () {
+    it("Should prevent deploying with odds below minimum", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("4", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("0.01", 18),
+        odds: [5], // 0.05% - below minimum 0.1%
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rig.connect(owner).setOdds([50]) // 0.5% - below minimum 1%
-      ).to.be.revertedWith("SlotRig__OddsTooLow()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
-    it("Should prevent setting odds above maximum", async function () {
+    it("Should prevent deploying with odds above maximum", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("4", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("0.01", 18),
+        odds: [9000], // 90% - above maximum 80%
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rig.connect(owner).setOdds([15000]) // 150% - above maximum 100%
-      ).to.be.revertedWith("SlotRig__InvalidOdds()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
-    it("Should prevent setting empty odds", async function () {
+    it("Should prevent deploying with empty odds", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("4", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("0.01", 18),
+        odds: [], // empty
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rig.connect(owner).setOdds([])
-      ).to.be.revertedWith("SlotRig__InvalidOdds()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
     it("Should allow owner to update treasury", async function () {
@@ -177,7 +234,7 @@ describe("SlotRig Tests", function () {
       // Slot at price 0 to start new epoch
       const fee = await rig.getEntropyFee();
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(user0.address, 0, Date.now() + 3600, convert("1000", 6), { value: fee });
+      await rig.connect(user0).spin(user0.address, 0, Date.now() + 3600, convert("1000", 6), { value: fee });
 
       // Now we have a fresh epoch with initPrice set
       const priceAfterSlot = await rig.getPrice();
@@ -199,10 +256,7 @@ describe("SlotRig Tests", function () {
   });
 
   describe("Slot and Win Tests", function () {
-    beforeEach(async function () {
-      // Reset odds to a known state
-      await rig.connect(owner).setOdds([1000]); // 10% payout on every slot
-    });
+    // odds are set at deploy time (default: [10] = 0.1%)
 
     it("Should accumulate emissions in prize pool", async function () {
       const poolBefore = await rig.getPrizePool();
@@ -223,7 +277,7 @@ describe("SlotRig Tests", function () {
       // Approve and slot
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
-      const tx = await rig.connect(user0).slot(
+      const tx = await rig.connect(user0).spin(
         user0.address,
         epochId,
         Date.now() + 3600,
@@ -232,13 +286,13 @@ describe("SlotRig Tests", function () {
       );
 
       const receipt = await tx.wait();
-      const slotEvent = receipt.events.find((e) => e.event === "SlotRig__Slot");
-      const entropyEvent = receipt.events.find((e) => e.event === "SlotRig__EntropyRequested");
+      const spinEvent = receipt.events.find((e) => e.event === "SpinRig__Spin");
+      const entropyEvent = receipt.events.find((e) => e.event === "SpinRig__EntropyRequested");
 
-      expect(slotEvent).to.not.be.undefined;
+      expect(spinEvent).to.not.be.undefined;
       expect(entropyEvent).to.not.be.undefined;
 
-      console.log("Slot price:", divDec(slotEvent.args.price, 6), "USDC");
+      console.log("Slot price:", divDec(spinEvent.args.price, 6), "USDC");
 
       // Get sequence number from entropy request
       const sequenceNumber = entropyEvent.args.sequenceNumber;
@@ -248,7 +302,7 @@ describe("SlotRig Tests", function () {
       await mockEntropy.fulfillEntropy(sequenceNumber, randomNumber);
 
       // Check for Win event
-      const filter = rig.filters.SlotRig__Win();
+      const filter = rig.filters.SpinRig__Win();
       const events = await rig.queryFilter(filter);
       expect(events.length).to.be.gt(0);
 
@@ -274,7 +328,7 @@ describe("SlotRig Tests", function () {
       // Approve and slot
       await paymentToken.connect(user1).approve(rig.address, price.add(convert("100", 6)));
 
-      await rig.connect(user1).slot(
+      await rig.connect(user1).spin(
         user1.address,
         epochId,
         Date.now() + 3600,
@@ -302,8 +356,8 @@ describe("SlotRig Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(user0.address, epochId, 1, convert("1000", 6), { value: fee })
-      ).to.be.revertedWith("SlotRig__Expired()");
+        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), { value: fee })
+      ).to.be.revertedWith("SpinRig__Expired()");
     });
 
     it("Should prevent slot with wrong epoch ID", async function () {
@@ -312,8 +366,8 @@ describe("SlotRig Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(user0.address, 9999, Date.now() + 3600, convert("1000", 6), { value: fee })
-      ).to.be.revertedWith("SlotRig__EpochIdMismatch()");
+        rig.connect(user0).spin(user0.address, 9999, Date.now() + 3600, convert("1000", 6), { value: fee })
+      ).to.be.revertedWith("SpinRig__EpochIdMismatch()");
     });
 
     it("Should prevent slot with price exceeding max", async function () {
@@ -325,8 +379,8 @@ describe("SlotRig Tests", function () {
         await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
         await expect(
-          rig.connect(user0).slot(user0.address, epochId, Date.now() + 3600, 1, { value: fee })
-        ).to.be.revertedWith("SlotRig__MaxPriceExceeded()");
+          rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, 1, { value: fee })
+        ).to.be.revertedWith("SpinRig__MaxPriceExceeded()");
       }
     });
 
@@ -336,19 +390,19 @@ describe("SlotRig Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(user0.address, epochId, Date.now() + 3600, convert("1000", 6), { value: 0 })
-      ).to.be.revertedWith("SlotRig__InsufficientFee()");
+        rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, convert("1000", 6), { value: 0 })
+      ).to.be.revertedWith("SpinRig__InsufficientFee()");
     });
 
-    it("Should prevent slot with zero slotner address", async function () {
+    it("Should prevent slot with zero spinner address", async function () {
       const epochId = await rig.getEpochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(AddressZero, epochId, Date.now() + 3600, convert("1000", 6), { value: fee })
-      ).to.be.revertedWith("SlotRig__InvalidSlotner()");
+        rig.connect(user0).spin(AddressZero, epochId, Date.now() + 3600, convert("1000", 6), { value: fee })
+      ).to.be.revertedWith("SpinRig__InvalidSpinner()");
     });
   });
 

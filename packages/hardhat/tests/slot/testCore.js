@@ -8,12 +8,12 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 
 let owner, protocol, user0, user1, user2;
 let usdc, donut, registry, core;
-let slotRig, auction, unit, lpToken;
-let unitFactory, slotRigFactory, auctionFactory;
+let spinRig, auction, unit, lpToken;
+let unitFactory, spinRigFactory, auctionFactory;
 let uniswapFactory, uniswapRouter;
 let mockEntropy;
 
-describe("SlotCore Launch Tests", function () {
+describe("SpinCore Launch Tests", function () {
   before("Initial set up", async function () {
     await network.provider.send("hardhat_reset");
     console.log("Begin Initialization");
@@ -54,33 +54,33 @@ describe("SlotCore Launch Tests", function () {
     unitFactory = await unitFactoryArtifact.deploy();
     console.log("- UnitFactory Initialized");
 
-    const slotRigFactoryArtifact = await ethers.getContractFactory("SlotRigFactory");
-    slotRigFactory = await slotRigFactoryArtifact.deploy();
-    console.log("- SlotRigFactory Initialized");
+    const spinRigFactoryArtifact = await ethers.getContractFactory("SpinRigFactory");
+    spinRigFactory = await spinRigFactoryArtifact.deploy();
+    console.log("- SpinRigFactory Initialized");
 
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
     console.log("- AuctionFactory Initialized");
 
-    // Deploy SlotCore
-    const coreArtifact = await ethers.getContractFactory("SlotCore");
+    // Deploy SpinCore
+    const coreArtifact = await ethers.getContractFactory("SpinCore");
     core = await coreArtifact.deploy(
       registry.address,
       donut.address,
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      slotRigFactory.address,
+      spinRigFactory.address,
       auctionFactory.address,
       mockEntropy.address,
       protocol.address,
       convert("100", 18) // minDonutForLaunch
     );
-    console.log("- SlotCore Initialized");
+    console.log("- SpinCore Initialized");
 
-    // Approve SlotCore as factory in Registry
+    // Approve SpinCore as factory in Registry
     await registry.setFactoryApproval(core.address, true);
-    console.log("- SlotCore approved in Registry");
+    console.log("- SpinCore approved in Registry");
 
     // Mint DONUT to user0 for launching
     await donut.connect(user0).deposit({ value: convert("1000", 18) });
@@ -96,11 +96,11 @@ describe("SlotCore Launch Tests", function () {
     expect(await core.entropy()).to.equal(mockEntropy.address);
     expect(await core.minDonutForLaunch()).to.equal(convert("100", 18));
     expect(await core.deployedRigsLength()).to.equal(0);
-    expect(await core.RIG_TYPE()).to.equal("slot");
+    expect(await core.RIG_TYPE()).to.equal("spin");
     console.log("Core state verified");
   });
 
-  it("Launch a new slot rig", async function () {
+  it("Launch a new spin rig", async function () {
     console.log("******************************************************");
 
     const launchParams = {
@@ -116,6 +116,7 @@ describe("SlotCore Launch Tests", function () {
       rigEpochPeriod: 3600, // 1 hour
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("1", 6),
+      odds: [10],
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400, // 1 day
       auctionPriceMultiplier: convert("1.5", 18),
@@ -130,38 +131,38 @@ describe("SlotCore Launch Tests", function () {
     const receipt = await tx.wait();
 
     // Get deployed addresses from event
-    const launchEvent = receipt.events.find((e) => e.event === "SlotCore__Launched");
-    slotRig = launchEvent.args.rig;
+    const launchEvent = receipt.events.find((e) => e.event === "SpinCore__Launched");
+    spinRig = launchEvent.args.rig;
     unit = launchEvent.args.unit;
     auction = launchEvent.args.auction;
     lpToken = launchEvent.args.lpToken;
 
-    console.log("SlotRig deployed at:", slotRig);
+    console.log("SpinRig deployed at:", spinRig);
     console.log("Unit token deployed at:", unit);
     console.log("Auction deployed at:", auction);
     console.log("LP Token at:", lpToken);
 
     // Verify registry
-    expect(await core.isDeployedRig(slotRig)).to.equal(true);
-    expect(await core.rigToLauncher(slotRig)).to.equal(user0.address);
-    expect(await core.rigToUnit(slotRig)).to.equal(unit);
-    expect(await core.rigToAuction(slotRig)).to.equal(auction);
-    expect(await core.rigToLP(slotRig)).to.equal(lpToken);
-    expect(await core.rigToQuote(slotRig)).to.equal(usdc.address);
+    expect(await core.isDeployedRig(spinRig)).to.equal(true);
+    expect(await core.rigToLauncher(spinRig)).to.equal(user0.address);
+    expect(await core.rigToUnit(spinRig)).to.equal(unit);
+    expect(await core.rigToAuction(spinRig)).to.equal(auction);
+    expect(await core.rigToLP(spinRig)).to.equal(lpToken);
+    expect(await core.rigToQuote(spinRig)).to.equal(usdc.address);
     expect(await core.deployedRigsLength()).to.equal(1);
   });
 
-  it("SlotRig ownership transferred to launcher", async function () {
+  it("SpinRig ownership transferred to launcher", async function () {
     console.log("******************************************************");
-    const rigContract = await ethers.getContractAt("SlotRig", slotRig);
+    const rigContract = await ethers.getContractAt("SpinRig", spinRig);
     expect(await rigContract.owner()).to.equal(user0.address);
-    console.log("SlotRig owner:", await rigContract.owner());
+    console.log("SpinRig owner:", await rigContract.owner());
   });
 
-  it("Unit minting rights transferred to SlotRig", async function () {
+  it("Unit minting rights transferred to SpinRig", async function () {
     console.log("******************************************************");
     const unitContract = await ethers.getContractAt("Unit", unit);
-    expect(await unitContract.rig()).to.equal(slotRig);
+    expect(await unitContract.rig()).to.equal(spinRig);
     console.log("Unit rig:", await unitContract.rig());
   });
 
@@ -173,9 +174,9 @@ describe("SlotCore Launch Tests", function () {
     expect(deadBalance).to.be.gt(0);
   });
 
-  it("SlotRig parameters correct", async function () {
+  it("SpinRig parameters correct", async function () {
     console.log("******************************************************");
-    const rigContract = await ethers.getContractAt("SlotRig", slotRig);
+    const rigContract = await ethers.getContractAt("SpinRig", spinRig);
 
     expect(await rigContract.unit()).to.equal(unit);
     expect(await rigContract.quote()).to.equal(usdc.address);
@@ -188,7 +189,7 @@ describe("SlotCore Launch Tests", function () {
     expect(await rigContract.priceMultiplier()).to.equal(convert("2", 18));
     expect(await rigContract.minInitPrice()).to.equal(convert("1", 6));
 
-    console.log("SlotRig parameters verified");
+    console.log("SpinRig parameters verified");
   });
 
   it("Cannot launch with insufficient DONUT", async function () {
@@ -207,6 +208,7 @@ describe("SlotCore Launch Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("1", 6),
+      odds: [10],
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -216,7 +218,7 @@ describe("SlotCore Launch Tests", function () {
     await donut.connect(user0).approve(core.address, launchParams.donutAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "SlotCore__InsufficientDonut()"
+      "SpinCore__InsufficientDonut()"
     );
     console.log("Launch correctly reverted with insufficient DONUT");
   });
@@ -237,6 +239,7 @@ describe("SlotCore Launch Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("1", 6),
+      odds: [10],
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -246,7 +249,7 @@ describe("SlotCore Launch Tests", function () {
     await donut.connect(user0).approve(core.address, launchParams.donutAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "SlotCore__ZeroLauncher()"
+      "SpinCore__ZeroLauncher()"
     );
     console.log("Launch correctly reverted with zero launcher address");
   });
@@ -267,6 +270,7 @@ describe("SlotCore Launch Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("1", 6),
+      odds: [10],
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -276,7 +280,7 @@ describe("SlotCore Launch Tests", function () {
     await donut.connect(user0).approve(core.address, launchParams.donutAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "SlotCore__RigHalvingPeriodOutOfRange()"
+      "SpinRig__HalvingPeriodOutOfRange()"
     );
     console.log("Launch correctly reverted with invalid halving period");
   });
@@ -311,7 +315,7 @@ describe("SlotCore Launch Tests", function () {
     await core.connect(owner).setMinDonutForLaunch(convert("100", 18));
   });
 
-  it("Can launch multiple slot rigs", async function () {
+  it("Can launch multiple spin rigs", async function () {
     console.log("******************************************************");
 
     const launchParams = {
@@ -327,6 +331,7 @@ describe("SlotCore Launch Tests", function () {
       rigEpochPeriod: 7200, // 2 hours
       rigPriceMultiplier: convert("1.5", 18),
       rigMinInitPrice: convert("100", 6),
+      odds: [10],
       auctionInitPrice: convert("2000", 6),
       auctionEpochPeriod: 86400 * 2,
       auctionPriceMultiplier: convert("2", 18),
@@ -341,6 +346,6 @@ describe("SlotCore Launch Tests", function () {
     await tx.wait();
 
     expect(await core.deployedRigsLength()).to.equal(2);
-    console.log("Second slot rig launched. Total:", (await core.deployedRigsLength()).toString());
+    console.log("Second spin rig launched. Total:", (await core.deployedRigsLength()).toString());
   });
 });

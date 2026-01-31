@@ -1,4 +1,4 @@
-# Mineport
+# Farplace
 
 A permissionless token launchpad on Base that distributes tokens through gamified mining mechanisms. Instead of traditional token sales or airdrops, users compete for tokens through Dutch auction-style mechanics where engagement determines distribution.
 
@@ -24,7 +24,7 @@ A permissionless token launchpad on Base that distributes tokens through gamifie
 
 ## Overview
 
-Mineport reimagines token distribution by turning it into a competitive game. When someone launches a token on Mineport:
+Farplace reimagines token distribution by turning it into a competitive game. When someone launches a token on Farplace:
 
 1. A new **Unit** token is created with minting controlled by a "Rig" contract
 2. Initial liquidity is created by pairing the Unit with DONUT on Uniswap V2
@@ -51,7 +51,7 @@ Creator provides DONUT → Unit token created → LP created & burned → Rig de
 
 ## Rig Types
 
-Mineport supports multiple "Rig" types, each with a unique distribution mechanism:
+Farplace supports multiple "Rig" types, each with a unique distribution mechanism:
 
 ### Seat Rig
 

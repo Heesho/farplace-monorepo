@@ -37,6 +37,8 @@ async function launchFreshRig(launcher, params = {}) {
     rigEpochPeriod: 3600,
     rigPriceMultiplier: convert("2", 18),
     rigMinInitPrice: convert("0.0001", 18),
+    upsMultipliers: [],
+    upsMultiplierDuration: 86400,
     auctionInitPrice: convert("1", 18),
     auctionEpochPeriod: 86400,
     auctionPriceMultiplier: convert("1.2", 18),
@@ -47,7 +49,7 @@ async function launchFreshRig(launcher, params = {}) {
   await donut.connect(launcher).approve(core.address, launchParams.donutAmount);
   const tx = await core.connect(launcher).launch(launchParams);
   const receipt = await tx.wait();
-  const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+  const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
 
   return {
     rig: launchEvent.args.rig,
@@ -144,7 +146,7 @@ describe("Business Logic Tests", function () {
     await registry.setFactoryApproval(core.address, true);
 
     // Deploy Multicall
-    const multicallArtifact = await ethers.getContractFactory("Multicall");
+    const multicallArtifact = await ethers.getContractFactory("MineMulticall");
     multicall = await multicallArtifact.deploy(core.address, donut.address);
 
     // Mint DONUT to users for launching (need enough for many rigs at 500 each)
@@ -864,9 +866,9 @@ describe("Business Logic Tests", function () {
     it("setRig cannot set to zero address", async function () {
       // Deploy a fresh Unit where we control the rig
       const UnitFactory = await ethers.getContractFactory("Unit");
-      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH");
+      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH", user0.address);
 
-      // user0 is the initial rig (deployer)
+      // user0 is the initial rig
       expect(await freshUnit.rig()).to.equal(user0.address);
 
       // Cannot set rig to zero address
@@ -878,9 +880,9 @@ describe("Business Logic Tests", function () {
     it("setRig transfers minting rights", async function () {
       // Deploy a fresh Unit where we control the rig
       const UnitFactory = await ethers.getContractFactory("Unit");
-      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH");
+      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH", user0.address);
 
-      // user0 is the initial rig (deployer)
+      // user0 is the initial rig
       expect(await freshUnit.rig()).to.equal(user0.address);
 
       // user0 can mint
@@ -922,7 +924,7 @@ describe("Business Logic Tests", function () {
     it("Unit__RigSet event is emitted on setRig", async function () {
       // Deploy a fresh Unit where we control the rig
       const UnitFactory = await ethers.getContractFactory("Unit");
-      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH");
+      const freshUnit = await UnitFactory.connect(user0).deploy("Fresh Unit", "FRESH", user0.address);
 
       // Transfer rig to user1 and check event
       await expect(freshUnit.connect(user0).setRig(user1.address))
@@ -953,12 +955,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigInitialUpsOutOfRange()");
+      ).to.be.revertedWith("Rig__ZeroInitialUps()");
     });
 
     it("Reverts with zero tailUps", async function () {
@@ -979,12 +983,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigTailUpsOutOfRange()");
+      ).to.be.revertedWith("Rig__TailUpsOutOfRange()");
     });
 
     it("Reverts when tailUps > initialUps", async function () {
@@ -1005,12 +1011,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigTailUpsOutOfRange()");
+      ).to.be.revertedWith("Rig__TailUpsOutOfRange()");
     });
 
     it("Reverts with zero halvingAmount", async function () {
@@ -1031,12 +1039,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigHalvingAmountOutOfRange()");
+      ).to.be.revertedWith("Rig__ZeroHalvingAmount()");
     });
 
     it("Reverts with empty token symbol", async function () {
@@ -1057,6 +1067,8 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
@@ -1240,12 +1252,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 60, // Below 1 hour minimum
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__AuctionEpochPeriodOutOfRange()");
+      ).to.be.revertedWith("Auction__EpochPeriodOutOfRange()");
     });
 
     it("Reverts if price multiplier below minimum", async function () {
@@ -1266,12 +1280,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.05", 18), // Below 1.1x minimum
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__AuctionPriceMultiplierOutOfRange()");
+      ).to.be.revertedWith("Auction__PriceMultiplierOutOfRange()");
     });
 
     it("Reverts if price multiplier above maximum", async function () {
@@ -1292,12 +1308,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("4", 18), // Above 3x maximum
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__AuctionPriceMultiplierOutOfRange()");
+      ).to.be.revertedWith("Auction__PriceMultiplierOutOfRange()");
     });
 
     it("Reverts if minInitPrice below absolute minimum", async function () {
@@ -1318,12 +1336,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: 100, // Below 1e6 minimum
         })
-      ).to.be.revertedWith("Core__AuctionMinInitPriceOutOfRange()");
+      ).to.be.revertedWith("Auction__MinInitPriceOutOfRange()");
     });
   });
 
@@ -1349,12 +1369,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 300, // 5 minutes - below 10 minute minimum
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigEpochPeriodOutOfRange()");
+      ).to.be.revertedWith("Rig__EpochPeriodOutOfRange()");
     });
 
     it("Reverts if rig epoch period above maximum (365 days)", async function () {
@@ -1375,12 +1397,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 86400 * 366, // 366 days - above 365 day maximum
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigEpochPeriodOutOfRange()");
+      ).to.be.revertedWith("Rig__EpochPeriodOutOfRange()");
     });
 
     it("Reverts if rig price multiplier below minimum (110%)", async function () {
@@ -1401,12 +1425,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("1.05", 18), // 105% - below 110% minimum
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigPriceMultiplierOutOfRange()");
+      ).to.be.revertedWith("Rig__PriceMultiplierOutOfRange()");
     });
 
     it("Reverts if rig price multiplier above maximum (300%)", async function () {
@@ -1427,12 +1453,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("4", 18), // 400% - above 300% maximum
           rigMinInitPrice: convert("0.0001", 18),
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigPriceMultiplierOutOfRange()");
+      ).to.be.revertedWith("Rig__PriceMultiplierOutOfRange()");
     });
 
     it("Reverts if rig minInitPrice below absolute minimum", async function () {
@@ -1453,12 +1481,14 @@ describe("Business Logic Tests", function () {
           rigEpochPeriod: 3600,
           rigPriceMultiplier: convert("2", 18),
           rigMinInitPrice: 100, // Below 1e6 minimum
+          upsMultipliers: [],
+          upsMultiplierDuration: 86400,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: 86400,
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Core__RigMinInitPriceOutOfRange()");
+      ).to.be.revertedWith("Rig__MinInitPriceOutOfRange()");
     });
 
     it("Accepts valid rig parameters at boundary values", async function () {
@@ -1479,6 +1509,8 @@ describe("Business Logic Tests", function () {
         rigEpochPeriod: 600, // Exact minimum (10 minutes)
         rigPriceMultiplier: convert("1.1", 18), // Exact minimum (110%)
         rigMinInitPrice: 1000000, // Exact minimum (1e6)
+        upsMultipliers: [],
+        upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
         auctionPriceMultiplier: convert("1.1", 18),
@@ -1507,6 +1539,8 @@ describe("Business Logic Tests", function () {
         rigEpochPeriod: 86400 * 365, // Exact maximum (365 days)
         rigPriceMultiplier: convert("3", 18), // Exact maximum (300%)
         rigMinInitPrice: convert("0.0001", 18),
+        upsMultipliers: [],
+        upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
         auctionPriceMultiplier: convert("1.1", 18),

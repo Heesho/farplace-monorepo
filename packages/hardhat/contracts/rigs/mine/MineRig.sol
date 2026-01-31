@@ -56,7 +56,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     uint256 public constant MAX_UPS_MULTIPLIER_DURATION = 7 days;
 
     // Capacity bounds
-    uint256 public constant MAX_CAPACITY = 1_000_000;
+    uint256 public constant MAX_CAPACITY = 256;
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
@@ -72,6 +72,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     uint256 public immutable initialUps;        // Starting units per second
     uint256 public immutable halvingAmount;     // Token amount threshold for halving
     uint256 public immutable tailUps;           // Minimum units per second after halvings
+    uint256 public immutable upsMultiplierDuration; // How long a UPS multiplier lasts
 
     /*----------  STATE  ------------------------------------------------*/
 
@@ -79,9 +80,8 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     address public team;
     uint256 public capacity = 1;
     uint256 public totalMinted;
-    bool public randomnessEnabled;
+    bool public multipliersEnabled;
     uint256[] public upsMultipliers;
-    uint256 public upsMultiplierDuration = 24 hours;
     string public uri;  // Global rig metadata URI
 
     mapping(uint256 => Slot) public indexToSlot;
@@ -98,6 +98,8 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 initialUps;
         uint256 halvingAmount;
         uint256 tailUps;
+        uint256[] upsMultipliers;
+        uint256 upsMultiplierDuration;
     }
 
     struct Slot {
@@ -125,7 +127,6 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     error Rig__CapacityBelowCurrent();
     error Rig__CapacityExceedsMax();
     error Rig__UpsMultiplierOutOfRange();
-    error Rig__EmptyArray();
     error Rig__UpsMultiplierDurationOutOfRange();
     error Rig__EpochPeriodOutOfRange();
     error Rig__PriceMultiplierOutOfRange();
@@ -157,9 +158,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     event Rig__TreasurySet(address indexed treasury);
     event Rig__TeamSet(address indexed team);
     event Rig__CapacitySet(uint256 capacity);
-    event Rig__UpsMultipliersSet(uint256[] upsMultipliers);
-    event Rig__RandomnessEnabledSet(bool enabled);
-    event Rig__UpsMultiplierDurationSet(uint256 duration);
+    event Rig__MultipliersEnabledSet(bool enabled);
     event Rig__UriSet(string uri);
     event Rig__Claimed(address indexed account, uint256 amount);
 
@@ -205,6 +204,19 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         if (_config.halvingAmount == 0) revert Rig__ZeroHalvingAmount();
         if (_config.halvingAmount < MIN_HALVING_AMOUNT) revert Rig__HalvingAmountBelowMin();
 
+        // Validate upsMultiplierDuration
+        if (_config.upsMultiplierDuration < MIN_UPS_MULTIPLIER_DURATION || _config.upsMultiplierDuration > MAX_UPS_MULTIPLIER_DURATION) {
+            revert Rig__UpsMultiplierDurationOutOfRange();
+        }
+
+        // Validate upsMultipliers (empty is OK - means no multipliers, always 1x)
+        for (uint256 i = 0; i < _config.upsMultipliers.length;) {
+            if (_config.upsMultipliers[i] < MIN_UPS_MULTIPLIER || _config.upsMultipliers[i] > MAX_UPS_MULTIPLIER) {
+                revert Rig__UpsMultiplierOutOfRange();
+            }
+            unchecked { ++i; }
+        }
+
         // Set immutables
         unit = _unit;
         quote = _quote;
@@ -218,9 +230,11 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         initialUps = _config.initialUps;
         halvingAmount = _config.halvingAmount;
         tailUps = _config.tailUps;
+        upsMultiplierDuration = _config.upsMultiplierDuration;
 
         // Set initial state
         treasury = _treasury;
+        upsMultipliers = _config.upsMultipliers;
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -320,7 +334,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         emit Rig__Mine(msg.sender, miner, index, epochId, price, _uri);
 
         // Only request entropy if randomness is enabled and upsMultiplier needs updating
-        if (randomnessEnabled && shouldUpdateUpsMultiplier) {
+        if (multipliersEnabled && shouldUpdateUpsMultiplier) {
             uint128 fee = IEntropyV2(entropy).getFeeV2();
             if (msg.value < fee) revert Rig__InsufficientFee();
             uint64 seq = IEntropyV2(entropy).requestV2{value: fee}();
@@ -477,42 +491,12 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Set the UPS multiplier options for random selection.
-     * @param _upsMultipliers Array of multiplier values (each must be between 1x and 10x)
-     */
-    function setUpsMultipliers(uint256[] calldata _upsMultipliers) external onlyOwner {
-        uint256 length = _upsMultipliers.length;
-        if (length == 0) revert Rig__EmptyArray();
-
-        for (uint256 i = 0; i < length;) {
-            if (_upsMultipliers[i] < MIN_UPS_MULTIPLIER) revert Rig__UpsMultiplierOutOfRange();
-            if (_upsMultipliers[i] > MAX_UPS_MULTIPLIER) revert Rig__UpsMultiplierOutOfRange();
-            unchecked { ++i; }
-        }
-
-        upsMultipliers = _upsMultipliers;
-
-        emit Rig__UpsMultipliersSet(_upsMultipliers);
-    }
-
-    /**
-     * @notice Enable or disable randomness for UPS multipliers.
+     * @notice Enable or disable multipliers for UPS.
      * @param _enabled True to enable entropy-based random multipliers
      */
-    function setRandomnessEnabled(bool _enabled) external onlyOwner {
-        randomnessEnabled = _enabled;
-        emit Rig__RandomnessEnabledSet(_enabled);
-    }
-
-    /**
-     * @notice Set how long a UPS multiplier lasts before resetting.
-     * @param _duration Duration in seconds (must be between 1 hour and 7 days)
-     */
-    function setUpsMultiplierDuration(uint256 _duration) external onlyOwner {
-        if (_duration < MIN_UPS_MULTIPLIER_DURATION) revert Rig__UpsMultiplierDurationOutOfRange();
-        if (_duration > MAX_UPS_MULTIPLIER_DURATION) revert Rig__UpsMultiplierDurationOutOfRange();
-        upsMultiplierDuration = _duration;
-        emit Rig__UpsMultiplierDurationSet(_duration);
+    function setMultipliersEnabled(bool _enabled) external onlyOwner {
+        multipliersEnabled = _enabled;
+        emit Rig__MultipliersEnabledSet(_enabled);
     }
 
     /**
@@ -554,7 +538,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return upsMultipliers.length;
     }
 
-    function isRandomnessEnabled() external view returns (bool) {
-        return randomnessEnabled;
+    function isMultipliersEnabled() external view returns (bool) {
+        return multipliersEnabled;
     }
 }

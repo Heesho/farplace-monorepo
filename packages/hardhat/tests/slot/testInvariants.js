@@ -1,5 +1,5 @@
 /**
- * @title SlotRig Invariant and Business Logic Tests
+ * @title SpinRig Invariant and Business Logic Tests
  * @notice Comprehensive tests verifying slot machine mechanics and intended behavior
  * @dev Tests focus on prize pool, emissions, odds, and VRF integration
  */
@@ -26,7 +26,7 @@ const ONE_DAY = 86400;
 const THIRTY_DAYS = ONE_DAY * 30;
 const PRECISION = ethers.BigNumber.from("1000000000000000000");
 
-describe("SlotRig Invariant Tests", function () {
+describe("SpinRig Invariant Tests", function () {
   let owner, treasury, team, protocol, user0, user1, user2;
   let paymentToken, unitToken, rig, mockEntropy, mockCore;
 
@@ -47,12 +47,12 @@ describe("SlotRig Invariant Tests", function () {
     const mockCoreArtifact = await ethers.getContractFactory("MockCore");
     mockCore = await mockCoreArtifact.deploy(protocol.address);
 
-    // Deploy Unit token
+    // Deploy Unit token (owner is initial rig, will transfer to SpinRig)
     const unitArtifact = await ethers.getContractFactory("Unit");
-    unitToken = await unitArtifact.deploy("Slot Test Unit", "STUNIT");
+    unitToken = await unitArtifact.deploy("Slot Test Unit", "STUNIT", owner.address);
 
-    // Deploy SlotRig with testable parameters
-    const rigArtifact = await ethers.getContractFactory("SlotRig");
+    // Deploy SpinRig with testable parameters
+    const rigArtifact = await ethers.getContractFactory("SpinRig");
     const config = {
       epochPeriod: ONE_HOUR,
       priceMultiplier: convert("2", 18),
@@ -60,6 +60,7 @@ describe("SlotRig Invariant Tests", function () {
       initialUps: convert("100", 18), // High for testing
       halvingPeriod: THIRTY_DAYS,
       tailUps: convert("1", 18),
+      odds: [10],
     };
 
     rig = await rigArtifact.deploy(
@@ -106,7 +107,7 @@ describe("SlotRig Invariant Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -135,7 +136,7 @@ describe("SlotRig Invariant Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -195,7 +196,7 @@ describe("SlotRig Invariant Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
-      await rig.connect(user1).slot(
+      await rig.connect(user1).spin(
         user1.address,
         epochId,
         1961439882,
@@ -216,7 +217,7 @@ describe("SlotRig Invariant Tests", function () {
 
       const newEpochId = await rig.getEpochId();
       await paymentToken.connect(user2).approve(rig.address, price.add(convert("1000", 6)));
-      const tx = await rig.connect(user2).slot(
+      const tx = await rig.connect(user2).spin(
         user2.address,
         newEpochId,
         1961439882,
@@ -226,8 +227,8 @@ describe("SlotRig Invariant Tests", function () {
 
       // Get actual price from event
       const receipt = await tx.wait();
-      const slotEvent = receipt.events.find(e => e.event === "SlotRig__Slot");
-      const actualPrice = slotEvent.args.price;
+      const spinEvent = receipt.events.find(e => e.event === "SpinRig__Spin");
+      const actualPrice = spinEvent.args.price;
 
       const treasuryAfter = await paymentToken.balanceOf(treasury.address);
       const teamAfter = await paymentToken.balanceOf(team.address);
@@ -248,7 +249,7 @@ describe("SlotRig Invariant Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -268,7 +269,7 @@ describe("SlotRig Invariant Tests", function () {
 
       const newEpochId = await rig.getEpochId();
       await paymentToken.connect(user1).approve(rig.address, price);
-      await rig.connect(user1).slot(
+      await rig.connect(user1).spin(
         user1.address,
         newEpochId,
         1961439882,
@@ -334,7 +335,7 @@ describe("SlotRig Invariant Tests", function () {
    * INVARIANT 5: Odds validation
    */
   describe("INVARIANT: Odds Constraints", function () {
-    it("All odds should be >= MIN_ODDS_BPS (1%)", async function () {
+    it("All odds should be >= MIN_ODDS_BPS (0.1%)", async function () {
       const odds = await rig.getOdds();
       const minOdds = await rig.MIN_ODDS_BPS();
 
@@ -343,7 +344,7 @@ describe("SlotRig Invariant Tests", function () {
       }
     });
 
-    it("All odds should be <= MAX_ODDS_BPS (100%)", async function () {
+    it("All odds should be <= MAX_ODDS_BPS (80%)", async function () {
       const odds = await rig.getOdds();
       const maxOdds = await rig.MAX_ODDS_BPS();
 
@@ -352,22 +353,58 @@ describe("SlotRig Invariant Tests", function () {
       }
     });
 
-    it("Should reject odds below minimum", async function () {
+    it("Should reject odds below minimum at deploy time", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("100", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("1", 18),
+        odds: [5],
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rig.connect(owner).setOdds([50]) // 0.5%
-      ).to.be.revertedWith("SlotRig__OddsTooLow()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
-    it("Should reject odds above maximum", async function () {
+    it("Should reject odds above maximum at deploy time", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("100", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("1", 18),
+        odds: [9000],
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rig.connect(owner).setOdds([15000]) // 150%
-      ).to.be.revertedWith("SlotRig__InvalidOdds()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
-    it("Should reject empty odds array", async function () {
+    it("Should reject empty odds array at deploy time", async function () {
+      const rigArtifact = await ethers.getContractFactory("SpinRig");
+      const badConfig = {
+        epochPeriod: ONE_HOUR,
+        priceMultiplier: convert("2", 18),
+        minInitPrice: convert("1", 6),
+        initialUps: convert("100", 18),
+        halvingPeriod: THIRTY_DAYS,
+        tailUps: convert("1", 18),
+        odds: [],
+      };
+      const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
+      const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rig.connect(owner).setOdds([])
-      ).to.be.revertedWith("SlotRig__InvalidOdds()");
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+      ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
   });
 
@@ -380,7 +417,7 @@ describe("SlotRig Invariant Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochIdBefore,
         1961439882,
@@ -394,7 +431,7 @@ describe("SlotRig Invariant Tests", function () {
   });
 });
 
-describe("SlotRig Business Logic Tests", function () {
+describe("SpinRig Business Logic Tests", function () {
   let owner, treasury, team, protocol, user0, user1, user2;
   let paymentToken, unitToken, rig, mockEntropy, mockCore;
 
@@ -414,9 +451,9 @@ describe("SlotRig Business Logic Tests", function () {
     mockCore = await mockCoreArtifact.deploy(protocol.address);
 
     const unitArtifact = await ethers.getContractFactory("Unit");
-    unitToken = await unitArtifact.deploy("Business Logic Unit", "BLUNIT");
+    unitToken = await unitArtifact.deploy("Business Logic Unit", "BLUNIT", owner.address);
 
-    const rigArtifact = await ethers.getContractFactory("SlotRig");
+    const rigArtifact = await ethers.getContractFactory("SpinRig");
     const config = {
       epochPeriod: ONE_HOUR,
       priceMultiplier: convert("2", 18),
@@ -424,6 +461,7 @@ describe("SlotRig Business Logic Tests", function () {
       initialUps: convert("100", 18),
       halvingPeriod: THIRTY_DAYS,
       tailUps: convert("1", 18),
+      odds: [5000], // 50% payout
     };
 
     rig = await rigArtifact.deploy(
@@ -437,9 +475,6 @@ describe("SlotRig Business Logic Tests", function () {
 
     await unitToken.setRig(rig.address);
     await rig.connect(owner).setTeam(team.address);
-
-    // Set predictable odds for testing
-    await rig.connect(owner).setOdds([5000]); // 50% payout
 
     await paymentToken.mint(user0.address, convert("100000", 6));
     await paymentToken.mint(user1.address, convert("100000", 6));
@@ -458,7 +493,7 @@ describe("SlotRig Business Logic Tests", function () {
       console.log("Prize pool before:", divDec(poolBefore));
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      const tx = await rig.connect(user0).slot(
+      const tx = await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -467,7 +502,7 @@ describe("SlotRig Business Logic Tests", function () {
       );
 
       const receipt = await tx.wait();
-      const entropyEvent = receipt.events.find(e => e.event === "SlotRig__EntropyRequested");
+      const entropyEvent = receipt.events.find(e => e.event === "SpinRig__EntropyRequested");
       expect(entropyEvent).to.not.be.undefined;
 
       const sequenceNumber = entropyEvent.args.sequenceNumber;
@@ -480,7 +515,7 @@ describe("SlotRig Business Logic Tests", function () {
       await mockEntropy.fulfillEntropy(sequenceNumber, randomNumber);
 
       // Check win event
-      const winEvents = await rig.queryFilter(rig.filters.SlotRig__Win());
+      const winEvents = await rig.queryFilter(rig.filters.SpinRig__Win());
       expect(winEvents.length).to.be.gt(0);
 
       const latestWin = winEvents[winEvents.length - 1];
@@ -500,7 +535,7 @@ describe("SlotRig Business Logic Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
-      const tx = await rig.connect(user1).slot(
+      const tx = await rig.connect(user1).spin(
         user1.address,
         epochId,
         1961439882,
@@ -509,7 +544,7 @@ describe("SlotRig Business Logic Tests", function () {
       );
 
       const receipt = await tx.wait();
-      const entropyEvent = receipt.events.find(e => e.event === "SlotRig__EntropyRequested");
+      const entropyEvent = receipt.events.find(e => e.event === "SpinRig__EntropyRequested");
       const sequenceNumber = entropyEvent.args.sequenceNumber;
 
       // Note the pool at callback time
@@ -520,7 +555,7 @@ describe("SlotRig Business Logic Tests", function () {
       await mockEntropy.fulfillEntropy(sequenceNumber, randomNumber);
 
       // Get win event
-      const winEvents = await rig.queryFilter(rig.filters.SlotRig__Win());
+      const winEvents = await rig.queryFilter(rig.filters.SpinRig__Win());
       const latestWin = winEvents[winEvents.length - 1];
 
       const odds = latestWin.args.oddsBps;
@@ -541,8 +576,8 @@ describe("SlotRig Business Logic Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(user0.address, epochId, 1, convert("1000", 6), { value: fee })
-      ).to.be.revertedWith("SlotRig__Expired()");
+        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), { value: fee })
+      ).to.be.revertedWith("SpinRig__Expired()");
     });
 
     it("Should revert with wrong epoch ID", async function () {
@@ -551,14 +586,14 @@ describe("SlotRig Business Logic Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(
+        rig.connect(user0).spin(
           user0.address,
           99999,
           1961439882,
           convert("1000", 6),
           { value: fee }
         )
-      ).to.be.revertedWith("SlotRig__EpochIdMismatch()");
+      ).to.be.revertedWith("SpinRig__EpochIdMismatch()");
     });
 
     it("Should revert if price exceeds maxPrice", async function () {
@@ -567,7 +602,7 @@ describe("SlotRig Business Logic Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -583,14 +618,14 @@ describe("SlotRig Business Logic Tests", function () {
         await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
 
         await expect(
-          rig.connect(user1).slot(
+          rig.connect(user1).spin(
             user1.address,
             newEpochId,
             1961439882,
             0, // maxPrice = 0
             { value: fee }
           )
-        ).to.be.revertedWith("SlotRig__MaxPriceExceeded()");
+        ).to.be.revertedWith("SpinRig__MaxPriceExceeded()");
       }
     });
 
@@ -600,41 +635,35 @@ describe("SlotRig Business Logic Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(
+        rig.connect(user0).spin(
           user0.address,
           epochId,
           1961439882,
           convert("1000", 6),
           { value: 0 }
         )
-      ).to.be.revertedWith("SlotRig__InsufficientFee()");
+      ).to.be.revertedWith("SpinRig__InsufficientFee()");
     });
 
-    it("Should revert with zero slotner address", async function () {
+    it("Should revert with zero spinner address", async function () {
       const epochId = await rig.getEpochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).slot(
+        rig.connect(user0).spin(
           AddressZero,
           epochId,
           1961439882,
           convert("1000", 6),
           { value: fee }
         )
-      ).to.be.revertedWith("SlotRig__InvalidSlotner()");
+      ).to.be.revertedWith("SpinRig__InvalidSpinner()");
     });
   });
 
   describe("Access Control", function () {
-    it("Only owner can set odds", async function () {
-      await expect(
-        rig.connect(user0).setOdds([1000])
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-    });
-
     it("Only owner can set treasury", async function () {
       await expect(
         rig.connect(user0).setTreasury(user0.address)
@@ -668,7 +697,7 @@ describe("SlotRig Business Logic Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -696,7 +725,7 @@ describe("SlotRig Business Logic Tests", function () {
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,
@@ -714,7 +743,7 @@ describe("SlotRig Business Logic Tests", function () {
 
       epochId = await rig.getEpochId();
       await paymentToken.connect(user1).approve(rig.address, price);
-      await rig.connect(user1).slot(
+      await rig.connect(user1).spin(
         user1.address,
         epochId,
         1961439882,
@@ -740,7 +769,7 @@ describe("SlotRig Business Logic Tests", function () {
       const minInitPrice = await rig.minInitPrice();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).slot(
+      await rig.connect(user0).spin(
         user0.address,
         epochId,
         1961439882,

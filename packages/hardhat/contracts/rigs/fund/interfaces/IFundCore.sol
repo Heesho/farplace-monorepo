@@ -10,13 +10,14 @@ interface IFundCore {
     struct LaunchParams {
         address launcher;
         address quoteToken;
+        address recipient;
         string tokenName;
         string tokenSymbol;
         uint256 donutAmount;
         uint256 unitAmount;
         uint256 initialEmission;
         uint256 minEmission;
-        uint256 minDonation;
+        uint256 halvingPeriod;
         uint256 auctionInitPrice;
         uint256 auctionEpochPeriod;
         uint256 auctionPriceMultiplier;
@@ -72,6 +73,7 @@ interface IFundCore {
         address indexed launcher,
         address indexed rig,
         address indexed unit,
+        address recipient,
         address auction,
         address lpToken,
         address quoteToken,
@@ -81,7 +83,7 @@ interface IFundCore {
         uint256 unitAmount,
         uint256 initialEmission,
         uint256 minEmission,
-        uint256 minDonation,
+        uint256 halvingPeriod,
         uint256 auctionInitPrice,
         uint256 auctionEpochPeriod,
         uint256 auctionPriceMultiplier,

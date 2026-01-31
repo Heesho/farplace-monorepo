@@ -15,9 +15,11 @@ import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Vo
  */
 contract Unit is ERC20, ERC20Permit, ERC20Votes {
     address public rig;
+    bool public rigLocked;
 
     error Unit__NotRig();
     error Unit__ZeroRig();
+    error Unit__RigLocked();
 
     event Unit__Minted(address account, uint256 amount);
     event Unit__Burned(address account, uint256 amount);
@@ -25,24 +27,27 @@ contract Unit is ERC20, ERC20Permit, ERC20Votes {
 
     /**
      * @notice Deploy a new Unit token.
-     * @dev The deployer (msg.sender) becomes the initial rig for minting.
+     * @dev The initial rig can mint tokens and transfer minting rights once via setRig().
      * @param _name Token name
      * @param _symbol Token symbol
+     * @param _initialRig Address that will have initial minting rights
      */
-    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) ERC20Permit(_name) {
-        rig = msg.sender;
+    constructor(string memory _name, string memory _symbol, address _initialRig) ERC20(_name, _symbol) ERC20Permit(_name) {
+        if (_initialRig == address(0)) revert Unit__ZeroRig();
+        rig = _initialRig;
     }
 
     /**
-     * @notice Transfer minting rights to a new rig address.
-     * @dev Only callable by the current rig. Once set to a Rig contract (which has no
-     *      setRig function), this becomes permanently locked.
+     * @notice Transfer minting rights to a new rig address (one-time only).
+     * @dev Only callable by the current rig. Once called, the rig is permanently locked.
      * @param _rig New rig address
      */
     function setRig(address _rig) external {
         if (msg.sender != rig) revert Unit__NotRig();
+        if (rigLocked) revert Unit__RigLocked();
         if (_rig == address(0)) revert Unit__ZeroRig();
         rig = _rig;
+        rigLocked = true;
         emit Unit__RigSet(_rig);
     }
 

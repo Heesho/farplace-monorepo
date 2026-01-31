@@ -70,7 +70,7 @@ describe("Rig Comprehensive Tests", function () {
     await registry.setFactoryApproval(core.address, true);
 
     // Deploy Multicall
-    const multicallArtifact = await ethers.getContractFactory("Multicall");
+    const multicallArtifact = await ethers.getContractFactory("MineMulticall");
     multicall = await multicallArtifact.deploy(core.address, donut.address);
 
     // Mint DONUT and WETH to users (reasonable amounts)
@@ -98,6 +98,8 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 3600,
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
+        upsMultipliers: [],
+        upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
         auctionPriceMultiplier: convert("1.2", 18),
@@ -108,7 +110,7 @@ describe("Rig Comprehensive Tests", function () {
       const tx = await core.connect(user0).launch(launchParams);
       const receipt = await tx.wait();
 
-      const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+      const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
       rig = launchEvent.args.rig;
       unit = launchEvent.args.unit;
       auction = launchEvent.args.auction;
@@ -463,7 +465,7 @@ describe("Rig Comprehensive Tests", function () {
 
     it("Should revert when capacity exceeds MAX_CAPACITY", async function () {
       await expect(
-        rigContract.connect(user0).setCapacity(1000001)
+        rigContract.connect(user0).setCapacity(257)
       ).to.be.revertedWith("Rig__CapacityExceedsMax()");
     });
 
@@ -520,47 +522,12 @@ describe("Rig Comprehensive Tests", function () {
       expect(slot.upsMultiplier).to.equal(convert("1", 18));
     });
 
-    it("Should allow owner to set UPS multipliers", async function () {
-      const multipliers = [
-        convert("1", 18),
-        convert("1.5", 18),
-        convert("2", 18),
-        convert("5", 18),
-        convert("10", 18)
-      ];
-
-      await rigContract.connect(user0).setUpsMultipliers(multipliers);
-
-      const storedMultipliers = await rigContract.getUpsMultipliers();
-      expect(storedMultipliers.length).to.equal(5);
-      expect(storedMultipliers[0]).to.equal(convert("1", 18));
-      expect(storedMultipliers[4]).to.equal(convert("10", 18));
+    it("Should allow enabling multipliers", async function () {
+      await rigContract.connect(user0).setMultipliersEnabled(true);
+      expect(await rigContract.isMultipliersEnabled()).to.equal(true);
     });
 
-    it("Should revert if UPS multiplier below minimum (1x)", async function () {
-      await expect(
-        rigContract.connect(user0).setUpsMultipliers([convert("0.5", 18)])
-      ).to.be.revertedWith("Rig__UpsMultiplierOutOfRange()");
-    });
-
-    it("Should revert if UPS multiplier above maximum (10x)", async function () {
-      await expect(
-        rigContract.connect(user0).setUpsMultipliers([convert("11", 18)])
-      ).to.be.revertedWith("Rig__UpsMultiplierOutOfRange()");
-    });
-
-    it("Should revert if UPS multipliers array is empty", async function () {
-      await expect(
-        rigContract.connect(user0).setUpsMultipliers([])
-      ).to.be.revertedWith("Rig__EmptyArray()");
-    });
-
-    it("Should allow enabling randomness", async function () {
-      await rigContract.connect(user0).setRandomnessEnabled(true);
-      expect(await rigContract.isRandomnessEnabled()).to.equal(true);
-    });
-
-    it("Should request entropy when randomness enabled and multiplier needs update", async function () {
+    it("Should request entropy when multipliers enabled and multiplier needs update", async function () {
       // Wait for upsMultiplierDuration to pass
       const duration = await rigContract.upsMultiplierDuration();
       await network.provider.send("evm_increaseTime", [duration.toNumber() + 1]);
@@ -604,29 +571,12 @@ describe("Rig Comprehensive Tests", function () {
       // For now, we verify the request was made
     });
 
-    it("Should allow setting UPS multiplier duration", async function () {
-      await rigContract.connect(user0).setUpsMultiplierDuration(2 * 60 * 60); // 2 hours
-      expect(await rigContract.upsMultiplierDuration()).to.equal(2 * 60 * 60);
+    it("Should disable multipliers", async function () {
+      await rigContract.connect(user0).setMultipliersEnabled(false);
+      expect(await rigContract.isMultipliersEnabled()).to.equal(false);
     });
 
-    it("Should revert if duration below minimum (1 hour)", async function () {
-      await expect(
-        rigContract.connect(user0).setUpsMultiplierDuration(30 * 60) // 30 minutes
-      ).to.be.revertedWith("Rig__UpsMultiplierDurationOutOfRange()");
-    });
-
-    it("Should revert if duration above maximum (7 days)", async function () {
-      await expect(
-        rigContract.connect(user0).setUpsMultiplierDuration(8 * 24 * 60 * 60) // 8 days
-      ).to.be.revertedWith("Rig__UpsMultiplierDurationOutOfRange()");
-    });
-
-    it("Should disable randomness", async function () {
-      await rigContract.connect(user0).setRandomnessEnabled(false);
-      expect(await rigContract.isRandomnessEnabled()).to.equal(false);
-    });
-
-    it("Should revert with ETH when randomness is disabled", async function () {
+    it("Should revert with ETH when multipliers are disabled", async function () {
       const slot = await rigContract.getSlot(0);
       const price = await rigContract.getPrice(0);
       const ethToSend = convert("0.01", 18);
@@ -687,8 +637,8 @@ describe("Rig Comprehensive Tests", function () {
         .to.emit(rigContract, "Rig__CapacitySet")
         .withArgs(10);
 
-      await expect(rigContract.connect(user0).setRandomnessEnabled(true))
-        .to.emit(rigContract, "Rig__RandomnessEnabledSet")
+      await expect(rigContract.connect(user0).setMultipliersEnabled(true))
+        .to.emit(rigContract, "Rig__MultipliersEnabledSet")
         .withArgs(true);
 
       await expect(rigContract.connect(user0).setUri("test-uri"))
@@ -710,15 +660,7 @@ describe("Rig Comprehensive Tests", function () {
       ).to.be.revertedWith("Ownable: caller is not the owner");
 
       await expect(
-        rigContract.connect(user1).setUpsMultipliers([convert("1", 18)])
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-
-      await expect(
-        rigContract.connect(user1).setRandomnessEnabled(true)
-      ).to.be.revertedWith("Ownable: caller is not the owner");
-
-      await expect(
-        rigContract.connect(user1).setUpsMultiplierDuration(3600)
+        rigContract.connect(user1).setMultipliersEnabled(true)
       ).to.be.revertedWith("Ownable: caller is not the owner");
 
       await expect(
@@ -882,6 +824,8 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 600, // 10 minutes
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
+        upsMultipliers: [],
+        upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
         auctionPriceMultiplier: convert("1.2", 18),
@@ -892,7 +836,7 @@ describe("Rig Comprehensive Tests", function () {
       const tx = await core.connect(user0).launch(launchParams);
       const receipt = await tx.wait();
 
-      const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+      const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
       halveRig = launchEvent.args.rig;
       halveUnit = launchEvent.args.unit;
 
@@ -961,6 +905,8 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 3600,
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
+        upsMultipliers: [],
+        upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
         auctionPriceMultiplier: convert("1.2", 18),
@@ -971,7 +917,7 @@ describe("Rig Comprehensive Tests", function () {
       const tx = await core.connect(user0).launch(launchParams);
       const receipt = await tx.wait();
 
-      const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+      const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
       multiRig = launchEvent.args.rig;
       multiRigContract = await ethers.getContractAt("MineRig", multiRig);
 

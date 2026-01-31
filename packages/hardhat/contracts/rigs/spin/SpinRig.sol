@@ -135,7 +135,6 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     event SpinRig__EmissionMinted(uint256 indexed epochId, uint256 amount);
     event SpinRig__TreasurySet(address indexed treasury);
     event SpinRig__TeamSet(address indexed team);
-    event SpinRig__OddsSet(uint256[] odds);
     event SpinRig__UriSet(string uri);
 
     /*----------  STRUCTS  ----------------------------------------------*/
@@ -147,6 +146,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 initialUps;
         uint256 halvingPeriod;
         uint256 tailUps;
+        uint256[] odds;
     }
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
@@ -212,8 +212,8 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         spinStartTime = block.timestamp;
         initPrice = config.minInitPrice;
 
-        // Default odds: 0.1% payout (can be changed by owner)
-        odds.push(MIN_ODDS_BPS);
+        // Validate and set odds from config (immutable after deployment)
+        _validateAndSetOdds(config.odds);
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -364,7 +364,6 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         }
 
         odds = _odds;
-        emit SpinRig__OddsSet(_odds);
     }
 
     /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
@@ -389,14 +388,6 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         emit SpinRig__TeamSet(_team);
     }
 
-    /**
-     * @notice Update the odds array for spin payouts.
-     * @dev Each element is a payout percentage in basis points (100 = 1%).
-     * @param _odds New odds array
-     */
-    function setOdds(uint256[] calldata _odds) external onlyOwner {
-        _validateAndSetOdds(_odds);
-    }
 
     /**
      * @notice Update the metadata URI for the rig.

@@ -36,7 +36,9 @@ contract MineRigFactory {
         uint256 _minInitPrice,
         uint256 _initialUps,
         uint256 _halvingAmount,
-        uint256 _tailUps
+        uint256 _tailUps,
+        uint256[] calldata _upsMultipliers,
+        uint256 _upsMultiplierDuration
     ) external returns (address) {
         MineRig.Config memory config = MineRig.Config({
             epochPeriod: _epochPeriod,
@@ -44,7 +46,9 @@ contract MineRigFactory {
             minInitPrice: _minInitPrice,
             initialUps: _initialUps,
             halvingAmount: _halvingAmount,
-            tailUps: _tailUps
+            tailUps: _tailUps,
+            upsMultipliers: _upsMultipliers,
+            upsMultiplierDuration: _upsMultiplierDuration
         });
 
         MineRig rig = new MineRig(

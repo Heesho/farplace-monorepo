@@ -390,7 +390,7 @@ export function FundModal({
             userRank={userRank}
             tokenSymbol={tokenSymbol}
             tokenName={tokenName}
-            rigUrl={`https://mineport.xyz/rig/${rigAddress}`}
+            rigUrl={`https://farplace.xyz/rig/${rigAddress}`}
           />
         </div>
 

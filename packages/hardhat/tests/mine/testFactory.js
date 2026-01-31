@@ -86,7 +86,7 @@ describe("Core Tests", function () {
     console.log("- Core approved in Registry");
 
     // Deploy Multicall
-    const multicallArtifact = await ethers.getContractFactory("Multicall");
+    const multicallArtifact = await ethers.getContractFactory("MineMulticall");
     multicall = await multicallArtifact.deploy(core.address, donut.address);
     console.log("- Multicall Initialized");
 
@@ -123,6 +123,8 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600, // 1 hour
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
+      upsMultipliers: [],
+      upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400, // 1 day
       auctionPriceMultiplier: convert("1.2", 18),
@@ -137,7 +139,7 @@ describe("Core Tests", function () {
     const receipt = await tx.wait();
 
     // Get deployed addresses from event
-    const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+    const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
     rig = launchEvent.args.rig;
     unit = launchEvent.args.unit;
     auction = launchEvent.args.auction;
@@ -331,6 +333,8 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
+      upsMultipliers: [],
+      upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.2", 18),
@@ -363,6 +367,8 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
+      upsMultipliers: [],
+      upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.2", 18),

@@ -96,13 +96,11 @@ contract FundMulticall {
      * @dev User must approve the payment token to this contract.
      * @param rig Rig contract address
      * @param account The account to credit for this funding
-     * @param recipient The whitelisted fund address
      * @param amount The amount of payment tokens to fund
      */
     function fund(
         address rig,
         address account,
-        address recipient,
         uint256 amount
     ) external {
         if (!IFundCore(core).isDeployedRig(rig)) revert FundMulticall__InvalidRig();
@@ -111,7 +109,7 @@ contract FundMulticall {
         IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(paymentToken).safeApprove(rig, 0);
         IERC20(paymentToken).safeApprove(rig, amount);
-        IFundRig(rig).fund(account, recipient, amount);
+        IFundRig(rig).fund(account, amount);
     }
 
     /**
@@ -195,13 +193,14 @@ contract FundMulticall {
         IFundCore.LaunchParams memory launchParams = IFundCore.LaunchParams({
             launcher: msg.sender,
             quoteToken: params.quoteToken,
+            recipient: params.recipient,
             tokenName: params.tokenName,
             tokenSymbol: params.tokenSymbol,
             donutAmount: params.donutAmount,
             unitAmount: params.unitAmount,
             initialEmission: params.initialEmission,
             minEmission: params.minEmission,
-            minDonation: params.minDonation,
+            halvingPeriod: params.halvingPeriod,
             auctionInitPrice: params.auctionInitPrice,
             auctionEpochPeriod: params.auctionEpochPeriod,
             auctionPriceMultiplier: params.auctionPriceMultiplier,
@@ -355,13 +354,12 @@ contract FundMulticall {
     }
 
     /**
-     * @notice Check if an address is a whitelisted fund recipient.
+     * @notice Get the recipient address for a FundRig.
      * @param rig Rig contract address
-     * @param recipient Address to check
-     * @return isRecipient True if recipient is whitelisted
+     * @return recipient The recipient address that receives 50% of donations
      */
-    function isRecipient(address rig, address recipient) external view returns (bool) {
-        return IFundRig(rig).accountToIsRecipient(recipient);
+    function getRecipient(address rig) external view returns (address) {
+        return IFundRig(rig).recipient();
     }
 
     /**

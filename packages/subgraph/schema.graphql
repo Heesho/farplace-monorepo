@@ -1,5 +1,5 @@
 # =============================================================================
-# MINEPORT UNIFIED SUBGRAPH SCHEMA
+# FARPLACE UNIFIED SUBGRAPH SCHEMA
 # =============================================================================
 # Central concept: Unit token is the universal entity across all rig types
 # Each Unit has an LP pair (Unit/DONUT) for price tracking
@@ -11,7 +11,7 @@
 # =============================================================================
 
 type Protocol @entity(immutable: false) {
-  id: ID!                              # "mineport"
+  id: ID!                              # "farplace"
 
   # Counts
   totalUnits: BigInt!                  # Total Unit tokens launched
@@ -224,6 +224,11 @@ type Rig @entity(immutable: false) {
   quoteToken: Bytes!                   # Payment token for rig actions
   uri: String!
 
+  # Emission config (common across rig types)
+  initialUps: BigInt!                  # Starting units per second (or per day for FundRig)
+  tailUps: BigInt!                     # Minimum emission rate (floor)
+  halvingPeriod: BigInt!               # Time or token amount for halving
+
   # Revenue tracking (in quoteToken)
   treasuryRevenue: BigDecimal!         # Fees sent to auction/treasury
   teamRevenue: BigDecimal!             # Fees to team
@@ -377,10 +382,14 @@ type FundRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
+  # Recipient (required at launch, receives 50% of donations)
+  recipient: Bytes!                    # Recipient address (charity/cause)
+
   # Emission config
   initialEmission: BigInt!             # Starting daily emission
   minEmission: BigInt!                 # Minimum daily emission (floor)
   minDonation: BigInt!                 # Minimum donation amount
+  halvingPeriod: BigInt!               # Days between emission halvings
 
   # State
   currentDay: BigInt!                  # Current day number
@@ -425,13 +434,12 @@ type Donation @entity(immutable: true) {
   fundRig: FundRig!
 
   donor: Account!
-  recipient: Bytes!                    # Which whitelisted recipient received funds
 
   day: BigInt!                         # Day number
   amount: BigDecimal!                  # Donation amount
 
   # Fee split (calculated from amount)
-  recipientAmount: BigDecimal!         # 50% to recipient
+  recipientAmount: BigDecimal!         # 50% to recipient (single address set on rig)
   treasuryAmount: BigDecimal!          # 45% to treasury
   teamAmount: BigDecimal!              # 4% to team
 

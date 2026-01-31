@@ -37,18 +37,6 @@ contract FundCore is Ownable, ReentrancyGuard {
     string public constant RIG_TYPE = "fund";
     address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    // Rig parameter bounds
-    uint256 public constant MIN_INITIAL_EMISSION = 1e18; // minimum 1 Unit per day
-    uint256 public constant MAX_INITIAL_EMISSION = 1e30; // maximum emission per day
-
-    // Auction parameter bounds (mirrored from Auction.sol for early validation)
-    uint256 public constant AUCTION_MIN_EPOCH_PERIOD = 1 hours;
-    uint256 public constant AUCTION_MAX_EPOCH_PERIOD = 365 days;
-    uint256 public constant AUCTION_MIN_PRICE_MULTIPLIER = 1.1e18;
-    uint256 public constant AUCTION_MAX_PRICE_MULTIPLIER = 3e18;
-    uint256 public constant AUCTION_ABS_MIN_INIT_PRICE = 1e6;
-    uint256 public constant AUCTION_ABS_MAX_INIT_PRICE = type(uint192).max;
-
     /*----------  IMMUTABLES  -------------------------------------------*/
 
     address public immutable registry; // central registry for all rig types
@@ -71,6 +59,7 @@ contract FundCore is Ownable, ReentrancyGuard {
     mapping(address => address) public rigToAuction; // rig => Auction contract
     mapping(address => address) public rigToLP; // rig => LP token
     mapping(address => address) public rigToQuote; // rig => quote token (payment token)
+    mapping(address => address) public rigToRecipient; // rig => recipient address
 
     /*----------  STRUCTS  ----------------------------------------------*/
 
@@ -80,13 +69,14 @@ contract FundCore is Ownable, ReentrancyGuard {
     struct LaunchParams {
         address launcher; // address to receive ownership
         address quoteToken; // ERC20 payment token for donations (e.g., USDC, WETH)
+        address recipient; // address to receive 50% of donations (required)
         string tokenName; // Unit token name
         string tokenSymbol; // Unit token symbol
         uint256 donutAmount; // DONUT to provide for LP
         uint256 unitAmount; // Unit tokens minted for initial LP
         uint256 initialEmission; // starting Unit emission per day
         uint256 minEmission; // minimum Unit emission per day (floor)
-        uint256 minDonation; // minimum donation amount (must be >= 100)
+        uint256 halvingPeriod; // number of days between emission halvings
         uint256 auctionInitPrice; // auction starting price
         uint256 auctionEpochPeriod; // auction epoch duration
         uint256 auctionPriceMultiplier; // auction price multiplier
@@ -98,18 +88,11 @@ contract FundCore is Ownable, ReentrancyGuard {
     error FundCore__InsufficientDonut();
     error FundCore__ZeroLauncher();
     error FundCore__ZeroQuoteToken();
+    error FundCore__ZeroRecipient();
     error FundCore__EmptyTokenName();
     error FundCore__EmptyTokenSymbol();
     error FundCore__ZeroUnitAmount();
     error FundCore__ZeroAddress();
-    // Rig parameter errors
-    error FundCore__InitialEmissionOutOfRange();
-    error FundCore__MinEmissionOutOfRange();
-    // Auction parameter errors
-    error FundCore__AuctionEpochPeriodOutOfRange();
-    error FundCore__AuctionPriceMultiplierOutOfRange();
-    error FundCore__AuctionInitPriceOutOfRange();
-    error FundCore__AuctionMinInitPriceOutOfRange();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
@@ -117,6 +100,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         address indexed launcher,
         address indexed rig,
         address indexed unit,
+        address recipient,
         address auction,
         address lpToken,
         address quoteToken,
@@ -126,7 +110,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         uint256 unitAmount,
         uint256 initialEmission,
         uint256 minEmission,
-        uint256 minDonation,
+        uint256 halvingPeriod,
         uint256 auctionInitPrice,
         uint256 auctionEpochPeriod,
         uint256 auctionPriceMultiplier,
@@ -239,17 +223,19 @@ contract FundCore is Ownable, ReentrancyGuard {
         );
 
         // Deploy FundRig via factory
+        // Recipient receives 50% of donations
         // Treasury is the Auction contract (receives 45% of donations)
-        // Team is the launcher (receives 5% of donations)
+        // Team is the launcher (receives 4% of donations)
         rig = IFundRigFactory(fundRigFactory).deploy(
             params.quoteToken,
             unit,
-            auction, // treasury
-            params.launcher, // team
+            params.recipient, // recipient (50%)
+            auction, // treasury (45%)
+            params.launcher, // team (4%)
             address(this), // core
             params.initialEmission,
             params.minEmission,
-            params.minDonation
+            params.halvingPeriod
         );
 
         // Transfer Unit minting rights to FundRig (permanently locked)
@@ -266,6 +252,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         rigToAuction[rig] = auction;
         rigToLP[rig] = lpToken;
         rigToQuote[rig] = params.quoteToken;
+        rigToRecipient[rig] = params.recipient;
 
         // Register with central registry
         IRegistry(registry).register(rig, RIG_TYPE, unit, params.launcher);
@@ -274,6 +261,7 @@ contract FundCore is Ownable, ReentrancyGuard {
             params.launcher,
             rig,
             unit,
+            params.recipient,
             auction,
             lpToken,
             params.quoteToken,
@@ -283,7 +271,7 @@ contract FundCore is Ownable, ReentrancyGuard {
             params.unitAmount,
             params.initialEmission,
             params.minEmission,
-            params.minDonation,
+            params.halvingPeriod,
             params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,
@@ -317,40 +305,18 @@ contract FundCore is Ownable, ReentrancyGuard {
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
-     * @notice Validate all launch parameters upfront to fail fast.
-     * @dev Mirrors validation from FundRig and Auction constructors for early revert.
+     * @notice Validate Core-specific launch parameters.
+     * @dev Rig and Auction parameters are validated by their respective constructors.
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        // Basic validations
         if (params.launcher == address(0)) revert FundCore__ZeroLauncher();
         if (params.quoteToken == address(0)) revert FundCore__ZeroQuoteToken();
+        if (params.recipient == address(0)) revert FundCore__ZeroRecipient();
         if (params.donutAmount < minDonutForLaunch) revert FundCore__InsufficientDonut();
         if (bytes(params.tokenName).length == 0) revert FundCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert FundCore__EmptyTokenSymbol();
         if (params.unitAmount == 0) revert FundCore__ZeroUnitAmount();
-
-        // Rig parameter validations
-        if (params.initialEmission < MIN_INITIAL_EMISSION || params.initialEmission > MAX_INITIAL_EMISSION) {
-            revert FundCore__InitialEmissionOutOfRange();
-        }
-        if (params.minEmission == 0 || params.minEmission > params.initialEmission) {
-            revert FundCore__MinEmissionOutOfRange();
-        }
-
-        // Auction parameter validations
-        if (params.auctionEpochPeriod < AUCTION_MIN_EPOCH_PERIOD || params.auctionEpochPeriod > AUCTION_MAX_EPOCH_PERIOD) {
-            revert FundCore__AuctionEpochPeriodOutOfRange();
-        }
-        if (params.auctionPriceMultiplier < AUCTION_MIN_PRICE_MULTIPLIER || params.auctionPriceMultiplier > AUCTION_MAX_PRICE_MULTIPLIER) {
-            revert FundCore__AuctionPriceMultiplierOutOfRange();
-        }
-        if (params.auctionMinInitPrice < AUCTION_ABS_MIN_INIT_PRICE || params.auctionMinInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert FundCore__AuctionMinInitPriceOutOfRange();
-        }
-        if (params.auctionInitPrice < params.auctionMinInitPrice || params.auctionInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert FundCore__AuctionInitPriceOutOfRange();
-        }
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

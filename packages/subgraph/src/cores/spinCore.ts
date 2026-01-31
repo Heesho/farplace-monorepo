@@ -1,8 +1,8 @@
 import { Address, BigInt } from '@graphprotocol/graph-ts'
-import { SlotCore__Launched as SlotCoreLaunchedEvent } from '../../generated/SlotCore/SlotCore'
+import { SpinCore__Launched as SpinCoreLaunchedEvent } from '../../generated/SpinCore/SpinCore'
 import {
   UniswapV2Pair as PairTemplate,
-  SlotRig as SlotRigTemplate,
+  SpinRig as SpinRigTemplate,
   Unit as UnitTemplate,
 } from '../../generated/templates'
 import { Protocol, Unit, Rig, SlotRig, Account } from '../../generated/schema'
@@ -21,7 +21,7 @@ import {
   convertTokenToDecimal,
 } from '../helpers'
 
-export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
+export function handleSpinCoreLaunched(event: SpinCoreLaunchedEvent): void {
   // Load or create Protocol entity (singleton)
   let protocol = getOrCreateProtocol()
   protocol.totalUnits = protocol.totalUnits.plus(ONE_BI)
@@ -32,7 +32,7 @@ export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
   // Load or create launcher Account
   let launcher = getOrCreateAccount(event.params.launcher)
 
-  // Event params for SlotCore:
+  // Event params for SpinCore:
   // launcher (indexed), rig (indexed), unit (indexed), auction, lpToken, quoteToken,
   // tokenName, tokenSymbol, donutAmount, unitAmount, initialUps, tailUps, halvingPeriod,
   // rigEpochPeriod, rigPriceMultiplier, rigMinInitPrice, auctionInitPrice, auctionEpochPeriod,
@@ -61,7 +61,7 @@ export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
   rig.launcher = launcher.id
   rig.auction = event.params.auction
   rig.quoteToken = quoteToken
-  rig.uri = '' // SlotCore doesn't have uri param
+  rig.uri = '' // SpinCore doesn't have uri param
   rig.initialUps = event.params.initialUps
   rig.tailUps = event.params.tailUps
   rig.halvingPeriod = event.params.halvingPeriod
@@ -77,6 +77,9 @@ export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
   // Create SlotRig specialized entity
   let slotRig = new SlotRig(rigAddress.toHexString())
   slotRig.rig = rig.id
+  slotRig.initialUps = event.params.initialUps
+  slotRig.tailUps = event.params.tailUps
+  slotRig.halvingPeriod = event.params.halvingPeriod
   slotRig.epochPeriod = event.params.rigEpochPeriod
   slotRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)
   slotRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_18)
@@ -91,7 +94,7 @@ export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
   slotRig.currentOdds = new Array<BigInt>()
 
   // Stats
-  slotRig.totalSlots = ZERO_BI
+  slotRig.totalSpins = ZERO_BI
   slotRig.totalWins = ZERO_BI
   slotRig.totalWonAmount = ZERO_BD
   slotRig.totalSpent = ZERO_BD
@@ -107,6 +110,6 @@ export function handleSlotCoreLaunched(event: SlotCoreLaunchedEvent): void {
 
   // Start indexing events from the new contracts
   PairTemplate.create(lpPairAddress)
-  SlotRigTemplate.create(rigAddress)
+  SpinRigTemplate.create(rigAddress)
   UnitTemplate.create(unitAddress)
 }

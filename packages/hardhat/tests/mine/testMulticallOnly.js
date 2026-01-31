@@ -22,13 +22,13 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
         await network.provider.send("evm_mine");
     }
 
-    // Helper to parse Core__Launched event from Multicall transaction
+    // Helper to parse MineCore__Launched event from Multicall transaction
     async function parseLaunchEvent(receipt) {
         const coreInterface = core.interface;
         for (const log of receipt.logs) {
             try {
                 const parsed = coreInterface.parseLog(log);
-                if (parsed.name === "Core__Launched") {
+                if (parsed.name === "MineCore__Launched") {
                     return parsed;
                 }
             } catch (e) {
@@ -92,7 +92,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
         await registry.setFactoryApproval(core.address, true);
 
         // Deploy Multicall
-        const Multicall = await ethers.getContractFactory("Multicall");
+        const Multicall = await ethers.getContractFactory("MineMulticall");
         multicall = await Multicall.deploy(core.address, donut.address);
 
         // Give users DONUT tokens (more for multiple launches)
@@ -125,6 +125,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("2", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -170,6 +172,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.1", 18),
@@ -203,6 +207,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.1", 18),
@@ -229,6 +235,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.1", 18),
@@ -264,6 +272,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("2", 18),
                 rigMinInitPrice: convert("0.001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -296,7 +306,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 deadline,
                 price,
                 "First mine via Multicall",
-                { value: 0 } // No ETH needed unless randomness enabled
+                { value: 0 } // No ETH needed unless multipliers enabled
             );
 
             const slotAfter = await rig.getSlot(0);
@@ -506,6 +516,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 1800,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0005", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("2", 18),
                 auctionEpochPeriod: 43200,
                 auctionPriceMultiplier: convert("1.3", 18),
@@ -720,6 +732,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 1800,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -860,6 +874,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -959,6 +975,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.2", 18),
                 rigMinInitPrice: convert("0.00001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
                 auctionPriceMultiplier: convert("1.1", 18),
@@ -1023,6 +1041,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -1094,6 +1114,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
                 auctionPriceMultiplier: convert("1.2", 18),
@@ -1216,6 +1238,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
+                upsMultipliers: [],
+                upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
                 auctionPriceMultiplier: convert("1.1", 18),

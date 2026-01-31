@@ -36,24 +36,6 @@ contract MineCore is Ownable, ReentrancyGuard {
     string public constant RIG_TYPE = "mine";
     address public constant DEAD_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
-    // Rig parameter bounds (mirrored from MineRig.sol for early validation)
-    uint256 public constant RIG_MIN_EPOCH_PERIOD = 10 minutes;
-    uint256 public constant RIG_MAX_EPOCH_PERIOD = 365 days;
-    uint256 public constant RIG_MIN_PRICE_MULTIPLIER = 1.1e18;
-    uint256 public constant RIG_MAX_PRICE_MULTIPLIER = 3e18;
-    uint256 public constant RIG_ABS_MIN_INIT_PRICE = 1e6;
-    uint256 public constant RIG_ABS_MAX_INIT_PRICE = type(uint192).max;
-    uint256 public constant RIG_MAX_INITIAL_UPS = 1e24;
-    uint256 public constant RIG_MIN_HALVING_AMOUNT = 1000 ether;
-
-    // Auction parameter bounds (mirrored from Auction.sol for early validation)
-    uint256 public constant AUCTION_MIN_EPOCH_PERIOD = 1 hours;
-    uint256 public constant AUCTION_MAX_EPOCH_PERIOD = 365 days;
-    uint256 public constant AUCTION_MIN_PRICE_MULTIPLIER = 1.1e18;
-    uint256 public constant AUCTION_MAX_PRICE_MULTIPLIER = 3e18;
-    uint256 public constant AUCTION_ABS_MIN_INIT_PRICE = 1e6;
-    uint256 public constant AUCTION_ABS_MAX_INIT_PRICE = type(uint192).max;
-
     /*----------  IMMUTABLES  -------------------------------------------*/
 
     address public immutable registry; // central registry for all rig types
@@ -98,6 +80,8 @@ contract MineCore is Ownable, ReentrancyGuard {
         uint256 rigEpochPeriod; // rig auction epoch duration
         uint256 rigPriceMultiplier; // rig price multiplier
         uint256 rigMinInitPrice; // rig minimum starting price
+        uint256[] upsMultipliers; // UPS multiplier options for random selection
+        uint256 upsMultiplierDuration; // how long a UPS multiplier lasts
         uint256 auctionInitPrice; // auction starting price
         uint256 auctionEpochPeriod; // auction epoch duration
         uint256 auctionPriceMultiplier; // auction price multiplier
@@ -113,18 +97,6 @@ contract MineCore is Ownable, ReentrancyGuard {
     error Core__EmptyTokenSymbol();
     error Core__ZeroUnitAmount();
     error Core__ZeroAddress();
-    // Rig parameter errors
-    error Core__RigEpochPeriodOutOfRange();
-    error Core__RigPriceMultiplierOutOfRange();
-    error Core__RigMinInitPriceOutOfRange();
-    error Core__RigInitialUpsOutOfRange();
-    error Core__RigTailUpsOutOfRange();
-    error Core__RigHalvingAmountOutOfRange();
-    // Auction parameter errors
-    error Core__AuctionEpochPeriodOutOfRange();
-    error Core__AuctionPriceMultiplierOutOfRange();
-    error Core__AuctionInitPriceOutOfRange();
-    error Core__AuctionMinInitPriceOutOfRange();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
@@ -273,7 +245,9 @@ contract MineCore is Ownable, ReentrancyGuard {
             params.rigMinInitPrice,
             params.initialUps,
             params.halvingAmount,
-            params.tailUps
+            params.tailUps,
+            params.upsMultipliers,
+            params.upsMultiplierDuration
         );
 
         // Transfer Unit minting rights to MineRig (permanently locked since MineRig has no setRig function)
@@ -350,52 +324,17 @@ contract MineCore is Ownable, ReentrancyGuard {
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
-     * @notice Validate all launch parameters upfront to fail fast.
-     * @dev Mirrors validation from MineRig and Auction constructors for early revert.
+     * @notice Validate Core-specific launch parameters.
+     * @dev Rig and Auction parameters are validated by their respective constructors.
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        // Basic validations
         if (params.launcher == address(0)) revert Core__ZeroLauncher();
         if (params.quoteToken == address(0)) revert Core__ZeroQuoteToken();
         if (params.donutAmount < minDonutForLaunch) revert Core__InsufficientDonut();
         if (bytes(params.tokenName).length == 0) revert Core__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert Core__EmptyTokenSymbol();
         if (params.unitAmount == 0) revert Core__ZeroUnitAmount();
-
-        // Rig parameter validations
-        if (params.rigEpochPeriod < RIG_MIN_EPOCH_PERIOD || params.rigEpochPeriod > RIG_MAX_EPOCH_PERIOD) {
-            revert Core__RigEpochPeriodOutOfRange();
-        }
-        if (params.rigPriceMultiplier < RIG_MIN_PRICE_MULTIPLIER || params.rigPriceMultiplier > RIG_MAX_PRICE_MULTIPLIER) {
-            revert Core__RigPriceMultiplierOutOfRange();
-        }
-        if (params.rigMinInitPrice < RIG_ABS_MIN_INIT_PRICE || params.rigMinInitPrice > RIG_ABS_MAX_INIT_PRICE) {
-            revert Core__RigMinInitPriceOutOfRange();
-        }
-        if (params.initialUps == 0 || params.initialUps > RIG_MAX_INITIAL_UPS) {
-            revert Core__RigInitialUpsOutOfRange();
-        }
-        if (params.tailUps == 0 || params.tailUps > params.initialUps) {
-            revert Core__RigTailUpsOutOfRange();
-        }
-        if (params.halvingAmount == 0 || params.halvingAmount < RIG_MIN_HALVING_AMOUNT) {
-            revert Core__RigHalvingAmountOutOfRange();
-        }
-
-        // Auction parameter validations
-        if (params.auctionEpochPeriod < AUCTION_MIN_EPOCH_PERIOD || params.auctionEpochPeriod > AUCTION_MAX_EPOCH_PERIOD) {
-            revert Core__AuctionEpochPeriodOutOfRange();
-        }
-        if (params.auctionPriceMultiplier < AUCTION_MIN_PRICE_MULTIPLIER || params.auctionPriceMultiplier > AUCTION_MAX_PRICE_MULTIPLIER) {
-            revert Core__AuctionPriceMultiplierOutOfRange();
-        }
-        if (params.auctionMinInitPrice < AUCTION_ABS_MIN_INIT_PRICE || params.auctionMinInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert Core__AuctionMinInitPriceOutOfRange();
-        }
-        if (params.auctionInitPrice < params.auctionMinInitPrice || params.auctionInitPrice > AUCTION_ABS_MAX_INIT_PRICE) {
-            revert Core__AuctionInitPriceOutOfRange();
-        }
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

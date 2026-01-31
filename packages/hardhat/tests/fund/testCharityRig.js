@@ -5,7 +5,7 @@ const { ethers, network } = require("hardhat");
 
 const AddressZero = "0x0000000000000000000000000000000000000000";
 
-let owner, recipient, recipient2, treasury, team, protocol, user0, user1, user2;
+let owner, recipient, treasury, team, protocol, user0, user1, user2;
 let paymentToken, unitToken, rig, mockCore;
 
 // Time helpers
@@ -18,14 +18,13 @@ const ONE_DAY = 86400;
 const THIRTY_DAYS = ONE_DAY * 30;
 const INITIAL_EMISSION = ethers.utils.parseUnits("345600", 18);
 const MIN_EMISSION = ethers.utils.parseUnits("864", 18);
-const MIN_DONATION = ethers.utils.parseUnits("0.01", 18); // 0.01 tokens (ensures non-zero fees)
 
 describe("FundRig Tests", function () {
   before("Initial set up", async function () {
     await network.provider.send("hardhat_reset");
     console.log("Begin Initialization");
 
-    [owner, recipient, recipient2, treasury, team, protocol, user0, user1, user2] = await ethers.getSigners();
+    [owner, recipient, treasury, team, protocol, user0, user1, user2] = await ethers.getSigners();
 
     // Deploy mock payment token (using MockWETH.sol)
     const mockWethArtifact = await ethers.getContractFactory("MockWETH");
@@ -37,29 +36,25 @@ describe("FundRig Tests", function () {
     mockCore = await mockCoreArtifact.deploy(protocol.address);
     console.log("- MockCore Initialized");
 
-    // Deploy Unit token
+    // Deploy Unit token (owner is initial rig, will transfer to FundRig)
     const unitArtifact = await ethers.getContractFactory("Unit");
-    unitToken = await unitArtifact.deploy("Test Unit", "TUNIT");
+    unitToken = await unitArtifact.deploy("Test Unit", "TUNIT", owner.address);
     console.log("- Unit Token Initialized");
 
-    // Deploy FundRig
+    // Deploy FundRig (recipient is now required in constructor)
     const rigArtifact = await ethers.getContractFactory("FundRig");
     rig = await rigArtifact.deploy(
       paymentToken.address,
       unitToken.address,
+      recipient.address, // recipient (required)
       treasury.address,
       team.address,
       mockCore.address, // core
       INITIAL_EMISSION,
       MIN_EMISSION,
-      MIN_DONATION
+      30 // halvingPeriod in days
     );
-    console.log("- FundRig Initialized");
-
-    // Whitelist recipient addresses
-    await rig.addRecipient(recipient.address);
-    await rig.addRecipient(recipient2.address);
-    console.log("- Recipients whitelisted");
+    console.log("- FundRig Initialized (with recipient)");
 
     // Transfer minting rights to Rig
     await unitToken.setRig(rig.address);
@@ -90,6 +85,52 @@ describe("FundRig Tests", function () {
         unitToken.connect(user0).setRig(user0.address)
       ).to.be.reverted;
     });
+
+    it("Should have rigLocked set to true after setRig", async function () {
+      expect(await unitToken.rigLocked()).to.equal(true);
+    });
+
+    it("Should prevent setRig when rigLocked is true", async function () {
+      // Even if somehow rig contract could call setRig, it should be locked
+      // We test by deploying a fresh Unit and calling setRig twice
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const freshUnit = await unitArtifact.deploy("Fresh Unit", "FRESH", owner.address);
+
+      // First setRig should succeed
+      await freshUnit.connect(owner).setRig(user0.address);
+      expect(await freshUnit.rig()).to.equal(user0.address);
+      expect(await freshUnit.rigLocked()).to.equal(true);
+
+      // Second setRig should fail even from the new rig
+      await expect(
+        freshUnit.connect(user0).setRig(user1.address)
+      ).to.be.revertedWith("Unit__RigLocked()");
+    });
+
+    it("Should allow minting before rigLocked", async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const freshUnit = await unitArtifact.deploy("Fresh Unit", "FRESH", owner.address);
+
+      // rigLocked should be false initially
+      expect(await freshUnit.rigLocked()).to.equal(false);
+
+      // Initial rig (owner) can mint
+      await freshUnit.connect(owner).mint(user0.address, convert("100"));
+      expect(await freshUnit.balanceOf(user0.address)).to.equal(convert("100"));
+    });
+
+    it("Should allow minting after rigLocked", async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const freshUnit = await unitArtifact.deploy("Fresh Unit", "FRESH", owner.address);
+
+      // Transfer rig to user0 and lock
+      await freshUnit.connect(owner).setRig(user0.address);
+      expect(await freshUnit.rigLocked()).to.equal(true);
+
+      // New rig (user0) can still mint
+      await freshUnit.connect(user0).mint(user1.address, convert("200"));
+      expect(await freshUnit.balanceOf(user1.address)).to.equal(convert("200"));
+    });
   });
 
   describe("FundRig Configuration Tests", function () {
@@ -104,7 +145,7 @@ describe("FundRig Tests", function () {
     it("Should have correct constants", async function () {
       expect(await rig.initialEmission()).to.equal(INITIAL_EMISSION);
       expect(await rig.minEmission()).to.equal(MIN_EMISSION);
-      expect(await rig.HALVING_PERIOD()).to.equal(THIRTY_DAYS);
+      expect(await rig.halvingPeriod()).to.equal(30); // 30 days
       expect(await rig.RECIPIENT_BPS()).to.equal(5000); // 50%
       expect(await rig.TEAM_BPS()).to.equal(400); // 4%
       expect(await rig.PROTOCOL_BPS()).to.equal(100); // 1%
@@ -112,25 +153,16 @@ describe("FundRig Tests", function () {
       expect(await rig.DIVISOR()).to.equal(10000);
     });
 
-    it("Should have whitelisted recipients", async function () {
-      expect(await rig.accountToIsRecipient(recipient.address)).to.equal(true);
-      expect(await rig.accountToIsRecipient(recipient2.address)).to.equal(true);
-      expect(await rig.accountToIsRecipient(user0.address)).to.equal(false);
+    it("Should have recipient set", async function () {
+      expect(await rig.recipient()).to.equal(recipient.address);
     });
 
-    it("Should allow owner to add recipient", async function () {
+    it("Should allow owner to set recipient", async function () {
       const newRecipient = user2.address;
-      await rig.connect(owner).addRecipient(newRecipient);
-      expect(await rig.accountToIsRecipient(newRecipient)).to.equal(true);
-      // Remove for other tests
-      await rig.connect(owner).removeRecipient(newRecipient);
-    });
-
-    it("Should allow owner to remove recipient", async function () {
-      await rig.connect(owner).removeRecipient(recipient2.address);
-      expect(await rig.accountToIsRecipient(recipient2.address)).to.equal(false);
-      // Re-add for other tests
-      await rig.connect(owner).addRecipient(recipient2.address);
+      await rig.connect(owner).setRecipient(newRecipient);
+      expect(await rig.recipient()).to.equal(newRecipient);
+      // Reset for other tests
+      await rig.connect(owner).setRecipient(recipient.address);
     });
 
     it("Should allow owner to update treasury address", async function () {
@@ -155,9 +187,9 @@ describe("FundRig Tests", function () {
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
-    it("Should prevent non-owner from adding recipient", async function () {
+    it("Should prevent non-owner from setting recipient", async function () {
       await expect(
-        rig.connect(user0).addRecipient(user0.address)
+        rig.connect(user0).setRecipient(user0.address)
       ).to.be.revertedWith("Ownable: caller is not the owner");
     });
 
@@ -174,9 +206,9 @@ describe("FundRig Tests", function () {
       await rig.connect(owner).setTeam(team.address);
     });
 
-    it("Should prevent adding zero address as recipient", async function () {
+    it("Should prevent setting zero address as recipient", async function () {
       await expect(
-        rig.connect(owner).addRecipient(AddressZero)
+        rig.connect(owner).setRecipient(AddressZero)
       ).to.be.revertedWith("FundRig__InvalidAddress()");
     });
   });
@@ -185,16 +217,61 @@ describe("FundRig Tests", function () {
     it("Should revert donation without approval", async function () {
       console.log("\n*** Allowance Check ***");
       await expect(
-        rig.connect(user0).donate(user0.address, recipient.address, convert("100"))
+        rig.connect(user0).fund(user0.address, convert("100"))
       ).to.be.reverted;
       console.log("- Donation without approval correctly reverted");
     });
 
-    it("Should revert donation to non-whitelisted recipient", async function () {
-      await paymentToken.connect(user0).approve(rig.address, convert("100"));
+    it("Should revert deployment with zero recipient address", async function () {
+      // Deploying with zero address recipient should revert
+      const rigArtifact = await ethers.getContractFactory("FundRig");
       await expect(
-        rig.connect(user0).donate(user0.address, user1.address, convert("100"))
-      ).to.be.revertedWith("FundRig__NotRecipient()");
+        rigArtifact.deploy(
+          paymentToken.address,
+          unitToken.address,
+          AddressZero, // zero recipient should fail
+          treasury.address,
+          team.address,
+          mockCore.address,
+          INITIAL_EMISSION,
+          MIN_EMISSION,
+          30 // halvingPeriod
+        )
+      ).to.be.revertedWith("FundRig__InvalidAddress()");
+    });
+
+    it("Should revert deployment with halving period too low", async function () {
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      await expect(
+        rigArtifact.deploy(
+          paymentToken.address,
+          unitToken.address,
+          recipient.address,
+          treasury.address,
+          team.address,
+          mockCore.address,
+          INITIAL_EMISSION,
+          MIN_EMISSION,
+          6 // halvingPeriod too low (min is 7)
+        )
+      ).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
+    });
+
+    it("Should revert deployment with halving period too high", async function () {
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      await expect(
+        rigArtifact.deploy(
+          paymentToken.address,
+          unitToken.address,
+          recipient.address,
+          treasury.address,
+          team.address,
+          mockCore.address,
+          INITIAL_EMISSION,
+          MIN_EMISSION,
+          366 // halvingPeriod too high (max is 365)
+        )
+      ).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
     });
 
     it("Should correctly split donations (50/45/4/1)", async function () {
@@ -209,7 +286,7 @@ describe("FundRig Tests", function () {
       // Approve and donate 1000 tokens
       const donationAmount = convert("1000");
       await paymentToken.connect(user0).approve(rig.address, donationAmount);
-      await rig.connect(user0).donate(user0.address, recipient.address, donationAmount);
+      await rig.connect(user0).fund(user0.address, donationAmount);
 
       // Check balances after
       const recipientAfter = await paymentToken.balanceOf(recipient.address);
@@ -237,33 +314,15 @@ describe("FundRig Tests", function () {
       console.log("- Split verification passed!");
     });
 
-    it("Should allow donations to different recipients", async function () {
-      const recipientBefore = await paymentToken.balanceOf(recipient.address);
-      const recipient2Before = await paymentToken.balanceOf(recipient2.address);
-
-      // Donate to first recipient
-      await paymentToken.connect(user1).approve(rig.address, convert("200"));
-      await rig.connect(user1).donate(user1.address, recipient.address, convert("100"));
-
-      // Donate to second recipient
-      await rig.connect(user1).donate(user1.address, recipient2.address, convert("100"));
-
-      const recipientAfter = await paymentToken.balanceOf(recipient.address);
-      const recipient2After = await paymentToken.balanceOf(recipient2.address);
-
-      expect(recipientAfter.sub(recipientBefore)).to.equal(convert("50")); // 50% of 100
-      expect(recipient2After.sub(recipient2Before)).to.equal(convert("50")); // 50% of 100
-    });
-
-    it("Should emit FundRig__Donated event", async function () {
+    it("Should emit FundRig__Funded event", async function () {
       const donationAmount = convert("100");
       await paymentToken.connect(user1).approve(rig.address, donationAmount);
 
       const currentDay = await rig.currentDay();
 
-      await expect(rig.connect(user1).donate(user1.address, recipient.address, donationAmount))
-        .to.emit(rig, "FundRig__Donated")
-        .withArgs(user1.address, recipient.address, donationAmount, currentDay);
+      await expect(rig.connect(user1).fund(user1.address, donationAmount))
+        .to.emit(rig, "FundRig__Funded")
+        .withArgs(user1.address, donationAmount, currentDay);
     });
 
     it("Should track daily donations correctly", async function () {
@@ -277,14 +336,14 @@ describe("FundRig Tests", function () {
 
     it("Should prevent zero amount donation", async function () {
       await expect(
-        rig.connect(user0).donate(user0.address, recipient.address, 0)
+        rig.connect(user0).fund(user0.address, 0)
       ).to.be.revertedWith("FundRig__BelowMinDonation()");
     });
 
     it("Should prevent donation to zero address account", async function () {
       await paymentToken.connect(user0).approve(rig.address, convert("100"));
       await expect(
-        rig.connect(user0).donate(AddressZero, recipient.address, convert("100"))
+        rig.connect(user0).fund(AddressZero, convert("100"))
       ).to.be.revertedWith("FundRig__InvalidAddress()");
     });
 
@@ -300,7 +359,7 @@ describe("FundRig Tests", function () {
       // Donate 1000 tokens
       const donationAmount = convert("1000");
       await paymentToken.connect(user0).approve(rig.address, donationAmount);
-      await rig.connect(user0).donate(user0.address, recipient.address, donationAmount);
+      await rig.connect(user0).fund(user0.address, donationAmount);
 
       // Check balances after
       const recipientAfter = await paymentToken.balanceOf(recipient.address);
@@ -326,7 +385,7 @@ describe("FundRig Tests", function () {
       const user0DonationBefore = await rig.getUserDonation(await rig.currentDay(), user0.address);
 
       await paymentToken.connect(user2).approve(rig.address, convert("100"));
-      await rig.connect(user2).donate(user0.address, recipient.address, convert("100"));
+      await rig.connect(user2).fund(user0.address, convert("100"));
 
       const user0DonationAfter = await rig.getUserDonation(await rig.currentDay(), user0.address);
       expect(user0DonationAfter.sub(user0DonationBefore)).to.equal(convert("100"));
@@ -352,11 +411,11 @@ describe("FundRig Tests", function () {
 
       // User A donates 100 tokens
       await paymentToken.connect(user0).approve(rig.address, convert("100"));
-      await rig.connect(user0).donate(user0.address, recipient.address, convert("100"));
+      await rig.connect(user0).fund(user0.address, convert("100"));
 
       // User B donates 300 tokens
       await paymentToken.connect(user1).approve(rig.address, convert("300"));
-      await rig.connect(user1).donate(user1.address, recipient.address, convert("300"));
+      await rig.connect(user1).fund(user1.address, convert("300"));
 
       // Advance to next day
       await increaseTime(ONE_DAY + 1);
@@ -425,7 +484,7 @@ describe("FundRig Tests", function () {
       const newDay = await rig.currentDay();
 
       await paymentToken.connect(user2).approve(rig.address, convert("100"));
-      await rig.connect(user2).donate(user2.address, recipient.address, convert("100"));
+      await rig.connect(user2).fund(user2.address, convert("100"));
 
       // Advance to claim
       await increaseTime(ONE_DAY + 1);
@@ -456,7 +515,7 @@ describe("FundRig Tests", function () {
       const newDay = await rig.currentDay();
 
       await paymentToken.connect(user0).approve(rig.address, convert("200"));
-      await rig.connect(user0).donate(user0.address, recipient.address, convert("200"));
+      await rig.connect(user0).fund(user0.address, convert("200"));
 
       // Advance to claim
       await increaseTime(ONE_DAY + 1);
@@ -526,7 +585,7 @@ describe("FundRig Tests", function () {
       const day = await rig.currentDay();
 
       await paymentToken.connect(user0).approve(rig.address, convert("100"));
-      await rig.connect(user0).donate(user0.address, recipient.address, convert("100"));
+      await rig.connect(user0).fund(user0.address, convert("100"));
 
       const total = await rig.getDayTotal(day);
       expect(total).to.be.gt(0);

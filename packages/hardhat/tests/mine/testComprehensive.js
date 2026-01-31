@@ -92,7 +92,7 @@ describe("Comprehensive Security Tests", function () {
         // Approve MineCore as factory in Registry
         await registry.setFactoryApproval(core.address, true);
 
-        const Multicall = await ethers.getContractFactory("Multicall");
+        const Multicall = await ethers.getContractFactory("MineMulticall");
         multicall = await Multicall.deploy(core.address, DONUT.address);
         await multicall.deployed();
 
@@ -118,6 +118,8 @@ describe("Comprehensive Security Tests", function () {
             rigEpochPeriod: 3600,
             rigPriceMultiplier: convert("2", 18),
             rigMinInitPrice: convert("0.0001", 18),
+            upsMultipliers: [],
+            upsMultiplierDuration: 86400,
             auctionInitPrice: convert("1", 18),
             auctionEpochPeriod: 3600,
             auctionPriceMultiplier: convert("2", 18),
@@ -134,7 +136,7 @@ describe("Comprehensive Security Tests", function () {
         await DONUT.connect(launcher).approve(core.address, params.donutAmount);
         const tx = await core.connect(launcher).launch(params);
         const receipt = await tx.wait();
-        const launchEvent = receipt.events.find(e => e.event === "Core__Launched");
+        const launchEvent = receipt.events.find(e => e.event === "MineCore__Launched");
 
         const rig = await ethers.getContractAt("MineRig", launchEvent.args.rig);
         const unit = await ethers.getContractAt("Unit", launchEvent.args.unit);
@@ -349,7 +351,7 @@ describe("Comprehensive Security Tests", function () {
             // User needs to approve WETH for the actual mining price
             await WETH.connect(user1).approve(multicall.address, price.add(convert("1", 18)));
 
-            // Send extra ETH - should revert since randomness is not enabled
+            // Send extra ETH - should revert since multipliers are not enabled
             await expect(
                 multicall.connect(user1).mine(
                     rig.address,

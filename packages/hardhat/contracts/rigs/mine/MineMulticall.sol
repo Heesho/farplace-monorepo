@@ -284,6 +284,8 @@ contract MineMulticall {
             rigEpochPeriod: params.rigEpochPeriod,
             rigPriceMultiplier: params.rigPriceMultiplier,
             rigMinInitPrice: params.rigMinInitPrice,
+            upsMultipliers: params.upsMultipliers,
+            upsMultiplierDuration: params.upsMultiplierDuration,
             auctionInitPrice: params.auctionInitPrice,
             auctionEpochPeriod: params.auctionEpochPeriod,
             auctionPriceMultiplier: params.auctionPriceMultiplier,
@@ -302,7 +304,7 @@ contract MineMulticall {
      * @return fee Entropy fee to send (0 if not needed)
      */
     function _calculateEntropyFee(address rig, uint256 index) internal view returns (uint256 fee) {
-        if (!IMineRig(rig).isRandomnessEnabled()) {
+        if (!IMineRig(rig).isMultipliersEnabled()) {
             return 0;
         }
 
@@ -343,7 +345,7 @@ contract MineMulticall {
         state.capacity = IMineRig(rig).capacity();
 
         // Entropy state
-        if (IMineRig(rig).isRandomnessEnabled()) {
+        if (IMineRig(rig).isMultipliersEnabled()) {
             uint256 duration = IMineRig(rig).upsMultiplierDuration();
             state.needsEntropy = block.timestamp - slot.lastUpsMultiplierTime > duration;
             state.entropyFee = state.needsEntropy ? IMineRig(rig).getEntropyFee() : 0;

@@ -18,12 +18,12 @@
       },
       {
         "internalType": "address",
-        "name": "_protocol",
+        "name": "_treasury",
         "type": "address"
       },
       {
         "internalType": "address",
-        "name": "_treasury",
+        "name": "_core",
         "type": "address"
       },
       {
@@ -50,7 +50,7 @@
           },
           {
             "internalType": "uint256",
-            "name": "halvingAmount",
+            "name": "halvingPeriod",
             "type": "uint256"
           },
           {
@@ -60,17 +60,12 @@
           },
           {
             "internalType": "uint256[]",
-            "name": "upsMultipliers",
+            "name": "odds",
             "type": "uint256[]"
-          },
-          {
-            "internalType": "uint256",
-            "name": "upsMultiplierDuration",
-            "type": "uint256"
           }
         ],
-        "internalType": "struct MineRig.Config",
-        "name": "_config",
+        "internalType": "struct SpinRig.Config",
+        "name": "config",
         "type": "tuple"
       }
     ],
@@ -79,112 +74,72 @@
   },
   {
     "inputs": [],
-    "name": "Rig__CapacityBelowCurrent",
+    "name": "SpinRig__EpochIdMismatch",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__CapacityExceedsMax",
+    "name": "SpinRig__EpochPeriodOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__DeadlinePassed",
+    "name": "SpinRig__Expired",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__EpochIdMismatch",
+    "name": "SpinRig__HalvingPeriodOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__EpochPeriodOutOfRange",
+    "name": "SpinRig__InitialUpsOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__HalvingAmountBelowMin",
+    "name": "SpinRig__InsufficientFee",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__IndexOutOfBounds",
+    "name": "SpinRig__InvalidAddress",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__InitialUpsExceedsMax",
+    "name": "SpinRig__InvalidOdds",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__InsufficientFee",
+    "name": "SpinRig__InvalidSpinner",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__MaxPriceExceeded",
+    "name": "SpinRig__MaxPriceExceeded",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__MinInitPriceOutOfRange",
+    "name": "SpinRig__MinInitPriceOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__NoEntropyRequired",
+    "name": "SpinRig__OddsTooLow",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__NothingToClaim",
+    "name": "SpinRig__PriceMultiplierOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Rig__PriceMultiplierOutOfRange",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__TailUpsOutOfRange",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__UpsMultiplierDurationOutOfRange",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__UpsMultiplierOutOfRange",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__ZeroAddress",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__ZeroHalvingAmount",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__ZeroInitialUps",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__ZeroMiner",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Rig__ZeroTreasury",
+    "name": "SpinRig__TailUpsOutOfRange",
     "type": "error"
   },
   {
@@ -210,23 +165,10 @@
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "capacity",
-        "type": "uint256"
-      }
-    ],
-    "name": "Rig__CapacitySet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
         "indexed": true,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "epochId",
+        "type": "uint256"
       },
       {
         "indexed": false,
@@ -235,18 +177,12 @@
         "type": "uint256"
       }
     ],
-    "name": "Rig__Claimed",
+    "name": "SpinRig__EmissionMinted",
     "type": "event"
   },
   {
     "anonymous": false,
     "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
       {
         "indexed": true,
         "internalType": "uint256",
@@ -260,125 +196,7 @@
         "type": "uint64"
       }
     ],
-    "name": "Rig__EntropyRequested",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "miner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "price",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "uri",
-        "type": "string"
-      }
-    ],
-    "name": "Rig__Mine",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "miner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "Rig__MinerFee",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "miner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "Rig__Mint",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "enabled",
-        "type": "bool"
-      }
-    ],
-    "name": "Rig__MultipliersEnabledSet",
+    "name": "SpinRig__EntropyRequested",
     "type": "event"
   },
   {
@@ -393,12 +211,6 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
         "name": "epochId",
         "type": "uint256"
       },
@@ -409,7 +221,38 @@
         "type": "uint256"
       }
     ],
-    "name": "Rig__ProtocolFee",
+    "name": "SpinRig__ProtocolFee",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "spinner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "epochId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "name": "SpinRig__Spin",
     "type": "event"
   },
   {
@@ -424,12 +267,6 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
         "name": "epochId",
         "type": "uint256"
       },
@@ -440,7 +277,7 @@
         "type": "uint256"
       }
     ],
-    "name": "Rig__TeamFee",
+    "name": "SpinRig__TeamFee",
     "type": "event"
   },
   {
@@ -453,7 +290,7 @@
         "type": "address"
       }
     ],
-    "name": "Rig__TeamSet",
+    "name": "SpinRig__TeamSet",
     "type": "event"
   },
   {
@@ -464,12 +301,6 @@
         "internalType": "address",
         "name": "treasury",
         "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
       },
       {
         "indexed": true,
@@ -484,7 +315,7 @@
         "type": "uint256"
       }
     ],
-    "name": "Rig__TreasuryFee",
+    "name": "SpinRig__TreasuryFee",
     "type": "event"
   },
   {
@@ -497,32 +328,7 @@
         "type": "address"
       }
     ],
-    "name": "Rig__TreasurySet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "upsMultiplier",
-        "type": "uint256"
-      }
-    ],
-    "name": "Rig__UpsMultiplierSet",
+    "name": "SpinRig__TreasurySet",
     "type": "event"
   },
   {
@@ -535,7 +341,38 @@
         "type": "string"
       }
     ],
-    "name": "Rig__UriSet",
+    "name": "SpinRig__UriSet",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "spinner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "epochId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oddsBps",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "SpinRig__Win",
     "type": "event"
   },
   {
@@ -566,33 +403,7 @@
   },
   {
     "inputs": [],
-    "name": "DEFAULT_UPS_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "DIVISOR",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_CAPACITY",
     "outputs": [
       {
         "internalType": "uint256",
@@ -618,7 +429,33 @@
   },
   {
     "inputs": [],
+    "name": "MAX_HALVING_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_INITIAL_UPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_ODDS_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -644,32 +481,6 @@
   },
   {
     "inputs": [],
-    "name": "MAX_UPS_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_UPS_MULTIPLIER_DURATION",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "MIN_EPOCH_PERIOD",
     "outputs": [
       {
@@ -683,7 +494,20 @@
   },
   {
     "inputs": [],
-    "name": "MIN_HALVING_AMOUNT",
+    "name": "MIN_HALVING_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_ODDS_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -697,32 +521,6 @@
   {
     "inputs": [],
     "name": "MIN_PRICE_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MIN_UPS_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MIN_UPS_MULTIPLIER_DURATION",
     "outputs": [
       {
         "internalType": "uint256",
@@ -773,19 +571,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "TOTAL_BPS",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint64",
@@ -809,48 +594,16 @@
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "accountToClaimable",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
-    "name": "capacity",
+    "name": "core",
     "outputs": [
       {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
-        "name": "account",
+        "name": "",
         "type": "address"
       }
     ],
-    "name": "claim",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -858,9 +611,22 @@
     "name": "entropy",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "contract IEntropyV2",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "epochId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -893,13 +659,72 @@
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "getEpochId",
+    "outputs": [
       {
         "internalType": "uint256",
-        "name": "index",
+        "name": "",
         "type": "uint256"
       }
     ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getInitPrice",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getOdds",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getOddsLength",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getPendingEmissions",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getPrice",
     "outputs": [
       {
@@ -912,61 +737,26 @@
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "getPrizePool",
+    "outputs": [
       {
         "internalType": "uint256",
-        "name": "index",
+        "name": "",
         "type": "uint256"
       }
     ],
-    "name": "getSlot",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getSpinStartTime",
     "outputs": [
       {
-        "components": [
-          {
-            "internalType": "uint256",
-            "name": "epochId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "initPrice",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "startTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "ups",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "upsMultiplier",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "lastUpsMultiplierTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "address",
-            "name": "miner",
-            "type": "address"
-          },
-          {
-            "internalType": "string",
-            "name": "uri",
-            "type": "string"
-          }
-        ],
-        "internalType": "struct MineRig.Slot",
+        "internalType": "uint256",
         "name": "",
-        "type": "tuple"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -987,20 +777,7 @@
   },
   {
     "inputs": [],
-    "name": "getUpsMultipliers",
-    "outputs": [
-      {
-        "internalType": "uint256[]",
-        "name": "",
-        "type": "uint256[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getUpsMultipliersLength",
+    "name": "halvingPeriod",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1013,66 +790,12 @@
   },
   {
     "inputs": [],
-    "name": "halvingAmount",
+    "name": "initPrice",
     "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "indexToSlot",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "initPrice",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "startTime",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "ups",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "upsMultiplier",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "lastUpsMultiplierTime",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "miner",
-        "type": "address"
-      },
-      {
-        "internalType": "string",
-        "name": "uri",
-        "type": "string"
       }
     ],
     "stateMutability": "view",
@@ -1093,12 +816,12 @@
   },
   {
     "inputs": [],
-    "name": "isMultipliersEnabled",
+    "name": "lastEmissionTime",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint256",
         "name": "",
-        "type": "bool"
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1120,55 +843,17 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "miner",
-        "type": "address"
-      },
-      {
         "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "epochId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "deadline",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "maxPrice",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "_uri",
-        "type": "string"
-      }
-    ],
-    "name": "mine",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "price",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "multipliersEnabled",
-    "outputs": [
-      {
-        "internalType": "bool",
         "name": "",
-        "type": "bool"
+        "type": "uint256"
+      }
+    ],
+    "name": "odds",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1195,19 +880,6 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "protocol",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -1260,41 +932,15 @@
         "type": "uint64"
       }
     ],
-    "name": "sequenceToIndex",
+    "name": "sequenceToSpinner",
     "outputs": [
       {
-        "internalType": "uint256",
+        "internalType": "address",
         "name": "",
-        "type": "uint256"
+        "type": "address"
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_capacity",
-        "type": "uint256"
-      }
-    ],
-    "name": "setCapacity",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "bool",
-        "name": "_enabled",
-        "type": "bool"
-      }
-    ],
-    "name": "setMultipliersEnabled",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1337,6 +983,53 @@
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "spinner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_epochId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "maxPrice",
+        "type": "uint256"
+      }
+    ],
+    "name": "spin",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "spinStartTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "startTime",
     "outputs": [
@@ -1376,19 +1069,6 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "totalMinted",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",
@@ -1422,38 +1102,6 @@
         "internalType": "address",
         "name": "",
         "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "upsMultiplierDuration",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "upsMultipliers",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
       }
     ],
     "stateMutability": "view",

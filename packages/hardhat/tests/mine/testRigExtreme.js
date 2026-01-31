@@ -38,6 +38,8 @@ async function deployFreshRig(params = {}) {
     rigEpochPeriod: params.rigEpochPeriod || 3600,
     rigPriceMultiplier: params.rigPriceMultiplier || convert("2", 18),
     rigMinInitPrice: params.rigMinInitPrice || convert("0.0001", 18),
+    upsMultipliers: params.upsMultipliers || [],
+    upsMultiplierDuration: params.upsMultiplierDuration || 86400,
     auctionInitPrice: params.auctionInitPrice || convert("1", 18),
     auctionEpochPeriod: params.auctionEpochPeriod || 86400,
     auctionPriceMultiplier: params.auctionPriceMultiplier || convert("1.2", 18),
@@ -47,7 +49,7 @@ async function deployFreshRig(params = {}) {
   await donut.connect(user0).approve(core.address, launchParams.donutAmount);
   const tx = await core.connect(user0).launch(launchParams);
   const receipt = await tx.wait();
-  const launchEvent = receipt.events.find((e) => e.event === "Core__Launched");
+  const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
 
   return {
     rig: await ethers.getContractAt("MineRig", launchEvent.args.rig),
@@ -247,8 +249,8 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
     });
 
     it("ATTACK: Excess ETH stays in contract (no reentrancy via refund)", async function () {
-      // Enable randomness to trigger ETH handling
-      await rigContract.connect(user0).setRandomnessEnabled(true);
+      // Enable multipliers to trigger ETH handling
+      await rigContract.connect(user0).setMultipliersEnabled(true);
 
       // Wait for multiplier duration
       const duration = await rigContract.upsMultiplierDuration();
@@ -271,7 +273,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       // Should succeed (not revert)
       await expect(tx).to.not.be.reverted;
 
-      await rigContract.connect(user0).setRandomnessEnabled(false);
+      await rigContract.connect(user0).setMultipliersEnabled(false);
     });
   });
 
@@ -548,16 +550,15 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
     });
 
     it("ATTACK: Try to manipulate randomness by controlling entropy response", async function () {
-      const result = await deployFreshRig();
-
-      // Set up multipliers
-      await result.rig.connect(user0).setUpsMultipliers([
-        convert("1", 18),
-        convert("2", 18),
-        convert("5", 18),
-        convert("10", 18)
-      ]);
-      await result.rig.connect(user0).setRandomnessEnabled(true);
+      const result = await deployFreshRig({
+        upsMultipliers: [
+          convert("1", 18),
+          convert("2", 18),
+          convert("5", 18),
+          convert("10", 18)
+        ],
+      });
+      await result.rig.connect(user0).setMultipliersEnabled(true);
 
       // Mine to trigger entropy request
       const duration = await result.rig.upsMultiplierDuration();
@@ -742,11 +743,11 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       expect(finalSlot.epochId).to.equal(100);
     });
 
-    it("STRESS: Mine all 1000 slots (max capacity)", async function () {
+    it("STRESS: Mine all 256 slots (max capacity)", async function () {
       this.timeout(300000);
 
       const result = await deployFreshRig();
-      await result.rig.connect(user0).setCapacity(1000);
+      await result.rig.connect(user0).setCapacity(256);
 
       // Mine first 50 slots
       await ensureWeth(user1, convert("100", 18));
@@ -761,8 +762,8 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       // Verify slot 49 is mined
       expect((await result.rig.getSlot(49)).miner).to.equal(user1.address);
 
-      // Verify slot 999 is not mined
-      expect((await result.rig.getSlot(999)).miner).to.equal(AddressZero);
+      // Verify slot 255 is not mined
+      expect((await result.rig.getSlot(255)).miner).to.equal(AddressZero);
     });
 
     it("STRESS: Rapid time jumps", async function () {
@@ -967,7 +968,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       const prevMiner = slot.miner;
       // Get treasury from the result's auction - need to find the event for THIS rig
       const rigAddress = result.rig.address;
-      const launchEvents = await core.queryFilter(core.filters.Core__Launched());
+      const launchEvents = await core.queryFilter(core.filters.MineCore__Launched());
       let auctionAddress;
       for (const evt of launchEvents) {
         if (evt.args.rig === rigAddress) {
@@ -1128,69 +1129,29 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       await result.rig.connect(user2).mine(user2.address, 0, slot.epochId, getFutureDeadline(), convert("1", 18), "");
     });
 
-    it("BOUNDARY: Capacity at max (1,000,000)", async function () {
+    it("BOUNDARY: Capacity at max (256)", async function () {
       const result = await deployFreshRig();
 
       // Try to set to max
-      await result.rig.connect(user0).setCapacity(1000000);
-      expect(await result.rig.capacity()).to.equal(1000000);
+      await result.rig.connect(user0).setCapacity(256);
+      expect(await result.rig.capacity()).to.equal(256);
 
       // Try to exceed max
       await expect(
-        result.rig.connect(user0).setCapacity(1000001)
+        result.rig.connect(user0).setCapacity(257)
       ).to.be.revertedWith("Rig__CapacityExceedsMax()");
 
       // Mine last slot
       await ensureWeth(user1, convert("10", 18));
-      const slot = await result.rig.getSlot(999999);
+      const slot = await result.rig.getSlot(255);
       await weth.connect(user1).approve(result.rig.address, convert("1", 18));
       await result.rig.connect(user1).mine(
-        user1.address, 999999, slot.epochId, getFutureDeadline(), convert("1", 18), ""
+        user1.address, 255, slot.epochId, getFutureDeadline(), convert("1", 18), ""
       );
 
-      expect((await result.rig.getSlot(999999)).miner).to.equal(user1.address);
+      expect((await result.rig.getSlot(255)).miner).to.equal(user1.address);
     });
 
-    it("BOUNDARY: UPS multiplier at exact bounds", async function () {
-      const result = await deployFreshRig();
-
-      // Set to exactly 1x (min)
-      await result.rig.connect(user0).setUpsMultipliers([convert("1", 18)]);
-
-      // Set to exactly 10x (max)
-      await result.rig.connect(user0).setUpsMultipliers([convert("10", 18)]);
-
-      // Just below min should fail
-      await expect(
-        result.rig.connect(user0).setUpsMultipliers([convert("0.99999999", 18)])
-      ).to.be.revertedWith("Rig__UpsMultiplierOutOfRange()");
-
-      // Just above max should fail
-      await expect(
-        result.rig.connect(user0).setUpsMultipliers([convert("10.00000001", 18)])
-      ).to.be.revertedWith("Rig__UpsMultiplierOutOfRange()");
-    });
-
-    it("BOUNDARY: Duration at exact bounds", async function () {
-      const result = await deployFreshRig();
-
-      // Set to exactly 1 hour (min)
-      await result.rig.connect(user0).setUpsMultiplierDuration(3600);
-      expect(await result.rig.upsMultiplierDuration()).to.equal(3600);
-
-      // Set to exactly 7 days (max)
-      await result.rig.connect(user0).setUpsMultiplierDuration(7 * 24 * 60 * 60);
-      expect(await result.rig.upsMultiplierDuration()).to.equal(7 * 24 * 60 * 60);
-
-      // Just below min should fail
-      await expect(
-        result.rig.connect(user0).setUpsMultiplierDuration(3599)
-      ).to.be.revertedWith("Rig__UpsMultiplierDurationOutOfRange()");
-
-      // Just above max should fail
-      await expect(
-        result.rig.connect(user0).setUpsMultiplierDuration(7 * 24 * 60 * 60 + 1)
-      ).to.be.revertedWith("Rig__UpsMultiplierDurationOutOfRange()");
-    });
+    // UPS multiplier bounds and duration are now set at deploy time via Config, no runtime setters
   });
 });

@@ -17,6 +17,7 @@ interface ISpinRigFactory {
         uint256 _minInitPrice,
         uint256 _initialUps,
         uint256 _halvingPeriod,
-        uint256 _tailUps
+        uint256 _tailUps,
+        uint256[] calldata _odds
     ) external returns (address);
 }

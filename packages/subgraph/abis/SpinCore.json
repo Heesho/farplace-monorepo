@@ -28,7 +28,7 @@
       },
       {
         "internalType": "address",
-        "name": "_rigFactory",
+        "name": "_spinRigFactory",
         "type": "address"
       },
       {
@@ -57,124 +57,132 @@
   },
   {
     "inputs": [],
-    "name": "Core__AuctionEpochPeriodOutOfRange",
+    "name": "SpinCore__AuctionEpochPeriodOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__AuctionInitPriceOutOfRange",
+    "name": "SpinCore__AuctionInitPriceOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__AuctionMinInitPriceOutOfRange",
+    "name": "SpinCore__AuctionMinInitPriceOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__AuctionPriceMultiplierOutOfRange",
+    "name": "SpinCore__AuctionPriceMultiplierOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__EmptyTokenName",
+    "name": "SpinCore__EmptyTokenName",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__EmptyTokenSymbol",
+    "name": "SpinCore__EmptyTokenSymbol",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__InsufficientDonut",
+    "name": "SpinCore__InsufficientDonut",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigEpochPeriodOutOfRange",
+    "name": "SpinCore__InvalidOdds",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigHalvingAmountOutOfRange",
+    "name": "SpinCore__RigEpochPeriodOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigInitialUpsOutOfRange",
+    "name": "SpinCore__RigHalvingPeriodOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigMinInitPriceOutOfRange",
+    "name": "SpinCore__RigInitialUpsOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigPriceMultiplierOutOfRange",
+    "name": "SpinCore__RigMinInitPriceOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigTailUpsOutOfRange",
+    "name": "SpinCore__RigPriceMultiplierOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigUpsMultiplierDurationOutOfRange",
+    "name": "SpinCore__RigTailUpsOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__RigUpsMultiplierOutOfRange",
+    "name": "SpinCore__ZeroAddress",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__ZeroAddress",
+    "name": "SpinCore__ZeroLauncher",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__ZeroLauncher",
+    "name": "SpinCore__ZeroQuoteToken",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "Core__ZeroQuoteToken",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "Core__ZeroUnitAmount",
+    "name": "SpinCore__ZeroUnitAmount",
     "type": "error"
   },
   {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
         "internalType": "address",
         "name": "launcher",
         "type": "address"
       },
       {
-        "indexed": false,
-        "internalType": "address",
-        "name": "quoteToken",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "unit",
-        "type": "address"
-      },
-      {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "rig",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "unit",
         "type": "address"
       },
       {
@@ -191,6 +199,12 @@
       },
       {
         "indexed": false,
+        "internalType": "address",
+        "name": "quoteToken",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "string",
         "name": "tokenName",
         "type": "string"
@@ -199,12 +213,6 @@
         "indexed": false,
         "internalType": "string",
         "name": "tokenSymbol",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "uri",
         "type": "string"
       },
       {
@@ -234,7 +242,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "halvingAmount",
+        "name": "halvingPeriod",
         "type": "uint256"
       },
       {
@@ -280,7 +288,7 @@
         "type": "uint256"
       }
     ],
-    "name": "MineCore__Launched",
+    "name": "SpinCore__Launched",
     "type": "event"
   },
   {
@@ -293,7 +301,7 @@
         "type": "uint256"
       }
     ],
-    "name": "MineCore__MinDonutForLaunchSet",
+    "name": "SpinCore__MinDonutForLaunchSet",
     "type": "event"
   },
   {
@@ -306,26 +314,7 @@
         "type": "address"
       }
     ],
-    "name": "MineCore__ProtocolFeeAddressSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "previousOwner",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "newOwner",
-        "type": "address"
-      }
-    ],
-    "name": "OwnershipTransferred",
+    "name": "SpinCore__ProtocolFeeAddressSet",
     "type": "event"
   },
   {
@@ -460,7 +449,33 @@
   },
   {
     "inputs": [],
+    "name": "RIG_MAX_HALVING_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "RIG_MAX_INITIAL_UPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "RIG_MAX_ODDS_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -486,32 +501,6 @@
   },
   {
     "inputs": [],
-    "name": "RIG_MAX_UPS_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "RIG_MAX_UPS_MULTIPLIER_DURATION",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "RIG_MIN_EPOCH_PERIOD",
     "outputs": [
       {
@@ -525,7 +514,20 @@
   },
   {
     "inputs": [],
-    "name": "RIG_MIN_HALVING_AMOUNT",
+    "name": "RIG_MIN_HALVING_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "RIG_MIN_ODDS_BPS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -539,32 +541,6 @@
   {
     "inputs": [],
     "name": "RIG_MIN_PRICE_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "RIG_MIN_UPS_MULTIPLIER",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "RIG_MIN_UPS_MULTIPLIER_DURATION",
     "outputs": [
       {
         "internalType": "uint256",
@@ -703,11 +679,6 @@
             "type": "string"
           },
           {
-            "internalType": "string",
-            "name": "uri",
-            "type": "string"
-          },
-          {
             "internalType": "uint256",
             "name": "donutAmount",
             "type": "uint256"
@@ -729,7 +700,7 @@
           },
           {
             "internalType": "uint256",
-            "name": "halvingAmount",
+            "name": "halvingPeriod",
             "type": "uint256"
           },
           {
@@ -749,13 +720,8 @@
           },
           {
             "internalType": "uint256[]",
-            "name": "upsMultipliers",
+            "name": "odds",
             "type": "uint256[]"
-          },
-          {
-            "internalType": "uint256",
-            "name": "upsMultiplierDuration",
-            "type": "uint256"
           },
           {
             "internalType": "uint256",
@@ -778,7 +744,7 @@
             "type": "uint256"
           }
         ],
-        "internalType": "struct MineCore.LaunchParams",
+        "internalType": "struct SpinCore.LaunchParams",
         "name": "params",
         "type": "tuple"
       }
@@ -866,19 +832,6 @@
     "name": "renounceOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "rigFactory",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1000,6 +953,19 @@
     "name": "setProtocolFeeAddress",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "spinRigFactory",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {

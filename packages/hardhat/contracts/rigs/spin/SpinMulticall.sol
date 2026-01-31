@@ -179,6 +179,7 @@ contract SpinMulticall {
             rigEpochPeriod: params.rigEpochPeriod,
             rigPriceMultiplier: params.rigPriceMultiplier,
             rigMinInitPrice: params.rigMinInitPrice,
+            odds: params.odds,
             auctionInitPrice: params.auctionInitPrice,
             auctionEpochPeriod: params.auctionEpochPeriod,
             auctionPriceMultiplier: params.auctionPriceMultiplier,

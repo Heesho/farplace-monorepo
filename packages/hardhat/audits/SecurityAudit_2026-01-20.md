@@ -1,4 +1,4 @@
-# Mineport Smart Contract Security Audit Report
+# Farplace Smart Contract Security Audit Report
 
 **Date:** January 20, 2026
 **Auditor:** Claude Code (Trail of Bits Skills)
@@ -33,7 +33,7 @@ Traditional token launches suffer from a fundamental fairness problem: sophistic
 
 ### How It Works
 
-Mineport is a token launchpad on Base that distributes tokens through mining mechanisms instead of traditional sales. When a new token launches:
+Farplace is a token launchpad on Base that distributes tokens through mining mechanisms instead of traditional sales. When a new token launches:
 
 1. A "rig" is deployed that controls token emission and distribution
 2. Initial liquidity pairs the new token with DONUT
@@ -44,7 +44,7 @@ This creates rug-proof launches by design: there's no team allocation to dump, n
 
 ### The Four Rig Types
 
-Mineport supports four distinct "rig" architectures, each designed to incentivize different behaviors:
+Farplace supports four distinct "rig" architectures, each designed to incentivize different behaviors:
 
 | Rig Type | Purpose | Mechanism | Target Behavior |
 |----------|---------|-----------|-----------------|
@@ -549,7 +549,7 @@ No minimum donation amount. A user could donate 1 wei on a low-activity day and 
 
 ## Conclusion
 
-The Mineport smart contracts demonstrate **solid security practices**:
+The Farplace smart contracts demonstrate **solid security practices**:
 
 - ✅ Proper use of OpenZeppelin security primitives (ReentrancyGuard, SafeERC20, Ownable)
 - ✅ Comprehensive input validation throughout

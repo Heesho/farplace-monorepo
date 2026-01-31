@@ -1,8 +1,8 @@
-# Mineport Protocol Architecture
+# Farplace Protocol Architecture
 
 ## Overview
 
-Mineport is a decentralized token launchpad on Base with three distinct rig types, each implementing different token distribution mechanics. All rigs share common infrastructure (Unit tokens, Auctions, LP burning) but differ in how users earn tokens.
+Farplace is a decentralized token launchpad on Base with three distinct rig types, each implementing different token distribution mechanics. All rigs share common infrastructure (Unit tokens, Auctions, LP burning) but differ in how users earn tokens.
 
 ## Contract Hierarchy
 

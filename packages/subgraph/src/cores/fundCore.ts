@@ -33,14 +33,15 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   let launcher = getOrCreateAccount(event.params.launcher)
 
   // Event params for FundCore:
-  // launcher (indexed), rig (indexed), unit (indexed), auction, lpToken, quoteToken,
+  // launcher (indexed), rig (indexed), unit (indexed), recipient, auction, lpToken, quoteToken,
   // tokenName, tokenSymbol, donutAmount, unitAmount, initialEmission, minEmission,
-  // minDonation, auctionInitPrice, auctionEpochPeriod, auctionPriceMultiplier, auctionMinInitPrice
+  // minDonation, halvingPeriod, auctionInitPrice, auctionEpochPeriod, auctionPriceMultiplier, auctionMinInitPrice
 
   let unitAddress = event.params.unit
   let rigAddress = event.params.rig
   let lpPairAddress = event.params.lpToken
   let quoteToken = event.params.quoteToken
+  let recipientAddress = event.params.recipient
 
   // Create Unit entity
   let unit = createUnit(
@@ -76,6 +77,11 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   // Create FundRig specialized entity
   let fundRig = new FundRig(rigAddress.toHexString())
   fundRig.rig = rig.id
+  fundRig.recipient = recipientAddress
+  fundRig.initialEmission = event.params.initialEmission
+  fundRig.minEmission = event.params.minEmission
+  fundRig.minDonation = ZERO_BI // Not emitted in launch event
+  fundRig.halvingPeriod = event.params.halvingPeriod
   fundRig.currentDay = ZERO_BI
   fundRig.totalDonated = ZERO_BD
   fundRig.totalMinted = ZERO_BD

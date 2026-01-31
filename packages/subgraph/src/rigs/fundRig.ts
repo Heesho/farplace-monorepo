@@ -1,14 +1,15 @@
 import { BigDecimal, BigInt, Address } from '@graphprotocol/graph-ts'
 import {
-  FundRig__Donated as DonatedEvent,
+  FundRig__Funded as FundedEvent,
   FundRig__Claimed as ClaimedEvent,
+  FundRig__ProtocolFee as ProtocolFeeEvent,
 } from '../../generated/templates/FundRig/FundRig'
 import {
   Rig,
   FundRig,
-  FundDayData,
+  CharityDayData,
   Donation,
-  FundClaim,
+  CharityClaim,
   Account,
   Unit,
   Protocol,
@@ -36,12 +37,12 @@ function calculateFee(amount: BigDecimal, feeBps: BigInt): BigDecimal {
   return amount.times(feeBps.toBigDecimal()).div(DIVISOR.toBigDecimal())
 }
 
-// Helper to get or create FundDayData
-function getOrCreateFundDayData(fundRig: FundRig, day: BigInt, timestamp: BigInt): FundDayData {
+// Helper to get or create CharityDayData
+function getOrCreateCharityDayData(fundRig: FundRig, day: BigInt, timestamp: BigInt): CharityDayData {
   let id = fundRig.id + '-' + day.toString()
-  let dayData = FundDayData.load(id)
+  let dayData = CharityDayData.load(id)
   if (dayData === null) {
-    dayData = new FundDayData(id)
+    dayData = new CharityDayData(id)
     dayData.fundRig = fundRig.id
     dayData.day = day
     dayData.totalDonated = ZERO_BD
@@ -52,7 +53,7 @@ function getOrCreateFundDayData(fundRig: FundRig, day: BigInt, timestamp: BigInt
   return dayData
 }
 
-export function handleDonation(event: DonatedEvent): void {
+export function handleFunded(event: FundedEvent): void {
   let rigAddress = event.address.toHexString()
   let fundRig = FundRig.load(rigAddress)
   if (fundRig === null) return
@@ -63,9 +64,8 @@ export function handleDonation(event: DonatedEvent): void {
   let unit = Unit.load(rig.unit)
   if (unit === null) return
 
-  // Event params: account (indexed), recipient (indexed), amount, day
+  // Event params: account (indexed), amount, day
   let donorAddress = event.params.account
-  let recipientAddress = event.params.recipient
   let amount = convertTokenToDecimal(event.params.amount, BI_18)
   let day = event.params.day
 
@@ -85,7 +85,6 @@ export function handleDonation(event: DonatedEvent): void {
   let donation = new Donation(donationId)
   donation.fundRig = fundRig.id
   donation.donor = donor.id
-  donation.recipient = recipientAddress
   donation.day = day
   donation.amount = amount
   donation.recipientAmount = recipientAmount
@@ -96,8 +95,8 @@ export function handleDonation(event: DonatedEvent): void {
   donation.txHash = event.transaction.hash
   donation.save()
 
-  // Update FundDayData
-  let dayData = getOrCreateFundDayData(fundRig, day, event.block.timestamp)
+  // Update CharityDayData
+  let dayData = getOrCreateCharityDayData(fundRig, day, event.block.timestamp)
   dayData.totalDonated = dayData.totalDonated.plus(amount)
   dayData.donorCount = dayData.donorCount.plus(ONE_BI)
   dayData.save()
@@ -126,7 +125,7 @@ export function handleDonation(event: DonatedEvent): void {
   protocol.save()
 }
 
-export function handleFundClaimed(event: ClaimedEvent): void {
+export function handleCharityClaimed(event: ClaimedEvent): void {
   let rigAddress = event.address.toHexString()
   let fundRig = FundRig.load(rigAddress)
   if (fundRig === null) return
@@ -148,9 +147,9 @@ export function handleFundClaimed(event: ClaimedEvent): void {
   claimer.lastActivityAt = event.block.timestamp
   claimer.save()
 
-  // Create FundClaim entity
+  // Create CharityClaim entity
   let claimId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
-  let claim = new FundClaim(claimId)
+  let claim = new CharityClaim(claimId)
   claim.fundRig = fundRig.id
   claim.claimer = claimer.id
   claim.day = day
@@ -178,6 +177,24 @@ export function handleFundClaimed(event: ClaimedEvent): void {
   // Update Protocol total minted
   let protocol = getOrCreateProtocol()
   protocol.totalMinted = protocol.totalMinted.plus(amount)
+  protocol.lastUpdated = event.block.timestamp
+  protocol.save()
+}
+
+export function handleFundProtocolFee(event: ProtocolFeeEvent): void {
+  // Event params: protocol (indexed), amount, day
+  let rigAddress = event.address.toHexString()
+  let amount = convertTokenToDecimal(event.params.amount, BI_18)
+
+  let rig = Rig.load(rigAddress)
+  if (rig === null) return
+
+  rig.protocolRevenue = rig.protocolRevenue.plus(amount)
+  rig.save()
+
+  // Update Protocol total revenue
+  let protocol = getOrCreateProtocol()
+  protocol.totalProtocolRevenue = protocol.totalProtocolRevenue.plus(amount)
   protocol.lastUpdated = event.block.timestamp
   protocol.save()
 }
