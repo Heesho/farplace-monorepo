@@ -11,8 +11,8 @@ import {
 import {
   Rig,
   MineRig,
-  SeatSlot,
-  SeatMine,
+  MineSlot,
+  MineAction,
   Account,
   Unit,
   Protocol,
@@ -36,11 +36,11 @@ function getSlotId(rigAddress: string, slotIndex: BigInt): string {
 }
 
 // Helper to get or create a slot
-function getOrCreateSlot(mineRig: MineRig, slotIndex: BigInt): SeatSlot {
+function getOrCreateSlot(mineRig: MineRig, slotIndex: BigInt): MineSlot {
   let slotId = getSlotId(mineRig.id, slotIndex)
-  let slot = SeatSlot.load(slotId)
+  let slot = MineSlot.load(slotId)
   if (slot === null) {
-    slot = new SeatSlot(slotId)
+    slot = new MineSlot(slotId)
     slot.mineRig = mineRig.id
     slot.index = slotIndex
     slot.epochId = ZERO_BI
@@ -54,7 +54,7 @@ function getOrCreateSlot(mineRig: MineRig, slotIndex: BigInt): SeatSlot {
   return slot
 }
 
-export function handleSeatMine(event: MineEvent): void {
+export function handleMine(event: MineEvent): void {
   let rigAddress = event.address.toHexString()
   let mineRig = MineRig.load(rigAddress)
   if (mineRig === null) return
@@ -83,9 +83,9 @@ export function handleSeatMine(event: MineEvent): void {
   let slot = getOrCreateSlot(mineRig, slotIndex)
   let prevMinerAccount = slot.currentMiner
 
-  // Create SeatMine entity
+  // Create MineAction entity
   let mineId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
-  let mine = new SeatMine(mineId)
+  let mine = new MineAction(mineId)
   mine.mineRig = mineRig.id
   mine.slot = slot.id
   mine.miner = miner.id
@@ -129,7 +129,7 @@ export function handleSeatMine(event: MineEvent): void {
   unit.save()
 }
 
-export function handleSeatMinerFee(event: MinerFeeEvent): void {
+export function handleMineMinerFee(event: MinerFeeEvent): void {
   // Event params: miner (indexed), index (indexed), epochId (indexed), amount
   let rigAddress = event.address.toHexString()
   let minerAddress = event.params.miner
@@ -142,7 +142,7 @@ export function handleSeatMinerFee(event: MinerFeeEvent): void {
   miner.totalMined = miner.totalMined.plus(amount)
   miner.save()
 
-  // Try to find the corresponding SeatMine and update earned
+  // Try to find the corresponding MineAction and update earned
   // Note: This event comes after Mine event in same tx, so we try to find it
   // by matching tx hash, slot, and epochId
 }

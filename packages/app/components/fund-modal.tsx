@@ -109,7 +109,7 @@ export function FundModal({
 
   // Mock recipient data - from rig URI, not Farcaster
   const recipient = {
-    address: "0xcharity1234567890abcdef1234567890abcdef",
+    address: "0xrecipient1234567890abcdef1234567890abcde",
     name: "Ocean Cleanup Foundation",
   };
 

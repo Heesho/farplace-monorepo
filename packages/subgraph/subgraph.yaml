@@ -52,7 +52,7 @@ dataSources:
         - Protocol
         - Unit
         - Rig
-        - SlotRig
+        - SpinRig
         - Account
       abis:
         - name: SpinCore
@@ -140,8 +140,8 @@ templates:
       entities:
         - Rig
         - MineRig
-        - SeatSlot
-        - SeatMine
+        - MineSlot
+        - MineAction
         - Account
         - Unit
       abis:
@@ -149,9 +149,9 @@ templates:
           file: ./abis/MineRig.json
       eventHandlers:
         - event: Rig__Mine(address,indexed address,indexed uint256,indexed uint256,uint256,string)
-          handler: handleSeatMine
+          handler: handleMine
         - event: Rig__MinerFee(indexed address,indexed uint256,indexed uint256,uint256)
-          handler: handleSeatMinerFee
+          handler: handleMineMinerFee
         - event: Rig__Mint(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineMint
         - event: Rig__TreasuryFee(indexed address,indexed uint256,indexed uint256,uint256)
@@ -178,7 +178,7 @@ templates:
       language: wasm/assemblyscript
       entities:
         - Rig
-        - SlotRig
+        - SpinRig
         - Spin
         - Account
         - Unit
@@ -223,7 +223,7 @@ templates:
         - event: FundRig__Funded(indexed address,uint256,uint256)
           handler: handleFunded
         - event: FundRig__Claimed(indexed address,uint256,uint256)
-          handler: handleCharityClaimed
+          handler: handleFundClaimed
         - event: FundRig__ProtocolFee(indexed address,uint256,uint256)
           handler: handleFundProtocolFee
       file: ./src/rigs/fundRig.ts

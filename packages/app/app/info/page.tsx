@@ -26,11 +26,11 @@ const INFO_SECTIONS = [
   {
     title: "How It Works",
     content:
-      "Each token has a mining rig. One seat, many competitors. Hold the seat to earn emissions.",
+      "Each token has a mining rig. One slot, many competitors. Hold the slot to earn emissions.",
     bullets: [
-      "Pay to claim the mining seat and start earning tokens",
+      "Pay to claim the mining slot and start earning tokens",
       "Price resets high after each claim, then decays over time",
-      "When someone takes your seat, you get 80% of what they paid",
+      "When someone takes your slot, you get 80% of what they paid",
       "Emissions halve over time like Bitcoin",
     ],
   },

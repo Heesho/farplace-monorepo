@@ -7,9 +7,9 @@ import {
 import {
   Rig,
   FundRig,
-  CharityDayData,
+  FundDayData,
   Donation,
-  CharityClaim,
+  FundClaim,
   Account,
   Unit,
   Protocol,
@@ -37,12 +37,12 @@ function calculateFee(amount: BigDecimal, feeBps: BigInt): BigDecimal {
   return amount.times(feeBps.toBigDecimal()).div(DIVISOR.toBigDecimal())
 }
 
-// Helper to get or create CharityDayData
-function getOrCreateCharityDayData(fundRig: FundRig, day: BigInt, timestamp: BigInt): CharityDayData {
+// Helper to get or create FundDayData
+function getOrCreateFundDayData(fundRig: FundRig, day: BigInt, timestamp: BigInt): FundDayData {
   let id = fundRig.id + '-' + day.toString()
-  let dayData = CharityDayData.load(id)
+  let dayData = FundDayData.load(id)
   if (dayData === null) {
-    dayData = new CharityDayData(id)
+    dayData = new FundDayData(id)
     dayData.fundRig = fundRig.id
     dayData.day = day
     dayData.totalDonated = ZERO_BD
@@ -95,8 +95,8 @@ export function handleFunded(event: FundedEvent): void {
   donation.txHash = event.transaction.hash
   donation.save()
 
-  // Update CharityDayData
-  let dayData = getOrCreateCharityDayData(fundRig, day, event.block.timestamp)
+  // Update FundDayData
+  let dayData = getOrCreateFundDayData(fundRig, day, event.block.timestamp)
   dayData.totalDonated = dayData.totalDonated.plus(amount)
   dayData.donorCount = dayData.donorCount.plus(ONE_BI)
   dayData.save()
@@ -125,7 +125,7 @@ export function handleFunded(event: FundedEvent): void {
   protocol.save()
 }
 
-export function handleCharityClaimed(event: ClaimedEvent): void {
+export function handleFundClaimed(event: ClaimedEvent): void {
   let rigAddress = event.address.toHexString()
   let fundRig = FundRig.load(rigAddress)
   if (fundRig === null) return
@@ -147,9 +147,9 @@ export function handleCharityClaimed(event: ClaimedEvent): void {
   claimer.lastActivityAt = event.block.timestamp
   claimer.save()
 
-  // Create CharityClaim entity
+  // Create FundClaim entity
   let claimId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
-  let claim = new CharityClaim(claimId)
+  let claim = new FundClaim(claimId)
   claim.fundRig = fundRig.id
   claim.claimer = claimer.id
   claim.day = day

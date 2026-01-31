@@ -8,25 +8,25 @@ Each token launch creates a **Rig** (the distribution mechanism), a **Unit** (th
 
 ## Rig Types
 
-### MineRig (Seat Mining)
+### MineRig (Slot Mining)
 
-Users compete for "mining seats" via Dutch auction pricing. While you hold a seat, you earn Unit token emissions proportional to time held. When someone takes your seat, they pay the current auction price -- 80% of which goes to you as the displaced miner. The seat price resets to `lastPrice * priceMultiplier` and decays linearly back to zero over the epoch period. If no one takes the seat before the epoch ends, the next person can take it for free.
+Users compete for "mining slots" via Dutch auction pricing. While you hold a slot, you earn Unit token emissions proportional to time held. When someone takes your slot, they pay the current auction price -- 80% of which goes to you as the displaced miner. The slot price resets to `lastPrice * priceMultiplier` and decays linearly back to zero over the epoch period. If no one takes the slot before the epoch ends, the next person can take it for free.
 
-Each rig starts with 1 seat but the owner can increase capacity up to 256. UPS (units per second) is divided evenly across all seats. Emissions follow a Bitcoin-like halving schedule based on total tokens minted: once `halvingAmount` tokens are minted, UPS halves, then halves again at `halvingAmount * 1.5`, then at `halvingAmount * 1.75`, etc. (geometric series approaching `2 * halvingAmount`). UPS never drops below `tailUps`.
+Each rig starts with 1 slot but the owner can increase capacity up to 256. UPS (units per second) is divided evenly across all slots. Emissions follow a Bitcoin-like halving schedule based on total tokens minted: once `halvingAmount` tokens are minted, UPS halves, then halves again at `halvingAmount * 1.5`, then at `halvingAmount * 1.75`, etc. (geometric series approaching `2 * halvingAmount`). UPS never drops below `tailUps`.
 
-Optionally, Pyth Entropy VRF can assign a random UPS multiplier (1x-10x) to a seat each time it changes hands. The multiplier lasts for `upsMultiplierDuration` then resets to 1x until the next mine action triggers a new draw.
+Optionally, Pyth Entropy VRF can assign a random UPS multiplier (1x-10x) to a slot each time it changes hands. The multiplier lasts for `upsMultiplierDuration` then resets to 1x until the next mine action triggers a new draw.
 
-**Fee split (on seat purchase price):** 80% to previous miner, 15% to treasury, 4% to team, 1% to protocol. Miner fees use a pull-based claim pattern to prevent griefing.
+**Fee split (on slot purchase price):** 80% to previous miner, 15% to treasury, 4% to team, 1% to protocol. Miner fees use a pull-based claim pattern to prevent griefing.
 
 **Launch parameters (immutable):**
-- `quoteToken` -- ERC20 used for seat payments (e.g. USDC)
+- `quoteToken` -- ERC20 used for slot payments (e.g. USDC)
 - `tokenName`, `tokenSymbol` -- Unit token identity
 - `donutAmount` -- DONUT provided for initial LP
 - `unitAmount` -- Unit tokens minted for initial LP
 - `initialUps` -- starting units per second (max 1e24)
 - `tailUps` -- minimum UPS floor after halvings
 - `halvingAmount` -- total minted threshold for first halving (min 1000e18)
-- `epochPeriod` -- Dutch auction duration per seat (10 min - 365 days)
+- `epochPeriod` -- Dutch auction duration per slot (10 min - 365 days)
 - `priceMultiplier` -- price reset multiplier on purchase (1.1x - 3x, 18 decimals)
 - `minInitPrice` -- minimum starting price per epoch (min 1e6)
 - `upsMultipliers[]` -- array of possible multiplier values (1x-10x, drawn randomly)
@@ -36,7 +36,7 @@ Optionally, Pyth Entropy VRF can assign a random UPS multiplier (1x-10x) to a se
 **Owner-settable (live):**
 - `treasury` -- treasury fee recipient (cannot be zero)
 - `team` -- team fee recipient (zero disables team fees, redirects to treasury)
-- `capacity` -- number of mining seats (can only increase, max 256)
+- `capacity` -- number of mining slots (can only increase, max 256)
 - `multipliersEnabled` -- toggle Pyth Entropy random multipliers on/off
 - `uri` -- rig metadata URI
 

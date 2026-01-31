@@ -37,6 +37,6 @@ export const SECONDS_PER_DAY = 86400
 // RIG TYPES
 // ============================================================================
 
-export const RIG_TYPE_SEAT = 'seat'
+export const RIG_TYPE_MINE = 'mine'
 export const RIG_TYPE_SPIN = 'spin'
-export const RIG_TYPE_CHARITY = 'charity'
+export const RIG_TYPE_FUND = 'fund'

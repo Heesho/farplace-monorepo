@@ -21,7 +21,7 @@ contract Registry is Ownable {
     /*----------  STRUCTS  ----------------------------------------------*/
 
     struct RigInfo {
-        string rigType;      // e.g., "seat", "content", "charity", "spin"
+        string rigType;      // e.g., "mine", "spin", "fund"
         address unit;        // The token associated with this rig
         address launcher;    // Address that launched the rig
         address factory;     // Factory that deployed the rig
@@ -67,7 +67,7 @@ contract Registry is Ownable {
      * @notice Register a newly deployed rig.
      * @dev Only callable by approved factories.
      * @param rig Address of the deployed rig contract
-     * @param rigType Type identifier (e.g., "seat", "content")
+     * @param rigType Type identifier (e.g., "mine", "spin", "fund")
      * @param unit Address of the rig's token
      * @param launcher Address that initiated the launch
      */
@@ -120,7 +120,7 @@ contract Registry is Ownable {
 
     /**
      * @notice Get number of rigs of a specific type.
-     * @param rigType Type identifier (e.g., "seat")
+     * @param rigType Type identifier (e.g., "mine")
      */
     function totalRigsByType(string calldata rigType) external view returns (uint256) {
         return rigsByType[rigType].length;

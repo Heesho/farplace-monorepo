@@ -2,26 +2,6 @@
 
 A permissionless token launchpad on Base that distributes tokens through gamified mining mechanisms. Instead of traditional token sales or airdrops, users compete for tokens through Dutch auction-style mechanics where engagement determines distribution.
 
-## Table of Contents
-
-- [Overview](#overview)
-- [How It Works](#how-it-works)
-- [Rig Types](#rig-types)
-  - [Seat Rig](#seat-rig)
-  - [Spin Rig](#spin-rig)
-  - [Charity Rig](#charity-rig)
-- [Core Concepts](#core-concepts)
-  - [Dutch Auctions](#dutch-auctions)
-  - [Token Emissions](#token-emissions)
-  - [Halving Schedule](#halving-schedule)
-  - [Permanent Liquidity](#permanent-liquidity)
-- [Architecture](#architecture)
-- [Fee Distribution](#fee-distribution)
-- [Technical Details](#technical-details)
-- [Development](#development)
-
----
-
 ## Overview
 
 Farplace reimagines token distribution by turning it into a competitive game. When someone launches a token on Farplace:
@@ -43,7 +23,7 @@ Creator provides DONUT → Unit token created → LP created & burned → Rig de
 
 1. **Launch**: A creator provides DONUT tokens to launch. The system mints initial Unit tokens, creates a Unit/DONUT liquidity pool, and burns the LP tokens forever.
 
-2. **Mining**: Users interact with the Rig contract to earn Unit tokens. Each rig type has a different mechanic (seat competition, spinning, donations, content collection).
+2. **Mining**: Users interact with the Rig contract to earn Unit tokens. Each rig type has a different mechanic (slot mining, spinning, donations).
 
 3. **Emissions**: Unit tokens are minted over time according to a halving schedule, similar to Bitcoin's emission model.
 
@@ -53,14 +33,14 @@ Creator provides DONUT → Unit token created → LP created & burned → Rig de
 
 Farplace supports multiple "Rig" types, each with a unique distribution mechanism:
 
-### Seat Rig
+### Mine Rig
 
-**Mechanic**: Competitive seat ownership with continuous emissions
+**Mechanic**: Competitive slot ownership with continuous emissions
 
-Users compete to control "mining seats" in a Dutch auction. The seat holder passively earns token emissions over time. When someone takes the seat:
+Users compete to control "mining slots" in a Dutch auction. The slot holder passively earns token emissions over time. When someone takes the slot:
 
 - The new holder pays the auction price
-- **80%** goes to the previous seat holder
+- **80%** goes to the previous slot holder
 - **15%** goes to treasury (Auction contract for LP buybacks)
 - **4%** goes to the team
 - **1%** goes to the protocol
@@ -91,7 +71,7 @@ Users pay a Dutch auction price to "spin" for a chance to win tokens from a cont
 - **4%** to Team
 - **1%** to Protocol
 
-### Charity Rig
+### Fund Rig
 
 **Mechanic**: Donation-based daily pools with proportional distribution
 
@@ -102,12 +82,12 @@ Your reward = (your donation / total daily donations) × daily emission
 ```
 
 **Fee Split on Donations**:
-- **50%** to recipient (whitelisted charity/cause)
+- **50%** to recipient
 - **45%** to Treasury (remainder)
 - **4%** to Team
 - **1%** to Protocol
 
-**Emission Schedule**: Halves every 30 days down to a configurable floor.
+**Emission Schedule**: Halves every `halvingPeriod` days down to a configurable floor.
 
 ## Core Concepts
 
@@ -137,7 +117,7 @@ tokensEarned = timeHeld × ups × multiplier
 
 Similar to Bitcoin, emission rates decrease over time:
 
-**Seat Rig** (supply-based halvings):
+**Mine Rig** (supply-based halvings):
 ```
 Threshold[n] = halvingAmount × (2 - 1/2^n)
 
@@ -148,7 +128,7 @@ Example with halvingAmount = 1000:
   ...continues until tailUps floor
 ```
 
-**Spin/Charity Rigs** (time-based halvings):
+**Spin/Fund Rigs** (time-based halvings):
 ```
 halvings = (currentTime - startTime) / halvingPeriod
 currentUps = initialUps >> halvings  // divide by 2^halvings
@@ -175,11 +155,11 @@ This provides permanent trading liquidity and prevents rug pulls.
         ┌────────────────┬───────────────────┼───────────────────┐
         │                │                   │                   │
    ┌────▼────┐     ┌─────▼─────┐      ┌──────▼──────┐      ┌─────▼─────┐
-   │SeatCore │     │ SpinCore  │      │CharityCore  │      │  Future   │
+   │MineCore │     │ SpinCore  │      │  FundCore   │      │  Future   │
    └────┬────┘     └─────┬─────┘      └──────┬──────┘      │  Cores    │
         │                │                   │             └───────────┘
    ┌────▼────┐     ┌─────▼─────┐      ┌──────▼──────┐
-   │ SeatRig │     │  SpinRig  │      │ CharityRig  │
+   │ MineRig │     │  SpinRig  │      │  FundRig    │
    └────┬────┘     └─────┬─────┘      └──────┬──────┘
         │                │                   │
         └────────────────┴───────────────────┘
@@ -197,9 +177,9 @@ This provides permanent trading liquidity and prevents rug pulls.
 | `Registry` | Central registry for all rig types, enables discovery |
 | `Unit` | ERC20 token with mint rights controlled by its Rig |
 | `Auction` | Dutch auction for treasury fee collection, burns LP tokens |
-| `SeatRig` | Seat-based mining with Dutch auctions and VRF multipliers |
-| `SpinRig` | Slot machine gambling with VRF-determined payouts |
-| `CharityRig` | Daily donation pools with proportional distribution |
+| `MineRig` | Slot-based mining with Dutch auctions and VRF multipliers |
+| `SpinRig` | Slot machine spinning with VRF-determined payouts |
+| `FundRig` | Daily donation pools with proportional distribution |
 | `*Core` | Factory/launchpad for each rig type |
 | `*Factory` | Creates individual rig/unit/auction contracts |
 
@@ -207,13 +187,13 @@ This provides permanent trading liquidity and prevents rug pulls.
 
 ### Summary by Rig Type
 
-| Recipient | Seat | Spin | Charity |
-|-----------|------|------|---------|
+| Recipient | Mine | Spin | Fund |
+|-----------|------|------|------|
 | Previous Holder | 80% | - | - |
 | Treasury (remainder) | 15% | 95% | 45% |
 | Team | 4% | 4% | 4% |
 | Protocol | 1% | 1% | 1% |
-| Charity Recipient | - | - | 50% |
+| Fund Recipient | - | - | 50% |
 
 All rig types share consistent **4% team** and **1% protocol** fees. Treasury always receives the remainder after other fees.
 
@@ -225,9 +205,9 @@ Treasury fees accumulate in an Auction contract. Users can buy all accumulated f
 
 ### Randomness
 
-Seat and Spin rigs use [Pyth Entropy](https://docs.pyth.network/entropy) for verifiable randomness:
+Mine and Spin rigs use [Pyth Entropy](https://docs.pyth.network/entropy) for verifiable randomness:
 
-- **Seat Rig**: Random UPS multiplier (1x-10x) after mining
+- **Mine Rig**: Random UPS multiplier (1x-10x) after mining
 - **Spin Rig**: Random payout percentage from configurable odds array
 
 ### Token Properties
@@ -254,7 +234,7 @@ Seat and Spin rigs use [Pyth Entropy](https://docs.pyth.network/entropy) for ver
 | Price Multiplier | 1.1x | 3x |
 | Init Price | 1e6 | type(uint192).max |
 | UPS Multiplier | 1x | 10x |
-| Capacity (seats) | 1 | 1,000,000 |
+| Capacity (slots) | 1 | 1,000,000 |
 
 ## Development
 
@@ -321,9 +301,9 @@ The test suite includes:
 ```bash
 cd packages/hardhat
 npx hardhat test                           # Run all tests
-npx hardhat test tests/seat/*              # Run seat rig tests
+npx hardhat test tests/mine/*              # Run mine rig tests
 npx hardhat test tests/spin/*              # Run spin rig tests
-npx hardhat test tests/charity/*           # Run charity rig tests
+npx hardhat test tests/fund/*             # Run fund rig tests
 ```
 
 ---

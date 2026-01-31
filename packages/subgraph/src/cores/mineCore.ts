@@ -12,7 +12,7 @@ import {
   ZERO_BD,
   PROTOCOL_ID,
   BI_18,
-  RIG_TYPE_SEAT,
+  RIG_TYPE_MINE,
 } from '../constants'
 import {
   getOrCreateProtocol,
@@ -56,7 +56,7 @@ export function handleMineCoreLaunched(event: CoreLaunchedEvent): void {
   // Create general Rig entity
   let rig = new Rig(rigAddress.toHexString())
   rig.unit = unit.id
-  rig.rigType = RIG_TYPE_SEAT
+  rig.rigType = RIG_TYPE_MINE
   rig.launcher = launcher.id
   rig.auction = event.params.auction
   rig.quoteToken = quoteToken

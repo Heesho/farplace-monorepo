@@ -28,14 +28,14 @@ Farplace supports three distinct rig architectures, each designed to incentivize
 
 ### MineRig - Classic Mining
 
-A rotating seat competition where one wallet at a time collects token emissions.
+A rotating slot competition where one wallet at a time collects token emissions.
 
-- **Mechanism**: Dutch auction for mining seats. Price starts high and decays toward zero.
-- **Earning**: Hold the seat to accumulate tokens over time. Get paid when someone takes your seat.
+- **Mechanism**: Dutch auction for mining slots. Price starts high and decays toward zero.
+- **Earning**: Hold the slot to accumulate tokens over time. Get paid when someone takes your slot.
 - **Fee split**: 80% to previous miner, 15% treasury, 4% team, 1% protocol
 - **Use case**: Pure speculation and trading activity
 
-### SlotRig - Casino/Gambling
+### SpinRig - Slot Machine
 
 A slot machine where users pay to spin for a chance at the prize pool.
 
@@ -44,14 +44,14 @@ A slot machine where users pay to spin for a chance at the prize pool.
 - **Fee split**: 95% treasury, 4% team, 1% protocol
 - **Use case**: Entertainment and gaming
 
-### FundRig - Charitable Giving
+### FundRig - Donation Pool
 
 Daily donation pools where contributors claim proportional token rewards.
 
 - **Mechanism**: Donate to a daily pool. When the day ends, claim your share of emissions.
 - **Earning**: Your claim = (your donation / total daily donations) × daily emissions
-- **Fee split**: 50% to charity recipient, 45% treasury, 4% team, 1% protocol
-- **Use case**: Fundraising for causes with crypto incentives
+- **Fee split**: 50% to recipient, 45% treasury, 4% team, 1% protocol
+- **Use case**: Fundraising with crypto incentives
 
 ## 4) The Launch Process
 
@@ -137,7 +137,7 @@ The system is designed so that selfish behavior still benefits the ecosystem:
 |-------|--------------|----------------|
 | Miner | Maximize token earnings | Provides liquidity and activity |
 | Spinner | Win big payouts | Funds prize pool and treasury |
-| Donor | Earn tokens from charity | Actual charitable donations occur |
+| Donor | Earn tokens from funding | Donations flow to recipients |
 | LP Holder | Buy cheap treasury | Burns LP, concentrating liquidity |
 
 ## 9) What This Solves (And What It Doesn't)
@@ -163,10 +163,10 @@ A: DONUT to seed the initial liquidity pool, plus configuration choices for emis
 A: No. Emission rates, halving schedules, and pricing mechanics are immutable once deployed.
 
 **Q: What happens if no one participates?**
-A: For MineRig, accrued tokens wait until someone takes the seat. For other rigs, activity simply pauses.
+A: For MineRig, accrued tokens wait until someone takes the slot. For other rigs, activity simply pauses.
 
 **Q: How is randomness handled?**
-A: SlotRig and MineRig (optionally) use Pyth Entropy VRF for provably fair randomness.
+A: SpinRig and MineRig (optionally) use Pyth Entropy VRF for provably fair randomness.
 
 **Q: Can liquidity be removed?**
 A: No. Initial LP tokens are burned to a dead address. The trading pool exists forever.

@@ -15,7 +15,7 @@ Farplace is a decentralized token launchpad on Base with three distinct rig type
         +----------------------------+----------------------------+
         |                            |                            |
 +-------v-------+           +--------v--------+          +--------v--------+
-|   MineCore    |           |    SlotCore     |          |    FundCore     |
+|   MineCore    |           |    SpinCore     |          |    FundCore     |
 +-------+-------+           +--------+--------+          +--------+--------+
         |                            |                            |
 +-------v-------+           +--------v--------+          +--------v--------+
@@ -24,7 +24,7 @@ Farplace is a decentralized token launchpad on Base with three distinct rig type
 |AuctionFactory |                    |                            |
 +-------+-------+           +--------v--------+          +--------v--------+
         |                   |     Rig         |          |     Rig         |
-+-------v-------+           | (SlotRig)       |          | (FundRig)       |
++-------v-------+           | (SpinRig)       |          | (FundRig)       |
 |     Unit      |           +--------+--------+          +--------+--------+
 |   (ERC20)     |                    |                            |
 +---------------+           +--------v--------+          +--------v--------+
@@ -35,13 +35,13 @@ Farplace is a decentralized token launchpad on Base with three distinct rig type
 
 ## Rig Types Comparison
 
-| Feature | MineRig | SlotRig | FundRig |
+| Feature | MineRig | SpinRig | FundRig |
 |---------|---------|---------|---------|
-| **Mechanism** | Seat competition | Slot machine | Daily pools |
+| **Mechanism** | Slot competition | Slot machine | Daily pools |
 | **Multi-slot** | Yes (configurable) | No | No |
 | **VRF** | Optional (multiplier) | Required (payout) | None |
 | **Emission** | Time × UPS × multiplier | Time-based to pool | Day-based |
-| **Payout timing** | On seat takeover | On VRF callback | After day ends |
+| **Payout timing** | On slot takeover | On VRF callback | After day ends |
 | **Pull pattern** | Yes (miner fees) | No | No |
 
 ## Common Launch Flow
@@ -217,7 +217,7 @@ Thresholds (geometric series):
 
 ---
 
-## SlotRig Architecture
+## SpinRig Architecture
 
 ### Spin Flow
 
@@ -337,7 +337,7 @@ User calls donate(account, recipient, amount)
 | immediately   |
 +-------+-------+
         |
-        +---> Recipient (50%) --> charity address
+        +---> Recipient (50%) --> recipient address
         |
         +---> Treasury (45%) --> Auction contract
         |
@@ -458,7 +458,7 @@ Day 60-89       |  250  (2nd halving)
 6. **UPS floor**: Never drops below `tailUps`
 7. **Pull pattern**: Miner fees credited to claimable balance
 
-### SlotRig Specific
+### SpinRig Specific
 8. **Odds bounds**: All odds values between 100 (1%) and 10000 (100%)
 9. **VRF required**: Every spin requires entropy callback
 
@@ -472,7 +472,7 @@ Day 60-89       |  250  (2nd halving)
 
 | Contract | Address | Network |
 |----------|---------|---------|
-| MineCore | TBD | Base |
-| SlotCore | TBD | Base |
-| FundCore | TBD | Base |
+| MineCore | 0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1 | Base |
+| SpinCore | 0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631 | Base |
+| FundCore | 0x85f3e3135329272820ADC27F2561241f4b4e90db | Base |
 | Registry | TBD | Base |

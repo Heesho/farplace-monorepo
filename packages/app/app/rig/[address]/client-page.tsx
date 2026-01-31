@@ -166,7 +166,7 @@ const RIG_DATA: Record<RigType, {
       symbol: "FUND",
       price: 0.0089,
       change24h: 15.7,
-      description: "A charity funding rig token. Fund daily to earn token emissions proportional to your contribution.",
+      description: "A funding rig token. Fund daily to earn token emissions proportional to your contribution.",
       color: "from-sky-500 to-blue-600",
     },
     config: {

@@ -12,7 +12,7 @@ import {
   ZERO_BD,
   PROTOCOL_ID,
   BI_18,
-  RIG_TYPE_CHARITY,
+  RIG_TYPE_FUND,
 } from '../constants'
 import {
   getOrCreateProtocol,
@@ -57,7 +57,7 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   // Create general Rig entity
   let rig = new Rig(rigAddress.toHexString())
   rig.unit = unit.id
-  rig.rigType = RIG_TYPE_CHARITY
+  rig.rigType = RIG_TYPE_FUND
   rig.launcher = launcher.id
   rig.auction = event.params.auction
   rig.quoteToken = quoteToken

@@ -5,7 +5,7 @@ import {
   SpinRig as SpinRigTemplate,
   Unit as UnitTemplate,
 } from '../../generated/templates'
-import { Protocol, Unit, Rig, SlotRig, Account } from '../../generated/schema'
+import { Protocol, Unit, Rig, SpinRig, Account } from '../../generated/schema'
 import {
   ZERO_BI,
   ONE_BI,
@@ -74,34 +74,34 @@ export function handleSpinCoreLaunched(event: SpinCoreLaunchedEvent): void {
   rig.createdAtBlock = event.block.number
   rig.save()
 
-  // Create SlotRig specialized entity
-  let slotRig = new SlotRig(rigAddress.toHexString())
-  slotRig.rig = rig.id
-  slotRig.initialUps = event.params.initialUps
-  slotRig.tailUps = event.params.tailUps
-  slotRig.halvingPeriod = event.params.halvingPeriod
-  slotRig.epochPeriod = event.params.rigEpochPeriod
-  slotRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)
-  slotRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_18)
+  // Create SpinRig specialized entity
+  let spinRig = new SpinRig(rigAddress.toHexString())
+  spinRig.rig = rig.id
+  spinRig.initialUps = event.params.initialUps
+  spinRig.tailUps = event.params.tailUps
+  spinRig.halvingPeriod = event.params.halvingPeriod
+  spinRig.epochPeriod = event.params.rigEpochPeriod
+  spinRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)
+  spinRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_18)
 
   // Dutch auction state
-  slotRig.currentEpochId = ZERO_BI
-  slotRig.initPrice = slotRig.minInitPrice
-  slotRig.slotStartTime = event.block.timestamp
+  spinRig.currentEpochId = ZERO_BI
+  spinRig.initPrice = spinRig.minInitPrice
+  spinRig.slotStartTime = event.block.timestamp
 
   // Prize pool
-  slotRig.prizePool = ZERO_BD
-  slotRig.currentOdds = new Array<BigInt>()
+  spinRig.prizePool = ZERO_BD
+  spinRig.currentOdds = new Array<BigInt>()
 
   // Stats
-  slotRig.totalSpins = ZERO_BI
-  slotRig.totalWins = ZERO_BI
-  slotRig.totalWonAmount = ZERO_BD
-  slotRig.totalSpent = ZERO_BD
-  slotRig.save()
+  spinRig.totalSpins = ZERO_BI
+  spinRig.totalWins = ZERO_BI
+  spinRig.totalWonAmount = ZERO_BD
+  spinRig.totalSpent = ZERO_BD
+  spinRig.save()
 
-  // Link rig to slotRig
-  rig.slotRig = slotRig.id
+  // Link rig to spinRig
+  rig.spinRig = spinRig.id
   rig.save()
 
   // Link unit to rig

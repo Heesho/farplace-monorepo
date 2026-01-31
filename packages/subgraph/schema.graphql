@@ -216,7 +216,7 @@ type Swap @entity(immutable: true) {
 type Rig @entity(immutable: false) {
   id: ID!                              # Rig contract address
   unit: Unit!                          # The Unit token this rig mints
-  rigType: String!                     # "seat", "spin", "charity"
+  rigType: String!                     # "mine", "spin", "fund"
 
   # Common fields
   launcher: Account!
@@ -249,12 +249,12 @@ type Rig @entity(immutable: false) {
   # ==========================================================================
 
   mineRig: MineRig
-  slotRig: SlotRig
+  spinRig: SpinRig
   fundRig: FundRig
 }
 
 # =============================================================================
-# SEAT RIG - Mining seat competition
+# MINE RIG - Mining slot competition
 # =============================================================================
 
 type MineRig @entity(immutable: false) {
@@ -277,11 +277,11 @@ type MineRig @entity(immutable: false) {
   totalMines: BigInt!                  # All-time mine count
 
   # Relations
-  slots: [SeatSlot!]! @derivedFrom(field: "mineRig")
-  mines: [SeatMine!]! @derivedFrom(field: "mineRig")
+  slots: [MineSlot!]! @derivedFrom(field: "mineRig")
+  mines: [MineAction!]! @derivedFrom(field: "mineRig")
 }
 
-type SeatSlot @entity(immutable: false) {
+type MineSlot @entity(immutable: false) {
   id: ID!                              # {rigAddress}-{slotIndex}
   mineRig: MineRig!
   index: BigInt!
@@ -298,10 +298,10 @@ type SeatSlot @entity(immutable: false) {
   lastMined: BigInt!
 }
 
-type SeatMine @entity(immutable: true) {
+type MineAction @entity(immutable: true) {
   id: ID!                              # {txHash}-{logIndex}
   mineRig: MineRig!
-  slot: SeatSlot!
+  slot: MineSlot!
 
   miner: Account!
   prevMiner: Account
@@ -323,7 +323,7 @@ type SeatMine @entity(immutable: true) {
 # SPIN RIG - Slot machine with VRF
 # =============================================================================
 
-type SlotRig @entity(immutable: false) {
+type SpinRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
@@ -353,12 +353,12 @@ type SlotRig @entity(immutable: false) {
   totalSpent: BigDecimal!              # Total quoteToken spent on spins
 
   # Relations
-  spins: [Spin!]! @derivedFrom(field: "slotRig")
+  spins: [Spin!]! @derivedFrom(field: "spinRig")
 }
 
 type Spin @entity(immutable: true) {
   id: ID!                              # {txHash}-{logIndex}
-  slotRig: SlotRig!
+  spinRig: SpinRig!
   spinner: Account!
 
   epochId: BigInt!
@@ -375,7 +375,7 @@ type Spin @entity(immutable: true) {
 }
 
 # =============================================================================
-# CHARITY RIG - Daily donation pool mining
+# FUND RIG - Daily donation pool
 # =============================================================================
 
 type FundRig @entity(immutable: false) {
@@ -383,7 +383,7 @@ type FundRig @entity(immutable: false) {
   rig: Rig!
 
   # Recipient (required at launch, receives 50% of donations)
-  recipient: Bytes!                    # Recipient address (charity/cause)
+  recipient: Bytes!                    # Recipient address
 
   # Emission config
   initialEmission: BigInt!             # Starting daily emission
@@ -401,12 +401,12 @@ type FundRig @entity(immutable: false) {
 
   # Relations
   donations: [Donation!]! @derivedFrom(field: "fundRig")
-  recipients: [CharityRecipient!]! @derivedFrom(field: "fundRig")
-  dayData: [CharityDayData!]! @derivedFrom(field: "fundRig")
+  recipients: [FundRecipient!]! @derivedFrom(field: "fundRig")
+  dayData: [FundDayData!]! @derivedFrom(field: "fundRig")
 }
 
-# Whitelisted recipient for FundRig
-type CharityRecipient @entity(immutable: false) {
+# Recipient for FundRig
+type FundRecipient @entity(immutable: false) {
   id: ID!                              # {rigAddress}-{recipientAddress}
   fundRig: FundRig!
   recipient: Bytes!                    # Recipient address
@@ -416,7 +416,7 @@ type CharityRecipient @entity(immutable: false) {
 }
 
 # Daily donation pool data
-type CharityDayData @entity(immutable: false) {
+type FundDayData @entity(immutable: false) {
   id: ID!                              # {rigAddress}-{day}
   fundRig: FundRig!
   day: BigInt!                         # Day number (days since rig start)
@@ -449,7 +449,7 @@ type Donation @entity(immutable: true) {
 }
 
 # Claim record (when donor claims their Unit tokens)
-type CharityClaim @entity(immutable: true) {
+type FundClaim @entity(immutable: true) {
   id: ID!                              # {txHash}-{logIndex}
   fundRig: FundRig!
 
@@ -481,8 +481,8 @@ type Account @entity(immutable: false) {
   # Relations
   unitsLaunched: [Unit!]! @derivedFrom(field: "launcher")
   swaps: [Swap!]! @derivedFrom(field: "account")
-  seatMines: [SeatMine!]! @derivedFrom(field: "miner")
-  seatSlots: [SeatSlot!]! @derivedFrom(field: "currentMiner")
+  mineActions: [MineAction!]! @derivedFrom(field: "miner")
+  mineSlots: [MineSlot!]! @derivedFrom(field: "currentMiner")
   spins: [Spin!]! @derivedFrom(field: "spinner")
   donations: [Donation!]! @derivedFrom(field: "donor")
 }

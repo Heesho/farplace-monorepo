@@ -8,7 +8,7 @@ import {
 } from '../../generated/templates/SpinRig/SpinRig'
 import {
   Rig,
-  SlotRig,
+  SpinRig,
   Spin,
   Account,
   Unit,
@@ -33,8 +33,8 @@ import {
 
 export function handleSpin(event: SpinEvent): void {
   let rigAddress = event.address.toHexString()
-  let slotRig = SlotRig.load(rigAddress)
-  if (slotRig === null) return
+  let spinRig = SpinRig.load(rigAddress)
+  if (spinRig === null) return
 
   let rig = Rig.load(rigAddress)
   if (rig === null) return
@@ -57,7 +57,7 @@ export function handleSpin(event: SpinEvent): void {
   // Create Spin entity
   let spinId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
   let spin = new Spin(spinId)
-  spin.slotRig = slotRig.id
+  spin.spinRig = spinRig.id
   spin.spinner = spinner.id
   spin.epochId = epochId
   spin.price = price
@@ -69,15 +69,15 @@ export function handleSpin(event: SpinEvent): void {
   spin.txHash = event.transaction.hash
   spin.save()
 
-  // Update SlotRig Dutch auction state
-  slotRig.currentEpochId = epochId.plus(ONE_BI)
-  slotRig.initPrice = price.times(slotRig.priceMultiplier)
-  slotRig.slotStartTime = event.block.timestamp
+  // Update SpinRig Dutch auction state
+  spinRig.currentEpochId = epochId.plus(ONE_BI)
+  spinRig.initPrice = price.times(spinRig.priceMultiplier)
+  spinRig.slotStartTime = event.block.timestamp
 
-  // Update SlotRig stats
-  slotRig.totalSpins = slotRig.totalSpins.plus(ONE_BI)
-  slotRig.totalSpent = slotRig.totalSpent.plus(price)
-  slotRig.save()
+  // Update SpinRig stats
+  spinRig.totalSpins = spinRig.totalSpins.plus(ONE_BI)
+  spinRig.totalSpent = spinRig.totalSpent.plus(price)
+  spinRig.save()
 
   // Update Rig activity
   rig.lastActivityAt = event.block.timestamp
@@ -91,8 +91,8 @@ export function handleSpin(event: SpinEvent): void {
 
 export function handleWin(event: WinEvent): void {
   let rigAddress = event.address.toHexString()
-  let slotRig = SlotRig.load(rigAddress)
-  if (slotRig === null) return
+  let spinRig = SpinRig.load(rigAddress)
+  if (spinRig === null) return
 
   let rig = Rig.load(rigAddress)
   if (rig === null) return
@@ -108,10 +108,10 @@ export function handleWin(event: WinEvent): void {
   winner.totalWon = winner.totalWon.plus(amount)
   winner.save()
 
-  // Update SlotRig stats
-  slotRig.totalWins = slotRig.totalWins.plus(ONE_BI)
-  slotRig.totalWonAmount = slotRig.totalWonAmount.plus(amount)
-  slotRig.save()
+  // Update SpinRig stats
+  spinRig.totalWins = spinRig.totalWins.plus(ONE_BI)
+  spinRig.totalWonAmount = spinRig.totalWonAmount.plus(amount)
+  spinRig.save()
 
   // Note: We can't easily link back to the original Spin entity without
   // tracking the sequenceNumber -> spinId mapping. The Win event happens

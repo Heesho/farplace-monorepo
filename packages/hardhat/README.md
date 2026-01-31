@@ -594,7 +594,7 @@ REPORT_GAS=true npx hardhat test
 |-----------|-------|----------|
 | `tests/mine/` | 9 files | MineRig core, business logic, exploits, factory, multicall, invariants |
 | `tests/spin/` | 3 files | SpinRig core, invariants |
-| `tests/fund/` | 3 files | FundRig core, charity rig, invariants |
+| `tests/fund/` | 3 files | FundRig core, fund rig, invariants |
 | `tests/security/` | 4 files | Edge cases, exploits, fuzz testing, invariants |
 
 ### Deployment
