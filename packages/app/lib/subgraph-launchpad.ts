@@ -3,7 +3,7 @@ import { GraphQLClient, gql } from "graphql-request";
 // Subgraph URL (Goldsky)
 export const LAUNCHPAD_SUBGRAPH_URL =
   process.env.NEXT_PUBLIC_LAUNCHPAD_SUBGRAPH_URL ||
-  "https://api.goldsky.com/api/public/project_cmgscxhw81j5601xmhgd42rej/subgraphs/mineport/1.0.0/gn";
+  "https://api.goldsky.com/api/public/project_cmgscxhw81j5601xmhgd42rej/subgraphs/farplace/1.0.0/gn";
 
 const client = new GraphQLClient(LAUNCHPAD_SUBGRAPH_URL);
 
