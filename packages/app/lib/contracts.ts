@@ -1,7 +1,15 @@
 export const CONTRACT_ADDRESSES = {
-  // Core launchpad contracts
-  core: "0xF837F616Fe1fd33Cd8290759D3ae1FB09230d73b",
-  multicall: "0x9EEbEe08C3823290E7A17F27D4c644380E978cA8",
+  // Per-rig-type Core contracts
+  mineCore: "0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1",
+  spinCore: "0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631",
+  fundCore: "0x85f3e3135329272820ADC27F2561241f4b4e90db",
+  // Per-rig-type Multicall contracts
+  mineMulticall: "0xE59CD876ae177Ff513C1efB6922f9902e984946C",
+  spinMulticall: "0x71Ff3f51b0bB61B9205BF2F6c4600E86D4F7CFa1",
+  fundMulticall: "0xC39AF527b30509e28EC265F847c00432d54cd9E6",
+  // Legacy aliases (point to mine variants for backwards compat)
+  core: "0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1",
+  multicall: "0xE59CD876ae177Ff513C1efB6922f9902e984946C",
   // Token addresses (Mock tokens for staging)
   usdc: "0xe90495BE187d434e23A9B1FeC0B6Ce039700870e", // Mock USDC
   donut: "0xD50B69581362C60Ce39596B237C71e07Fc4F6fdA", // Mock DONUT
@@ -340,6 +348,273 @@ export const MULTICALL_ABI = [
     name: "donut",
     outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+// SpinMulticall ABI - for spin rig batched operations and state queries
+export const SPIN_MULTICALL_ABI = [
+  // getRig function - get aggregated spin rig state
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+    ],
+    name: "getRig",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "epochId", type: "uint256" },
+          { internalType: "uint256", name: "initPrice", type: "uint256" },
+          { internalType: "uint256", name: "spinStartTime", type: "uint256" },
+          { internalType: "uint256", name: "price", type: "uint256" },
+          { internalType: "uint256", name: "ups", type: "uint256" },
+          { internalType: "uint256", name: "prizePool", type: "uint256" },
+          { internalType: "uint256", name: "pendingEmissions", type: "uint256" },
+          { internalType: "uint256", name: "entropyFee", type: "uint256" },
+          { internalType: "uint256", name: "unitPrice", type: "uint256" },
+          { internalType: "string", name: "rigUri", type: "string" },
+          { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountDonutBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountUnitBalance", type: "uint256" },
+        ],
+        internalType: "struct SpinMulticall.SpinRigState",
+        name: "state",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // spin function - spin the slot machine
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "uint256", name: "epochId", type: "uint256" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+      { internalType: "uint256", name: "maxPrice", type: "uint256" },
+    ],
+    name: "spin",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  // getOdds function - get the odds array for a spin rig
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+    ],
+    name: "getOdds",
+    outputs: [
+      { internalType: "uint256[]", name: "", type: "uint256[]" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // getEntropyFee function - get the entropy fee for a spin rig
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+    ],
+    name: "getEntropyFee",
+    outputs: [
+      { internalType: "uint256", name: "", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // getAuction function - get aggregated auction state
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+    ],
+    name: "getAuction",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "epochId", type: "uint256" },
+          { internalType: "uint256", name: "initPrice", type: "uint256" },
+          { internalType: "uint256", name: "startTime", type: "uint256" },
+          { internalType: "address", name: "paymentToken", type: "address" },
+          { internalType: "uint256", name: "price", type: "uint256" },
+          { internalType: "uint256", name: "paymentTokenPrice", type: "uint256" },
+          { internalType: "uint256", name: "quoteAccumulated", type: "uint256" },
+          { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+        ],
+        internalType: "struct SpinMulticall.AuctionState",
+        name: "state",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // buy function - buy from auction using LP tokens
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "uint256", name: "epochId", type: "uint256" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+      { internalType: "uint256", name: "maxPaymentTokenAmount", type: "uint256" },
+    ],
+    name: "buy",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+// FundMulticall ABI - for fund rig batched operations and state queries
+export const FUND_MULTICALL_ABI = [
+  // getRig function - get aggregated fund rig state
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+    ],
+    name: "getRig",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "currentDay", type: "uint256" },
+          { internalType: "uint256", name: "todayEmission", type: "uint256" },
+          { internalType: "uint256", name: "todayTotalDonated", type: "uint256" },
+          { internalType: "uint256", name: "startTime", type: "uint256" },
+          { internalType: "address", name: "treasury", type: "address" },
+          { internalType: "address", name: "team", type: "address" },
+          { internalType: "uint256", name: "unitPrice", type: "uint256" },
+          { internalType: "string", name: "rigUri", type: "string" },
+          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountDonutBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountUnitBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountTodayDonation", type: "uint256" },
+        ],
+        internalType: "struct FundMulticall.FundRigState",
+        name: "state",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // fund function - donate to a fund rig
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "fund",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // claim function - claim rewards for a specific day
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+      { internalType: "uint256", name: "day", type: "uint256" },
+    ],
+    name: "claim",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // claimMultiple function - claim rewards for multiple days
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+      { internalType: "uint256[]", name: "dayIds", type: "uint256[]" },
+    ],
+    name: "claimMultiple",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // getClaimableDays function - get claimable day info for a range
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+      { internalType: "uint256", name: "startDay", type: "uint256" },
+      { internalType: "uint256", name: "endDay", type: "uint256" },
+    ],
+    name: "getClaimableDays",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "day", type: "uint256" },
+          { internalType: "uint256", name: "donation", type: "uint256" },
+          { internalType: "uint256", name: "pendingReward", type: "uint256" },
+          { internalType: "bool", name: "hasClaimed", type: "bool" },
+        ],
+        internalType: "struct FundMulticall.ClaimableDay[]",
+        name: "days",
+        type: "tuple[]",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // getTotalPendingRewards function - get total pending rewards for a range
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+      { internalType: "uint256", name: "startDay", type: "uint256" },
+      { internalType: "uint256", name: "endDay", type: "uint256" },
+    ],
+    name: "getTotalPendingRewards",
+    outputs: [
+      { internalType: "uint256", name: "totalPending", type: "uint256" },
+      { internalType: "uint256[]", name: "unclaimedDays", type: "uint256[]" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // getAuction function - get aggregated auction state
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "account", type: "address" },
+    ],
+    name: "getAuction",
+    outputs: [
+      {
+        components: [
+          { internalType: "uint256", name: "epochId", type: "uint256" },
+          { internalType: "uint256", name: "initPrice", type: "uint256" },
+          { internalType: "uint256", name: "startTime", type: "uint256" },
+          { internalType: "address", name: "paymentToken", type: "address" },
+          { internalType: "uint256", name: "price", type: "uint256" },
+          { internalType: "uint256", name: "paymentTokenPrice", type: "uint256" },
+          { internalType: "uint256", name: "quoteAccumulated", type: "uint256" },
+          { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+        ],
+        internalType: "struct FundMulticall.AuctionState",
+        name: "state",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  // buy function - buy from auction using LP tokens
+  {
+    inputs: [
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "uint256", name: "epochId", type: "uint256" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+      { internalType: "uint256", name: "maxPaymentTokenAmount", type: "uint256" },
+    ],
+    name: "buy",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;
@@ -709,6 +984,46 @@ export type AuctionState = {
   accountPaymentTokenBalance: bigint;
 };
 
+export type RigType = "mine" | "spin" | "fund";
+
+export type SpinRigState = {
+  epochId: bigint;
+  initPrice: bigint;
+  spinStartTime: bigint;
+  price: bigint;
+  ups: bigint;
+  prizePool: bigint;
+  pendingEmissions: bigint;
+  entropyFee: bigint;
+  unitPrice: bigint;
+  rigUri: string;
+  accountQuoteBalance: bigint;
+  accountDonutBalance: bigint;
+  accountUnitBalance: bigint;
+};
+
+export type FundRigState = {
+  currentDay: bigint;
+  todayEmission: bigint;
+  todayTotalDonated: bigint;
+  startTime: bigint;
+  treasury: `0x${string}`;
+  team: `0x${string}`;
+  unitPrice: bigint;
+  rigUri: string;
+  accountPaymentTokenBalance: bigint;
+  accountDonutBalance: bigint;
+  accountUnitBalance: bigint;
+  accountTodayDonation: bigint;
+};
+
+export type ClaimableDay = {
+  day: bigint;
+  donation: bigint;
+  pendingReward: bigint;
+  hasClaimed: boolean;
+};
+
 export type LaunchParams = {
   launcher: `0x${string}`;
   quoteToken: `0x${string}`;
@@ -749,6 +1064,20 @@ export const LAUNCH_DEFAULTS = {
   auctionPriceMultiplier: BigInt("1200000000000000000"), // 1.2x (1.2e18)
   auctionMinInitPrice: BigInt("1000000000000000000000"), // 1000 LP
 } as const;
+
+// Mock token mint ABI - for test minting on MockDONUT/MockUSDC
+export const MOCK_MINT_ABI = [
+  {
+    inputs: [
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "mint",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
 
 // Uniswap V2 Router ABI (only addLiquidity)
 export const UNIV2_ROUTER_ABI = [
@@ -812,3 +1141,15 @@ export const UNIV2_PAIR_ABI = [
 
 // Quote token decimals (USDC = 6)
 export const QUOTE_TOKEN_DECIMALS = 6;
+
+// Helper to get the correct multicall address for a rig type
+export function getMulticallAddress(rigType: RigType): `0x${string}` {
+  switch (rigType) {
+    case "mine":
+      return CONTRACT_ADDRESSES.mineMulticall as `0x${string}`;
+    case "spin":
+      return CONTRACT_ADDRESSES.spinMulticall as `0x${string}`;
+    case "fund":
+      return CONTRACT_ADDRESSES.fundMulticall as `0x${string}`;
+  }
+}

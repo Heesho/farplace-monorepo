@@ -1,6 +1,7 @@
 "use client";
 
 import { NavBar } from "@/components/nav-bar";
+import { useFarcaster } from "@/hooks/useFarcaster";
 
 const INFO_SECTIONS = [
   {
@@ -58,6 +59,8 @@ const INFO_SECTIONS = [
 ];
 
 export default function InfoPage() {
+  const { address } = useFarcaster();
+
   return (
     <main className="flex h-screen w-screen justify-center bg-zinc-800">
       <div
@@ -69,7 +72,14 @@ export default function InfoPage() {
       >
         {/* Header */}
         <div className="px-4 pb-4">
-          <h1 className="text-2xl font-semibold tracking-tight">About</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold tracking-tight">About</h1>
+            {address && (
+              <div className="px-3 py-1.5 rounded-full bg-secondary text-[13px] text-muted-foreground font-mono">
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Content */}
