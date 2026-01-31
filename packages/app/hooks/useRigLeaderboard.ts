@@ -1,141 +1,168 @@
-"use client";
-
 import { useQuery } from "@tanstack/react-query";
-import { getRigLeaderboard } from "@/lib/subgraph-launchpad";
-import { formatUnits } from "viem";
-import { TOKEN_DECIMALS } from "@/lib/constants";
+import { SUBGRAPH_URL } from "./subgraph";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type LeaderboardEntry = {
-  rank: number;
-  address: string;
+  miner: string;
   mined: bigint;
-  minedFormatted: string;
-  spent: bigint;
-  spentFormatted: string;
   earned: bigint;
-  earnedFormatted: string;
-  isCurrentUser: boolean;
-  isFriend: boolean;
-  profile?: {
-    fid: number;
-    username?: string;
-    displayName?: string;
-    pfpUrl?: string;
-  } | null;
 };
 
-export type LeaderboardResult = {
-  entries: LeaderboardEntry[];
-  userRank: number | null;
-  friendsOnLeaderboard: LeaderboardEntry[];
-  isLoading: boolean;
-};
+// ---------------------------------------------------------------------------
+// GraphQL
+// ---------------------------------------------------------------------------
+
+const LEADERBOARD_QUERY = `
+  query GetRigLeaderboard($rigAddress: String!, $first: Int!) {
+    rigAccounts(
+      where: { rig: $rigAddress }
+      orderBy: mined
+      orderDirection: desc
+      first: $first
+    ) {
+      account
+      mined
+      earned
+    }
+  }
+`;
 
 /**
- * Hook to fetch the mining leaderboard for a rig
- *
- * @param rigAddress - The rig contract address
- * @param currentUserAddress - The current user's wallet address (for highlighting)
- * @param friendFids - Set of FIDs that are friends of the current user
- * @param limit - Number of entries to fetch
+ * Separate query to find the user's rank – we need their position across
+ * ALL participants, not just the top `limit`. We fetch all participants
+ * ordered by `mined` descending and find the user's index.
  */
-export function useRigLeaderboard(
+const USER_RANK_QUERY = `
+  query GetUserRank($rigAddress: String!) {
+    rigAccounts(
+      where: { rig: $rigAddress }
+      orderBy: mined
+      orderDirection: desc
+      first: 1000
+    ) {
+      account
+      mined
+    }
+  }
+`;
+
+// ---------------------------------------------------------------------------
+// Fetcher helpers
+// ---------------------------------------------------------------------------
+
+type RawLeaderboardEntry = {
+  account: string;
+  mined: string;
+  earned: string;
+};
+
+async function fetchLeaderboard(
   rigAddress: string,
-  currentUserAddress?: string,
-  friendFids?: Set<number>,
-  limit = 10
-): LeaderboardResult {
-  // Fetch leaderboard from subgraph
-  const { data: leaderboardData, isLoading: isLoadingLeaderboard } = useQuery({
-    queryKey: ["rig-leaderboard", rigAddress, limit],
-    queryFn: () => getRigLeaderboard(rigAddress, limit),
+  limit: number,
+): Promise<LeaderboardEntry[]> {
+  const res = await fetch(SUBGRAPH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: LEADERBOARD_QUERY,
+      variables: {
+        rigAddress: rigAddress.toLowerCase(),
+        first: limit,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Subgraph request failed: ${res.status}`);
+  }
+
+  const json = await res.json();
+
+  if (json.errors) {
+    throw new Error(json.errors[0]?.message ?? "Subgraph query error");
+  }
+
+  const raw: RawLeaderboardEntry[] = json.data?.rigAccounts ?? [];
+
+  return raw.map((entry) => ({
+    miner: entry.account,
+    mined: BigInt(entry.mined),
+    earned: BigInt(entry.earned),
+  }));
+}
+
+async function fetchUserRank(
+  rigAddress: string,
+  account: string,
+): Promise<number | undefined> {
+  const res = await fetch(SUBGRAPH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: USER_RANK_QUERY,
+      variables: {
+        rigAddress: rigAddress.toLowerCase(),
+      },
+    }),
+  });
+
+  if (!res.ok) return undefined;
+
+  const json = await res.json();
+  if (json.errors) return undefined;
+
+  const raw: { account: string; mined: string }[] =
+    json.data?.rigAccounts ?? [];
+
+  const index = raw.findIndex(
+    (entry) => entry.account.toLowerCase() === account.toLowerCase(),
+  );
+
+  // 1-indexed rank; undefined if not found
+  return index >= 0 ? index + 1 : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
+export function useRigLeaderboard(
+  rigAddress: string | undefined,
+  account: string | undefined,
+  limit: number = 10,
+): {
+  entries: LeaderboardEntry[] | undefined;
+  userRank: number | undefined;
+  isLoading: boolean;
+} {
+  const {
+    data: entries,
+    isLoading: isEntriesLoading,
+  } = useQuery({
+    queryKey: ["rigLeaderboard", rigAddress, limit],
+    queryFn: () => fetchLeaderboard(rigAddress!, limit),
     enabled: !!rigAddress,
-    staleTime: 60 * 1000, // 60 seconds
-    refetchInterval: 60 * 1000,
-    refetchOnWindowFocus: false, // Prevent duplicate requests on tab focus
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   });
 
-  // Get unique addresses for profile lookup
-  const addresses = leaderboardData?.map(entry => entry.account.id) ?? [];
-
-  // Fetch profiles for leaderboard entries
-  const { data: profilesData, isLoading: isLoadingProfiles } = useQuery({
-    queryKey: ["leaderboard-profiles", addresses.join(",")],
-    queryFn: async () => {
-      if (addresses.length === 0) return {};
-
-      const res = await fetch("/api/neynar/friends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ addresses }),
-      });
-
-      if (!res.ok) return {};
-      const data = await res.json();
-      return data.addressToUser || {};
-    },
-    enabled: addresses.length > 0,
-    staleTime: 10 * 60 * 1000, // 10 minutes - profiles don't change often
+  const {
+    data: userRank,
+    isLoading: isRankLoading,
+  } = useQuery({
+    queryKey: ["rigLeaderboardRank", rigAddress, account],
+    queryFn: () => fetchUserRank(rigAddress!, account!),
+    enabled: !!rigAddress && !!account,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
   });
-
-  // Build leaderboard entries
-  const entries: LeaderboardEntry[] = (leaderboardData ?? []).map((entry, index) => {
-    const address = entry.account.id;
-    const profile = profilesData?.[address.toLowerCase()];
-    const isCurrentUser = currentUserAddress?.toLowerCase() === address.toLowerCase();
-    const isFriend = profile?.fid ? (friendFids?.has(profile.fid) ?? false) : false;
-
-    // Convert decimal strings from subgraph to BigInt (same pattern as useUserRigStats)
-    const minedBigInt = BigInt(Math.floor(parseFloat(entry.mined) * 1e18));
-    const spentBigInt = BigInt(Math.floor(parseFloat(entry.spent) * 1e18));
-    const earnedBigInt = BigInt(Math.floor(parseFloat(entry.earned) * 1e18));
-
-    return {
-      rank: index + 1,
-      address,
-      mined: minedBigInt,
-      minedFormatted: Number(formatUnits(minedBigInt, TOKEN_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 0 }),
-      spent: spentBigInt,
-      spentFormatted: Number(formatUnits(spentBigInt, 18)).toFixed(4),
-      earned: earnedBigInt,
-      earnedFormatted: Number(formatUnits(earnedBigInt, 18)).toFixed(4),
-      isCurrentUser,
-      isFriend,
-      profile: profile ?? null,
-    };
-  });
-
-  // Find user's rank
-  const userRank = currentUserAddress
-    ? entries.find(e => e.isCurrentUser)?.rank ?? null
-    : null;
-
-  // Get friends on leaderboard
-  const friendsOnLeaderboard = entries.filter(e => e.isFriend && !e.isCurrentUser);
 
   return {
     entries,
     userRank,
-    friendsOnLeaderboard,
-    isLoading: isLoadingLeaderboard || isLoadingProfiles,
+    isLoading: isEntriesLoading || (!!account && isRankLoading),
   };
-}
-
-/**
- * Generate a challenge message for sharing
- */
-export function generateChallengeMessage(options: {
-  userRank: number;
-  tokenSymbol: string;
-  tokenName: string;
-  rigUrl: string;
-  friendUsername?: string;
-}): string {
-  const { userRank, tokenSymbol, tokenName, friendUsername } = options;
-
-  if (friendUsername) {
-    return `I'm ranked #${userRank} on the ${tokenName} ($${tokenSymbol}) mining leaderboard! Can you beat me @${friendUsername}? ⛏️`;
-  }
-
-  return `I'm ranked #${userRank} on the ${tokenName} ($${tokenSymbol}) mining leaderboard! Think you can beat me? ⛏️`;
 }

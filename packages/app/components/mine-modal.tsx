@@ -1,508 +1,637 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
-import { X, User } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { NavBar } from "@/components/nav-bar";
-import { Leaderboard } from "@/components/leaderboard";
-import { MineHistoryItem } from "@/components/mine-history-item";
+import { useState, useEffect, useCallback } from "react";
+import { X, Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { formatUnits, formatEther, zeroAddress } from "viem";
+import { useFarcaster } from "@/hooks/useFarcaster";
+import { useRigState } from "@/hooks/useRigState";
+import { useMultiSlotState } from "@/hooks/useMultiSlotState";
+import { useRigLeaderboard } from "@/hooks/useRigLeaderboard";
+import { useMineHistory } from "@/hooks/useMineHistory";
+import {
+  useBatchedTransaction,
+  encodeApproveCall,
+  encodeContractCall,
+  type Call,
+} from "@/hooks/useBatchedTransaction";
+import {
+  CONTRACT_ADDRESSES,
+  MULTICALL_ABI,
+  RIG_ABI,
+  QUOTE_TOKEN_DECIMALS,
+  DEADLINE_BUFFER_SECONDS,
+} from "@/lib/contracts";
 
-type Slot = {
-  index: number;
-  miner: string;
-  minerName?: string;
-  minerAvatar?: string;
-  price: number;
-  startPrice?: number;
-  lastMineTime?: number;
-  multiplier: number;
-  multiplierEndsAt?: number;
-  mined: number;
-  pnl?: number;
-  total?: number;
-  mineRate?: number;
-  uri?: string;
-  isOwned?: boolean;
-};
-
-// Generate mock slots for any count
-function generateMockSlots(count: number): Slot[] {
-  const names = ["King Glazer", "DiamondHands", "CryptoWhale", "SatoshiFan", "DonutLover", "BlockBuilder", "HashMaster", "TokenTitan", "ChainChamp", "MoonBoy", "GigaChad", "NightOwl", "DayTrader", "HODLer", "DegenKing", "AlphaHunter", "YieldFarmer", "GasGuzzler", "WhaleTales", "Rugpuller", "BasedDev", "AnonMiner", "TokenMaxi", "ChartWizard", "BagHolder"];
-  const uris = ["Never Stop Glazing", "WAGMI", "To the moon!", "", "gm frens", "Building the future", "", "LFG!", "Stay humble, stack sats", "ngmi", "probably nothing", "this is the way", "wen lambo", "", "gn", ""];
-
-  // Mark slots 2 and 7 as owned by the user for demo
-  const ownedSlots = new Set([2, 7]);
-
-  return Array.from({ length: count }, (_, i) => ({
-    index: i + 1,
-    miner: `0x${(i + 1).toString(16).padStart(4, "0")}...${(i + 1000).toString(16).padStart(4, "0")}`,
-    minerName: names[i % names.length],
-    minerAvatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${i + 1000}`,
-    price: 0.05 + Math.random() * 0.1,
-    multiplier: Math.floor(Math.random() * 10) + 1,
-    multiplierEndsAt: Date.now() + Math.floor(Math.random() * 60) * 60 * 1000,
-    mined: Math.floor(Math.random() * 8000) + 1000,
-    pnl: (Math.random() - 0.4) * 0.05,
-    total: Math.random() * 100 + 10,
-    mineRate: Math.floor(Math.random() * 3) + 1,
-    uri: uris[i % uris.length],
-    isOwned: ownedSlots.has(i + 1),
-  }));
-}
-
-// Default 9 slots
-const MOCK_SLOTS: Slot[] = generateMockSlots(9);
-
-// Mock leaderboard (top 10 miners)
-const MOCK_LEADERBOARD = [
-  { rank: 1, address: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", mined: BigInt(182500n * 10n**18n), minedFormatted: "182,500", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 2, address: "0x1234567890abcdef1234567890abcdef12345678", mined: BigInt(156200n * 10n**18n), minedFormatted: "156,200", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 3, address: "0xabcdef1234567890abcdef1234567890abcdef12", mined: BigInt(134800n * 10n**18n), minedFormatted: "134,800", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 4, address: "0x9876543210fedcba9876543210fedcba98765432", mined: BigInt(98400n * 10n**18n), minedFormatted: "98,400", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 5, address: "0xcafebabecafebabecafebabecafebabecafebabe", mined: BigInt(76500n * 10n**18n), minedFormatted: "76,500", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: true, isFriend: false, profile: null },
-  { rank: 6, address: "0xfeedfacefeedfacefeedfacefeedfacefeedface", mined: BigInt(54200n * 10n**18n), minedFormatted: "54,200", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 7, address: "0x1111222233334444555566667777888899990000", mined: BigInt(42100n * 10n**18n), minedFormatted: "42,100", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 8, address: "0xaaaa5555bbbb6666cccc7777dddd8888eeee9999", mined: BigInt(31800n * 10n**18n), minedFormatted: "31,800", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 9, address: "0x0000111122223333444455556666777788889999", mined: BigInt(24600n * 10n**18n), minedFormatted: "24,600", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-  { rank: 10, address: "0xbeef0000beef0000beef0000beef0000beef0000", mined: BigInt(18900n * 10n**18n), minedFormatted: "18,900", spent: BigInt(0), spentFormatted: "0", earned: BigInt(0), earnedFormatted: "0", isCurrentUser: false, isFriend: false, profile: null },
-];
-
-// Mock mine history (last 10 mines)
-const MOCK_MINES = [
-  { id: "1", miner: "0x1234567890abcdef1234567890abcdef12345678", uri: "gm frens", price: BigInt(2_500_000), spent: BigInt(2_500_000), earned: BigInt(1_200_000), mined: BigInt(4500n * 10n**18n), multiplier: 2, timestamp: Math.floor(Date.now() / 1000) - 120 },
-  { id: "2", miner: "0xabcdef1234567890abcdef1234567890abcdef12", uri: "to the moon", price: BigInt(1_800_000), spent: BigInt(1_800_000), earned: BigInt(890_000), mined: BigInt(3200n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 340 },
-  { id: "3", miner: "0x9876543210fedcba9876543210fedcba98765432", uri: "", price: BigInt(3_200_000), spent: BigInt(3_200_000), earned: BigInt(1_580_000), mined: BigInt(5800n * 10n**18n), multiplier: 3, timestamp: Math.floor(Date.now() / 1000) - 890 },
-  { id: "4", miner: "0x1111222233334444555566667777888899990000", uri: "wagmi", price: BigInt(950_000), spent: BigInt(950_000), earned: BigInt(420_000), mined: BigInt(1800n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 1800 },
-  { id: "5", miner: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", uri: "lfg", price: BigInt(4_100_000), spent: BigInt(4_100_000), earned: BigInt(2_050_000), mined: BigInt(7200n * 10n**18n), multiplier: 4, timestamp: Math.floor(Date.now() / 1000) - 3600 },
-  { id: "6", miner: "0x1234567890abcdef1234567890abcdef12345678", uri: "mining is fun", price: BigInt(2_100_000), spent: BigInt(2_100_000), earned: BigInt(980_000), mined: BigInt(3900n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 7200 },
-  { id: "7", miner: "0xfeedfacefeedfacefeedfacefeedfacefeedface", uri: "", price: BigInt(1_500_000), spent: BigInt(1_500_000), earned: BigInt(720_000), mined: BigInt(2800n * 10n**18n), multiplier: 2, timestamp: Math.floor(Date.now() / 1000) - 14400 },
-  { id: "8", miner: "0xabcdef1234567890abcdef1234567890abcdef12", uri: "donut gang", price: BigInt(2_800_000), spent: BigInt(2_800_000), earned: BigInt(1_350_000), mined: BigInt(5100n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 28800 },
-  { id: "9", miner: "0xcafebabecafebabecafebabecafebabecafebabe", uri: "first mine!", price: BigInt(500_000), spent: BigInt(500_000), earned: BigInt(230_000), mined: BigInt(950n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 43200 },
-  { id: "10", miner: "0x9876543210fedcba9876543210fedcba98765432", uri: "", price: BigInt(1_200_000), spent: BigInt(1_200_000), earned: BigInt(580_000), mined: BigInt(2200n * 10n**18n), multiplier: 1, timestamp: Math.floor(Date.now() / 1000) - 86400 },
-];
-
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor(Date.now() / 1000 - timestamp);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type MineModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  tokenSymbol?: string;
-  tokenName?: string;
-  userBalance?: number;
-  testSlotCount?: number; // For testing different slot counts
+  rigAddress: `0x${string}`;
+  tokenSymbol: string;
+  tokenName: string;
+  multicallAddress?: `0x${string}`;
 };
 
-// Countdown component for multiplier expiry
-function MultiplierCountdown({ endsAt }: { endsAt: number }) {
-  const [timeLeft, setTimeLeft] = useState("");
+type Tab = "slots" | "leaderboard" | "history";
 
-  useEffect(() => {
-    const update = () => {
-      const diff = Math.max(0, endsAt - Date.now());
-      const mins = Math.floor(diff / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(`${mins}m ${secs}s`);
-    };
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [endsAt]);
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-  return <span className="text-zinc-300 font-medium tabular-nums">{timeLeft}</span>;
+function truncateAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function SlotCard({
-  slot,
-  isSelected,
-  onSelect,
-  isFlashing,
-  isSingleSlot
-}: {
-  slot: Slot;
-  isSelected: boolean;
-  onSelect: () => void;
-  isFlashing?: boolean;
-  isSingleSlot?: boolean;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={`
-        aspect-square rounded-xl p-3 flex flex-col justify-between
-        transition-all duration-200 relative overflow-hidden
-        ${isSelected
-          ? "ring-2 ring-white"
-          : "ring-1 ring-zinc-700 hover:ring-zinc-600"
-        }
-        ${isFlashing ? "bg-zinc-600/80" : ""}
-      `}
-    >
-      {/* Slot number and multiplier */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500">#{slot.index}</span>
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-zinc-500">{slot.multiplier}x</span>
-        </div>
-      </div>
-
-      {/* Avatar - bigger for single slot */}
-      <div className="flex justify-center py-1">
-        <Avatar className={isSingleSlot ? "h-20 w-20" : "h-10 w-10"}>
-          <AvatarImage src={slot.minerAvatar} alt={slot.miner} />
-          <AvatarFallback className={`bg-zinc-700 text-zinc-300 ${isSingleSlot ? "text-xl" : "text-xs"}`}>
-            {slot.miner.slice(2, 4).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-      </div>
-
-      {/* Price and owned indicator */}
-      <div className="flex items-end justify-between">
-        {/* Owned indicator */}
-        {slot.isOwned ? (
-          <div className="w-6 h-6 rounded-md bg-zinc-700 flex items-center justify-center">
-            <User className="w-3.5 h-3.5 text-zinc-300" />
-          </div>
-        ) : (
-          <div className="w-6" />
-        )}
-        {/* Price */}
-        <div className={`font-semibold tabular-nums ${isSingleSlot ? "text-lg" : "text-sm"}`}>
-          ${slot.price.toFixed(4)}
-        </div>
-      </div>
-
-      {/* Flash overlay when mined */}
-      {isFlashing && (
-        <div className="absolute inset-0 bg-white/20 animate-pulse" />
-      )}
-    </button>
-  );
+function formatUSDC(value: bigint): string {
+  return Number(formatUnits(value, QUOTE_TOKEN_DECIMALS)).toFixed(2);
 }
 
-// Price decay: goes from startPrice to 0 over 1 hour (3600 seconds)
-const DECAY_DURATION_MS = 3600 * 1000; // 1 hour
-const TICK_INTERVAL_MS = 100; // Update every 100ms for smooth animation
+function formatTokenAmount(value: bigint): string {
+  const num = Number(formatEther(value));
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  if (num >= 1) return num.toFixed(2);
+  if (num >= 0.01) return num.toFixed(4);
+  return num.toFixed(6);
+}
 
-export function MineModal({ isOpen, onClose, tokenSymbol = "DONUT", tokenName = "Donut", userBalance = 12.45, testSlotCount }: MineModalProps) {
-  const params = useParams();
-  const rigAddress = (params?.address as string) || "";
-  const rigUrl = typeof window !== "undefined" ? `${window.location.origin}/rig/${rigAddress}` : "";
-  const [slots, setSlots] = useState<Slot[]>(() => {
-    const baseSlots = testSlotCount ? generateMockSlots(testSlotCount) : MOCK_SLOTS;
-    return baseSlots.map(slot => ({
-      ...slot,
-      startPrice: slot.price, // Track the price after last mine (for decay calculation)
-      lastMineTime: Date.now() - Math.random() * 30000, // Random start times for variety
-    }));
-  });
+function timeAgo(timestamp: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - timestamp;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
-  // Auto-select the cheapest slot
-  const [selectedSlot, setSelectedSlot] = useState<number>(() => {
-    const baseSlots = testSlotCount ? generateMockSlots(testSlotCount) : MOCK_SLOTS;
-    const cheapest = baseSlots.reduce((min, slot) => slot.price < min.price ? slot : min, baseSlots[0]);
-    return cheapest.index;
-  });
-  const [flashingSlots, setFlashingSlots] = useState<Set<number>>(new Set());
-  const [message, setMessage] = useState("");
-  const defaultMessage = "gm"; // Default message set by rig owner
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
-  // Price decay tick - all prices decay toward 0
+export function MineModal({
+  isOpen,
+  onClose,
+  rigAddress,
+  tokenSymbol,
+  tokenName,
+  multicallAddress: multicallAddressProp,
+}: MineModalProps) {
+  const multicallAddr =
+    (multicallAddressProp ?? CONTRACT_ADDRESSES.mineMulticall) as `0x${string}`;
+
+  // ---------- State ----------
+  const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<Tab>("slots");
+  const [showSlotDetails, setShowSlotDetails] = useState(false);
+
+  // ---------- Hooks ----------
+  const { address: account } = useFarcaster();
+
+  // Fetch slot 0 to get capacity (always needed for useMultiSlotState)
+  const {
+    rigState: slot0State,
+    isLoading: isSlot0Loading,
+  } = useRigState(rigAddress, account, 0n, multicallAddr);
+
+  const capacity = slot0State?.capacity ?? 0n;
+
+  // Fetch the selected slot state
+  const {
+    rigState,
+    isLoading: isRigStateLoading,
+    refetch: refetchRigState,
+  } = useRigState(rigAddress, account, BigInt(selectedSlotIndex), multicallAddr);
+
+  // Fetch all slots for the overview
+  const {
+    slots,
+    activeCount,
+    isLoading: isSlotsLoading,
+  } = useMultiSlotState(rigAddress, capacity, account, multicallAddr);
+
+  // Leaderboard
+  const {
+    entries: leaderboardEntries,
+    userRank,
+    isLoading: isLeaderboardLoading,
+  } = useRigLeaderboard(rigAddress, account, 10);
+
+  // Mine history
+  const {
+    mines: mineHistory,
+    isLoading: isHistoryLoading,
+  } = useMineHistory(rigAddress, 10);
+
+  // Batched transaction for mine / claim
+  const {
+    execute,
+    status: txStatus,
+    txHash,
+    error: txError,
+    reset: resetTx,
+  } = useBatchedTransaction();
+
+  // ---------- Derived ----------
+  const isSlotEmpty = rigState ? rigState.miner === zeroAddress : true;
+  const isUserMiner =
+    rigState && account
+      ? rigState.miner.toLowerCase() === account.toLowerCase()
+      : false;
+  const claimable = rigState?.accountClaimable ?? 0n;
+  const hasClaimable = claimable > 0n;
+  const userQuoteBalance = rigState?.accountQuoteBalance ?? 0n;
+
+  // ---------- Reset tx status on slot change or modal close ----------
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      resetTx();
+      setSelectedSlotIndex(0);
+      setActiveTab("slots");
+      setShowSlotDetails(false);
+    }
+  }, [isOpen, resetTx]);
 
-    const interval = setInterval(() => {
-      const now = Date.now();
-
-      setSlots(prev => prev.map(slot => {
-        const elapsed = now - (slot.lastMineTime || now);
-        const decayProgress = Math.min(elapsed / DECAY_DURATION_MS, 1);
-        // Linear decay from startPrice to 0
-        const decayedPrice = (slot.startPrice || slot.price) * (1 - decayProgress);
-
-        return {
-          ...slot,
-          price: Math.max(0.0001, decayedPrice), // Floor at 0.0001
-        };
-      }));
-    }, TICK_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [isOpen]);
-
-  // Simulate random mines (flash + price double)
   useEffect(() => {
-    if (!isOpen) return;
+    resetTx();
+  }, [selectedSlotIndex, resetTx]);
 
-    const interval = setInterval(() => {
-      // Random chance for a slot to get mined
-      if (Math.random() > 0.85) {
-        const slotIndex = Math.floor(Math.random() * slots.length) + 1;
+  // Auto-refetch after successful tx
+  useEffect(() => {
+    if (txStatus === "success") {
+      const timer = setTimeout(() => {
+        refetchRigState();
+        resetTx();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [txStatus, refetchRigState, resetTx]);
 
-        // Flash the slot
-        setFlashingSlots(prev => new Set(prev).add(slotIndex));
+  // ---------- Handlers ----------
+  const handleMine = useCallback(async () => {
+    if (!account || !rigState) return;
 
-        // Double the price and reset decay timer
-        setSlots(prev => prev.map(slot => {
-          if (slot.index === slotIndex) {
-            const newPrice = slot.price * 2;
-            return {
-              ...slot,
-              price: newPrice,
-              startPrice: newPrice,
-              lastMineTime: Date.now(),
-              // Optionally change miner avatar on mine
-              minerAvatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${Date.now()}`,
-            };
-          }
-          return slot;
-        }));
+    const slotState = rigState;
+    const maxPrice = slotState.price + (slotState.price * 5n / 100n); // 5% slippage
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS);
+    const slotUri = ""; // Empty string for default
 
-        // Remove flash after animation
-        setTimeout(() => {
-          setFlashingSlots(prev => {
-            const next = new Set(prev);
-            next.delete(slotIndex);
-            return next;
-          });
-        }, 500);
-      }
-    }, 2000);
+    const calls: Call[] = [];
 
-    return () => clearInterval(interval);
-  }, [isOpen, slots.length]);
+    // Approve quote token for multicall contract
+    const quoteTokenAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
+    calls.push(
+      encodeApproveCall(quoteTokenAddress, multicallAddr, maxPrice)
+    );
 
-  const selectedSlotData = slots.find(s => s.index === selectedSlot);
+    // Mine call - include entropy fee as msg.value if needed
+    const mineValue = slotState.needsEntropy ? slotState.entropyFee : 0n;
+    calls.push(
+      encodeContractCall(
+        multicallAddr,
+        MULTICALL_ABI,
+        "mine",
+        [
+          rigAddress,
+          BigInt(selectedSlotIndex),
+          slotState.epochId,
+          deadline,
+          maxPrice,
+          slotUri,
+        ],
+        mineValue
+      )
+    );
 
-  // Calculate grid columns - 1 col for single, 2 cols for 2, 3 cols for 3+
-  const getGridCols = (count: number) => {
-    if (count === 1) return "grid-cols-1 max-w-[200px]";
-    if (count === 2) return "grid-cols-2";
-    return "grid-cols-3"; // 3+ slots
-  };
+    await execute(calls);
+  }, [account, rigState, multicallAddr, rigAddress, selectedSlotIndex, execute]);
 
+  const handleClaim = useCallback(async () => {
+    if (!account) return;
+    const calls: Call[] = [
+      encodeContractCall(rigAddress, RIG_ABI, "claim", [account], 0n),
+    ];
+    await execute(calls);
+  }, [account, rigAddress, execute]);
+
+  // ---------- Render nothing when closed ----------
   if (!isOpen) return null;
 
+  const isPending = txStatus === "pending";
+  const isSuccess = txStatus === "success";
+  const isError = txStatus === "error";
+
   return (
-    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+      {/* Backdrop */}
       <div
-        className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
-        style={{
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 130px)",
-        }}
-      >
-        {/* Header - X on left, Mine centered */}
-        <div className="flex items-center justify-between px-4 pb-2">
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-[520px] max-h-[85vh] bg-background rounded-t-2xl flex flex-col animate-in slide-in-from-bottom duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-secondary">
+          <div>
+            <h2 className="text-[17px] font-semibold">Mine {tokenSymbol}</h2>
+            <p className="text-[12px] text-muted-foreground">{tokenName}</p>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
+            className="p-2 -mr-2 rounded-xl hover:bg-secondary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
-          <span className="text-base font-semibold">Mine</span>
-          <div className="w-9" /> {/* Spacer for balance */}
         </div>
 
-        {/* Sticky selected slot info */}
-        {selectedSlotData && (
-          <div className="px-4 pb-4 bg-background">
-            {/* Header: Avatar, Name, Address, Multiplier */}
-            <div className="flex items-start gap-3 mb-3">
-              <Avatar className="h-14 w-14 flex-shrink-0">
-                <AvatarImage src={selectedSlotData.minerAvatar} />
-                <AvatarFallback className="bg-zinc-700 text-sm">
-                  {selectedSlotData.miner.slice(2, 4).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-semibold truncate">
-                    {selectedSlotData.minerName || `Slot #${selectedSlotData.index}`}
-                  </span>
-                  <span className="text-xs font-semibold text-zinc-300 bg-zinc-700 px-1.5 py-0.5 rounded flex-shrink-0">
-                    {selectedSlotData.multiplier}x
-                  </span>
-                  {selectedSlotData.multiplierEndsAt && (
-                    <span className="text-[10px] text-zinc-500 flex-shrink-0">
-                      <MultiplierCountdown endsAt={selectedSlotData.multiplierEndsAt} />
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-zinc-500 mt-0.5">{selectedSlotData.miner}</div>
-                <div className="text-xs text-zinc-400 mt-1 truncate italic">
-                  "{selectedSlotData.uri || "No message"}"
-                </div>
-              </div>
-            </div>
+        {/* User Balance Bar */}
+        <div className="flex items-center justify-between px-4 py-2 bg-secondary/30">
+          <span className="text-[12px] text-muted-foreground">Your USDC balance</span>
+          <span className="text-[13px] font-semibold tabular-nums">
+            {account ? `$${formatUSDC(userQuoteBalance)}` : "Connect wallet"}
+          </span>
+        </div>
 
-            {/* Stats Grid - Rate, Mined, PnL, Total */}
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <div className="text-[12px] text-muted-foreground">Rate</div>
-                <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
-                  <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
-                    {tokenSymbol.charAt(0)}
-                  </span>
-                  {selectedSlotData.mineRate ?? 1}/s
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">Mined</div>
-                <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
-                  +
-                  <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
-                    {tokenSymbol.charAt(0)}
-                  </span>
-                  {selectedSlotData.mined.toLocaleString()}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">PnL</div>
-                <div className="text-[13px] font-medium tabular-nums mt-0.5">
-                  {(selectedSlotData.pnl ?? 0) >= 0 ? "+$" : "-$"}{Math.abs(selectedSlotData.pnl ?? 0).toFixed(2)}
-                </div>
-              </div>
-              <div>
-                <div className="text-[12px] text-muted-foreground">Total</div>
-                <div className="text-[13px] font-medium tabular-nums mt-0.5">
-                  {(selectedSlotData.total ?? 0) >= 0 ? "+$" : "-$"}{Math.abs(selectedSlotData.total ?? 0).toFixed(2)}
-                </div>
-              </div>
+        {/* Claimable Miner Fees */}
+        {hasClaimable && (
+          <div className="flex items-center justify-between px-4 py-2 bg-zinc-700/40 border-b border-secondary">
+            <div>
+              <span className="text-[12px] text-muted-foreground">Claimable miner fees</span>
+              <span className="text-[13px] font-semibold tabular-nums ml-2">
+                ${formatUSDC(claimable)} USDC
+              </span>
             </div>
+            <button
+              onClick={handleClaim}
+              disabled={isPending || !account}
+              className="px-3 py-1.5 rounded-lg bg-white text-black text-[12px] font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                "Claim"
+              )}
+            </button>
           </div>
         )}
 
-        {/* Scrollable Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4 pt-4">
-          {/* Slots Grid */}
-          <div className={`grid ${getGridCols(slots.length)} gap-2 mx-auto`}>
-            {slots.map((slot) => (
-              <SlotCard
-                key={slot.index}
-                slot={slot}
-                isSelected={selectedSlot === slot.index}
-                onSelect={() => setSelectedSlot(slot.index)}
-                isFlashing={flashingSlots.has(slot.index)}
-                isSingleSlot={slots.length === 1}
-              />
-            ))}
-          </div>
-
-          {/* Your Position */}
-          <div className="mt-6 px-2">
-            <div className="font-semibold text-[18px] mb-3">Your position</div>
-            <div className="grid grid-cols-2 gap-y-4 gap-x-8">
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
-                <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
-                    {tokenName.charAt(0)}
-                  </span>
-                  <span>183.5K</span>
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Value</div>
-                <div className="font-semibold text-[15px] tabular-nums text-white">
-                  $2.24
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Spent</div>
-                <div className="font-semibold text-[15px] tabular-nums text-white">
-                  $564.68
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground text-[12px] mb-1">Earned</div>
-                <div className="font-semibold text-[15px] tabular-nums text-white">
-                  $267.52
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Mines */}
-          <div className="mt-6">
-            <div className="font-semibold text-[18px] mb-3 px-2">Recent Mines</div>
-            <div className="px-2">
-              {MOCK_MINES.map((mine) => (
-                <MineHistoryItem
-                  key={mine.id}
-                  mine={mine}
-                  timeAgo={timeAgo}
-                  tokenSymbol={tokenSymbol}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Leaderboard Section */}
-          <Leaderboard
-            entries={MOCK_LEADERBOARD}
-            userRank={5}
-            tokenSymbol={tokenSymbol}
-            tokenName={tokenName}
-            rigUrl={rigUrl}
-            isLoading={false}
-          />
+        {/* Tab Bar */}
+        <div className="flex border-b border-secondary">
+          {(["slots", "leaderboard", "history"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2.5 text-[13px] font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? "text-white border-b-2 border-white"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        {/* Bottom Action Bar - no border */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}>
-          <div className="w-full max-w-[520px] px-4 pt-3 pb-3 bg-background">
-            {/* Message Input */}
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder={defaultMessage}
-              maxLength={100}
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-[15px] outline-none placeholder:text-zinc-500 mb-3"
-            />
-            {/* Price, Balance, Mine Button */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div>
-                  <div className="text-muted-foreground text-[12px]">Price</div>
-                  <div className="font-semibold text-[17px] tabular-nums">
-                    ${selectedSlotData?.price.toFixed(4) ?? "—"}
-                  </div>
+        {/* Content */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+          {/* ============ SLOTS TAB ============ */}
+          {activeTab === "slots" && (
+            <div className="p-4">
+              {/* Slots overview */}
+              <div className="mb-4">
+                <div className="text-[12px] text-muted-foreground mb-2">
+                  {activeCount} / {Number(capacity)} slots active
                 </div>
-                <div>
-                  <div className="text-muted-foreground text-[12px]">Balance</div>
-                  <div className="font-semibold text-[17px] tabular-nums">
-                    ${userBalance.toFixed(2)}
+
+                {isSlotsLoading || isSlot0Loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
-                </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {slots.map((slot, index) => {
+                      const isEmpty = slot.miner === zeroAddress;
+                      const isSelected = index === selectedSlotIndex;
+                      const isUser =
+                        account &&
+                        slot.miner.toLowerCase() === account.toLowerCase();
+
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => setSelectedSlotIndex(index)}
+                          className={`relative p-3 rounded-xl border text-left transition-all ${
+                            isSelected
+                              ? "border-white bg-zinc-700/60"
+                              : "border-secondary bg-secondary/30 hover:bg-secondary/50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[11px] text-muted-foreground">
+                              Slot {index + 1}
+                            </span>
+                            {isUser && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          {isEmpty ? (
+                            <div className="text-[13px] font-medium text-zinc-400">
+                              Empty
+                            </div>
+                          ) : (
+                            <div className="text-[13px] font-medium font-mono">
+                              {truncateAddress(slot.miner)}
+                            </div>
+                          )}
+                          <div className="text-[12px] tabular-nums mt-0.5">
+                            ${formatUSDC(slot.price)}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+
+              {/* Selected Slot Details */}
+              {rigState && !isRigStateLoading && (
+                <div className="border border-secondary rounded-xl overflow-hidden mb-4">
+                  <button
+                    onClick={() => setShowSlotDetails(!showSlotDetails)}
+                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-secondary/30 transition-colors"
+                  >
+                    <span className="text-[13px] font-medium">
+                      Slot {selectedSlotIndex + 1} Details
+                    </span>
+                    {showSlotDetails ? (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </button>
+
+                  {showSlotDetails && (
+                    <div className="px-4 pb-3 space-y-2 border-t border-secondary pt-3">
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">Miner</span>
+                        <span className="font-mono">
+                          {rigState.miner === zeroAddress
+                            ? "None"
+                            : truncateAddress(rigState.miner)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">Price</span>
+                        <span className="tabular-nums">
+                          ${formatUSDC(rigState.price)} USDC
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">Epoch</span>
+                        <span className="tabular-nums">{rigState.epochId.toString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">UPS</span>
+                        <span className="tabular-nums">{rigState.ups.toString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">Next UPS</span>
+                        <span className="tabular-nums">{rigState.nextUps.toString()}</span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">UPS Multiplier</span>
+                        <span className="tabular-nums">
+                          {rigState.upsMultiplier.toString()}x
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-[12px]">
+                        <span className="text-muted-foreground">Token Price</span>
+                        <span className="tabular-nums">
+                          {formatTokenAmount(rigState.unitPrice)} DONUT
+                        </span>
+                      </div>
+                      {rigState.needsEntropy && (
+                        <div className="flex justify-between text-[12px]">
+                          <span className="text-muted-foreground">VRF Fee</span>
+                          <span className="tabular-nums">
+                            {formatEther(rigState.entropyFee)} ETH
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isRigStateLoading && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {/* Transaction Status */}
+              {isSuccess && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 mb-4">
+                  <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                  <div className="text-[12px]">
+                    <span className="text-green-400 font-medium">Transaction successful!</span>
+                    {txHash && (
+                      <a
+                        href={`https://basescan.org/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-1 text-green-400/70 hover:underline"
+                      >
+                        View
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isError && (
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 mb-4">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <div className="text-[12px] text-red-400">
+                    {txError?.message ?? "Transaction failed. Please try again."}
+                  </div>
+                </div>
+              )}
+
+              {/* Mine Button */}
               <button
-                disabled={!selectedSlot}
-                className={`
-                  w-32 h-10 text-[14px] font-semibold rounded-xl transition-all
-                  ${selectedSlot
-                    ? "bg-white text-black hover:bg-zinc-200"
-                    : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                  }
-                `}
+                onClick={handleMine}
+                disabled={isPending || !account || !rigState}
+                className="w-full py-3.5 rounded-xl bg-white text-black font-semibold text-[15px] hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Mine
+                {isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Confirming...
+                  </>
+                ) : isSlotEmpty ? (
+                  `Mine Slot ${selectedSlotIndex + 1} - $${rigState ? formatUSDC(rigState.price) : "..."}`
+                ) : isUserMiner ? (
+                  `Re-mine Slot ${selectedSlotIndex + 1} - $${rigState ? formatUSDC(rigState.price) : "..."}`
+                ) : (
+                  `Overtake Slot ${selectedSlotIndex + 1} - $${rigState ? formatUSDC(rigState.price) : "..."}`
+                )}
               </button>
+
+              {!account && (
+                <p className="text-[11px] text-muted-foreground text-center mt-2">
+                  Connect your wallet to mine
+                </p>
+              )}
+
+              {rigState && rigState.needsEntropy && (
+                <p className="text-[11px] text-muted-foreground text-center mt-2">
+                  Includes {formatEther(rigState.entropyFee)} ETH VRF fee
+                </p>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* ============ LEADERBOARD TAB ============ */}
+          {activeTab === "leaderboard" && (
+            <div className="p-4">
+              {isLeaderboardLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : !leaderboardEntries || leaderboardEntries.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-[13px]">
+                  No mining activity yet
+                </div>
+              ) : (
+                <div>
+                  {/* User rank callout */}
+                  {userRank !== undefined && userRank > 0 && (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/50 mb-3">
+                      <span className="text-[12px] text-muted-foreground">Your rank</span>
+                      <span className="text-[13px] font-semibold">#{userRank}</span>
+                    </div>
+                  )}
+
+                  {/* Header */}
+                  <div className="grid grid-cols-[2rem_1fr_4.5rem_4.5rem] gap-2 px-2 pb-2 text-[11px] text-muted-foreground">
+                    <span>#</span>
+                    <span>Miner</span>
+                    <span className="text-right">Mined</span>
+                    <span className="text-right">Earned</span>
+                  </div>
+
+                  {/* Entries */}
+                  <div className="space-y-1">
+                    {leaderboardEntries.map((entry, index) => {
+                      const isUser =
+                        account &&
+                        entry.miner.toLowerCase() === account.toLowerCase();
+
+                      return (
+                        <div
+                          key={entry.miner}
+                          className={`grid grid-cols-[2rem_1fr_4.5rem_4.5rem] gap-2 px-2 py-2 rounded-lg text-[12px] ${
+                            isUser ? "bg-white/5" : ""
+                          }`}
+                        >
+                          <span className="text-muted-foreground tabular-nums">
+                            {index + 1}
+                          </span>
+                          <span className="font-mono truncate">
+                            {truncateAddress(entry.miner)}
+                            {isUser && (
+                              <span className="ml-1 text-[10px] text-muted-foreground">
+                                (you)
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-right tabular-nums">
+                            {formatTokenAmount(entry.mined)}
+                          </span>
+                          <span className="text-right tabular-nums">
+                            ${formatUSDC(entry.earned)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============ HISTORY TAB ============ */}
+          {activeTab === "history" && (
+            <div className="p-4">
+              {isHistoryLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : !mineHistory || mineHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-[13px]">
+                  No mine history yet
+                </div>
+              ) : (
+                <div>
+                  {/* Header */}
+                  <div className="grid grid-cols-[1fr_4rem_4.5rem_4rem] gap-2 px-2 pb-2 text-[11px] text-muted-foreground">
+                    <span>Miner</span>
+                    <span className="text-right">Price</span>
+                    <span className="text-right">Minted</span>
+                    <span className="text-right">Time</span>
+                  </div>
+
+                  {/* Entries */}
+                  <div className="space-y-1">
+                    {mineHistory.map((mine, index) => {
+                      const isUser =
+                        account &&
+                        mine.miner.toLowerCase() === account.toLowerCase();
+
+                      return (
+                        <div
+                          key={`${mine.miner}-${mine.timestamp}-${index}`}
+                          className={`grid grid-cols-[1fr_4rem_4.5rem_4rem] gap-2 px-2 py-2 rounded-lg text-[12px] ${
+                            isUser ? "bg-white/5" : ""
+                          }`}
+                        >
+                          <span className="font-mono truncate">
+                            {truncateAddress(mine.miner)}
+                            {isUser && (
+                              <span className="ml-1 text-[10px] text-muted-foreground">
+                                (you)
+                              </span>
+                            )}
+                          </span>
+                          <span className="text-right tabular-nums">
+                            ${formatUSDC(mine.price)}
+                          </span>
+                          <span className="text-right tabular-nums">
+                            {formatTokenAmount(mine.minted)}
+                          </span>
+                          <span className="text-right text-muted-foreground">
+                            {timeAgo(Number(mine.timestamp))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Safe area padding at bottom */}
+        <div style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }} />
       </div>
-      <NavBar />
     </div>
   );
 }
