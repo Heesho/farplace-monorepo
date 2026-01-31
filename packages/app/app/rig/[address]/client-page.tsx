@@ -21,10 +21,8 @@ import { useFarcaster } from "@/hooks/useFarcaster";
 import { useDexScreener } from "@/hooks/useDexScreener";
 import { usePriceHistory } from "@/hooks/usePriceHistory";
 import {
-  getCoreAddress,
-  getMulticallAddress,
+  CONTRACT_ADDRESSES,
   QUOTE_TOKEN_DECIMALS,
-  type RigType,
 } from "@/lib/contracts";
 import { getRig } from "@/lib/subgraph-launchpad";
 
@@ -266,12 +264,12 @@ export default function RigDetailPage() {
     staleTime: 30_000,
   });
 
-  // Derive rig type from subgraph data
-  const rigType = (subgraphRig?.rigType as RigType) ?? undefined;
+  // Rig type — currently all rigs are MineRig (single core/multicall)
+  const rigType = "mine";
 
-  // Get core and multicall addresses based on rig type
-  const coreAddress = rigType ? getCoreAddress(rigType) : undefined;
-  const multicallAddress = rigType ? getMulticallAddress(rigType) : undefined;
+  // Single multicall/core address (handles all rig types)
+  const multicallAddress = CONTRACT_ADDRESSES.multicall as `0x${string}`;
+  const coreAddress = CONTRACT_ADDRESSES.core as `0x${string}`;
 
   // Fetch on-chain rig state (slot 0) via multicall
   const { rigState, isLoading: isRigStateLoading } = useRigState(

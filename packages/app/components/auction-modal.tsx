@@ -14,9 +14,9 @@ import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   CONTRACT_ADDRESSES,
   MULTICALL_ABI,
-  DEADLINE_BUFFER_SECONDS,
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
+import { DEADLINE_BUFFER_SECONDS } from "@/lib/constants";
 
 type AuctionModalProps = {
   isOpen: boolean;
@@ -37,12 +37,11 @@ export function AuctionModal({
 }: AuctionModalProps) {
   const { address: account } = useFarcaster();
   const multicallAddr =
-    multicallAddress ?? (CONTRACT_ADDRESSES.mineMulticall as `0x${string}`);
+    multicallAddress ?? (CONTRACT_ADDRESSES.multicall as `0x${string}`);
 
   const { auctionState, isLoading, refetch: refetchAuction } = useAuctionState(
     rigAddress,
-    account,
-    multicallAddr
+    account
   );
 
   const { execute, status, txHash, error, reset } = useBatchedTransaction();

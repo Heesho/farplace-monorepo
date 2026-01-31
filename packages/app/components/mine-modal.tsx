@@ -19,8 +19,8 @@ import {
   MULTICALL_ABI,
   RIG_ABI,
   QUOTE_TOKEN_DECIMALS,
-  DEADLINE_BUFFER_SECONDS,
 } from "@/lib/contracts";
+import { DEADLINE_BUFFER_SECONDS } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -81,7 +81,7 @@ export function MineModal({
   multicallAddress: multicallAddressProp,
 }: MineModalProps) {
   const multicallAddr =
-    (multicallAddressProp ?? CONTRACT_ADDRESSES.mineMulticall) as `0x${string}`;
+    (multicallAddressProp ?? CONTRACT_ADDRESSES.multicall) as `0x${string}`;
 
   // ---------- State ----------
   const [selectedSlotIndex, setSelectedSlotIndex] = useState(0);

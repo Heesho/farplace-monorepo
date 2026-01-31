@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { SUBGRAPH_URL } from "./subgraph";
+import { getRigLeaderboard } from "@/lib/subgraph-launchpad";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -10,120 +10,6 @@ export type LeaderboardEntry = {
   mined: bigint;
   earned: bigint;
 };
-
-// ---------------------------------------------------------------------------
-// GraphQL
-// ---------------------------------------------------------------------------
-
-const LEADERBOARD_QUERY = `
-  query GetRigLeaderboard($rigAddress: String!, $first: Int!) {
-    rigAccounts(
-      where: { rig: $rigAddress }
-      orderBy: mined
-      orderDirection: desc
-      first: $first
-    ) {
-      account
-      mined
-      earned
-    }
-  }
-`;
-
-/**
- * Separate query to find the user's rank – we need their position across
- * ALL participants, not just the top `limit`. We fetch all participants
- * ordered by `mined` descending and find the user's index.
- */
-const USER_RANK_QUERY = `
-  query GetUserRank($rigAddress: String!) {
-    rigAccounts(
-      where: { rig: $rigAddress }
-      orderBy: mined
-      orderDirection: desc
-      first: 1000
-    ) {
-      account
-      mined
-    }
-  }
-`;
-
-// ---------------------------------------------------------------------------
-// Fetcher helpers
-// ---------------------------------------------------------------------------
-
-type RawLeaderboardEntry = {
-  account: string;
-  mined: string;
-  earned: string;
-};
-
-async function fetchLeaderboard(
-  rigAddress: string,
-  limit: number,
-): Promise<LeaderboardEntry[]> {
-  const res = await fetch(SUBGRAPH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: LEADERBOARD_QUERY,
-      variables: {
-        rigAddress: rigAddress.toLowerCase(),
-        first: limit,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Subgraph request failed: ${res.status}`);
-  }
-
-  const json = await res.json();
-
-  if (json.errors) {
-    throw new Error(json.errors[0]?.message ?? "Subgraph query error");
-  }
-
-  const raw: RawLeaderboardEntry[] = json.data?.rigAccounts ?? [];
-
-  return raw.map((entry) => ({
-    miner: entry.account,
-    mined: BigInt(entry.mined),
-    earned: BigInt(entry.earned),
-  }));
-}
-
-async function fetchUserRank(
-  rigAddress: string,
-  account: string,
-): Promise<number | undefined> {
-  const res = await fetch(SUBGRAPH_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: USER_RANK_QUERY,
-      variables: {
-        rigAddress: rigAddress.toLowerCase(),
-      },
-    }),
-  });
-
-  if (!res.ok) return undefined;
-
-  const json = await res.json();
-  if (json.errors) return undefined;
-
-  const raw: { account: string; mined: string }[] =
-    json.data?.rigAccounts ?? [];
-
-  const index = raw.findIndex(
-    (entry) => entry.account.toLowerCase() === account.toLowerCase(),
-  );
-
-  // 1-indexed rank; undefined if not found
-  return index >= 0 ? index + 1 : undefined;
-}
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -139,30 +25,37 @@ export function useRigLeaderboard(
   isLoading: boolean;
 } {
   const {
-    data: entries,
-    isLoading: isEntriesLoading,
+    data: raw,
+    isLoading,
   } = useQuery({
     queryKey: ["rigLeaderboard", rigAddress, limit],
-    queryFn: () => fetchLeaderboard(rigAddress!, limit),
+    queryFn: () => getRigLeaderboard(rigAddress!, limit),
     enabled: !!rigAddress,
     refetchInterval: 30_000,
     staleTime: 15_000,
   });
 
-  const {
-    data: userRank,
-    isLoading: isRankLoading,
-  } = useQuery({
-    queryKey: ["rigLeaderboardRank", rigAddress, account],
-    queryFn: () => fetchUserRank(rigAddress!, account!),
-    enabled: !!rigAddress && !!account,
-    refetchInterval: 30_000,
-    staleTime: 15_000,
-  });
+  // Convert SubgraphRigAccount[] to LeaderboardEntry[]
+  const entries = raw?.map((r) => ({
+    miner: r.account.id,
+    mined: BigInt(Math.floor(parseFloat(r.mined) * 1e18)),
+    earned: BigInt(Math.floor(parseFloat(r.earned) * 1e6)),
+  }));
+
+  // Compute user rank from the leaderboard data
+  const userRank =
+    account && entries
+      ? (() => {
+          const idx = entries.findIndex(
+            (e) => e.miner.toLowerCase() === account.toLowerCase()
+          );
+          return idx >= 0 ? idx + 1 : undefined;
+        })()
+      : undefined;
 
   return {
     entries,
     userRank,
-    isLoading: isEntriesLoading || (!!account && isRankLoading),
+    isLoading,
   };
 }
