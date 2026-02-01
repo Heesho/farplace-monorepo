@@ -36,7 +36,7 @@ Traditional token launches suffer from a fundamental fairness problem: sophistic
 Farplace is a token launchpad on Base that distributes tokens through mining mechanisms instead of traditional sales. When a new token launches:
 
 1. A "rig" is deployed that controls token emission and distribution
-2. Initial liquidity pairs the new token with DONUT
+2. Initial liquidity pairs the new token with USDC
 3. LP tokens are permanently burned (sent to dead address) - liquidity cannot be pulled
 4. Users interact with the rig to earn tokens through various mechanisms
 

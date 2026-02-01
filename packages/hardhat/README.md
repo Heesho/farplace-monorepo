@@ -1,6 +1,6 @@
 # Farplace Smart Contracts
 
-A decentralized token launchpad on Base with three distribution mechanisms: mining, spinning, and funding. All tokens are paired with DONUT, initial liquidity is permanently locked, and token emissions follow halving schedules.
+A decentralized token launchpad on Base with three distribution mechanisms: mining, spinning, and funding. All tokens are paired with USDC, initial liquidity is permanently locked, and token emissions follow halving schedules.
 
 ---
 
@@ -30,7 +30,7 @@ A decentralized token launchpad on Base with three distribution mechanisms: mini
 When someone launches a token on Farplace, the system:
 
 1. Deploys an ERC20 token (Unit) with voting/permit support
-2. Creates a Unit/DONUT liquidity pool on Uniswap V2
+2. Creates a Unit/USDC liquidity pool on Uniswap V2
 3. Burns the LP tokens permanently (liquidity can never be removed)
 4. Deploys a Rig contract that controls all future token minting
 5. Deploys an Auction contract for treasury LP buybacks
@@ -195,11 +195,11 @@ All three rig types follow the same launch flow, orchestrated by their respectiv
 ```
 User calls Core.launch(params)
     |
-    +-- 1. Validate Core-specific params (launcher, quoteToken, donut, name, symbol, unitAmount)
-    +-- 2. Transfer DONUT from launcher
+    +-- 1. Validate Core-specific params (launcher, quoteToken, usdc, name, symbol, unitAmount)
+    +-- 2. Transfer USDC from launcher
     +-- 3. Deploy Unit token (ERC20 with voting/permit)
     +-- 4. Mint initial Unit tokens for LP seeding
-    +-- 5. Create Uniswap V2 pair (Unit/DONUT), add liquidity
+    +-- 5. Create Uniswap V2 pair (Unit/USDC), add liquidity
     +-- 6. Burn LP tokens to 0x000...dEaD (permanent liquidity)
     +-- 7. Deploy Auction contract (LP buyback mechanism)
     +-- 8. Deploy Rig contract via factory (validates rig-specific params)
@@ -325,7 +325,7 @@ function launch(LaunchParams calldata params)
 
 // Admin
 function setProtocolFeeAddress(address) external      // owner only
-function setMinDonutForLaunch(uint256) external        // owner only
+function setMinUsdcForLaunch(uint256) external        // owner only
 
 // View
 function deployedRigsLength() external view returns (uint256)

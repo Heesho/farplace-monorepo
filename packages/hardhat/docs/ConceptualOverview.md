@@ -57,9 +57,9 @@ Daily donation pools where contributors claim proportional token rewards.
 
 When someone launches a token through Farplace:
 
-1. **Seed liquidity** - Launcher provides DONUT to create the initial trading pool
+1. **Seed liquidity** - Launcher provides USDC to create the initial trading pool
 2. **Deploy contracts** - Unit token, Rig, and Auction are deployed
-3. **Create LP** - Token is paired with DONUT in a Uniswap V2 pool
+3. **Create LP** - Token is paired with USDC in a Uniswap V2 pool
 4. **Burn LP tokens** - LP tokens are sent to a dead address (liquidity locked forever)
 5. **Start mining** - The rig begins and users can participate
 
@@ -157,7 +157,7 @@ The system is designed so that selfish behavior still benefits the ecosystem:
 ## 10) FAQ
 
 **Q: What do I need to launch a token?**
-A: DONUT to seed the initial liquidity pool, plus configuration choices for emission and timing.
+A: USDC to seed the initial liquidity pool, plus configuration choices for emission and timing.
 
 **Q: Can the launcher change the rules after launch?**
 A: No. Emission rates, halving schedules, and pricing mechanics are immutable once deployed.

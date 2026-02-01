@@ -1,1 +1,1 @@
-# donut-miner-subgraph
+# farplace-subgraph

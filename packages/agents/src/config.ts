@@ -6,12 +6,12 @@ import "dotenv/config";
 // ---------------------------------------------------------------------------
 
 export const ADDRESSES = {
-  mineCore: "0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1",
-  spinCore: "0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631",
-  fundCore: "0x85f3e3135329272820ADC27F2561241f4b4e90db",
-  mineMulticall: "0xE59CD876ae177Ff513C1efB6922f9902e984946C",
-  spinMulticall: "0x71Ff3f51b0bB61B9205BF2F6c4600E86D4F7CFa1",
-  fundMulticall: "0xC39AF527b30509e28EC265F847c00432d54cd9E6",
+  mineCore: "0xee347D06436D0995abe28d5CE8ab402e79958D1e",
+  spinCore: "0xF6515c81C8e9Fa40f56cf6882f096825730cabD0",
+  fundCore: "0x5536baD2ec14EbeD83038AF448620634B452185b",
+  mineMulticall: "0x1fE3B4f47D5B4824620676Aa2B8bd48007D36207",
+  spinMulticall: "0x76eE857c437b9cb7EA12a4fBb0BfCD5098a387A2",
+  fundMulticall: "0x103161203A302E6e79f516d04848b376dE0A2C03",
   usdc: "0xe90495BE187d434e23A9B1FeC0B6Ce039700870e",
   uniV2Router: "0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24",
   uniV2Factory: "0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6",

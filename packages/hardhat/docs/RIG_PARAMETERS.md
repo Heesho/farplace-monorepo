@@ -157,7 +157,7 @@ These are passed during `Core.launch()` for all rig types:
 | `quoteToken` | address | Payment token for the rig |
 | `tokenName` | string | Unit token name |
 | `tokenSymbol` | string | Unit token symbol |
-| `donutAmount` | uint256 | DONUT provided for Unit/DONUT LP |
+| `usdcAmount` | uint256 | USDC provided for Unit/USDC LP |
 | `unitAmount` | uint256 | Initial Unit tokens for LP |
 
 ---
@@ -166,7 +166,7 @@ These are passed during `Core.launch()` for all rig types:
 
 1. **Ownership**: All rigs transfer ownership to the `launcher` address at deployment. Only the owner can call setter functions.
 
-2. **LP Locking**: Initial liquidity (Unit/DONUT) is permanently locked - LP tokens are burned to dead address.
+2. **LP Locking**: Initial liquidity (Unit/USDC) is permanently locked - LP tokens are burned to dead address.
 
 3. **Protocol Fee**: Hardcoded 1% fee to protocol address across all rig types.
 

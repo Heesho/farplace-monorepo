@@ -54,7 +54,7 @@ User calls Core.launch(params)
         v
 +-------+-------+
 | 1. Transfer   |
-|    DONUT      |
+|    USDC      |
 +-------+-------+
         |
         v
@@ -73,7 +73,7 @@ User calls Core.launch(params)
         v
 +-------+-------+
 | 4. Create     |
-|  Unit/DONUT   |
+|  Unit/USDC   |
 |   LP Pool     |
 +-------+-------+
         |
@@ -472,7 +472,12 @@ Day 60-89       |  250  (2nd halving)
 
 | Contract | Address | Network |
 |----------|---------|---------|
-| MineCore | 0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1 | Base |
-| SpinCore | 0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631 | Base |
-| FundCore | 0x85f3e3135329272820ADC27F2561241f4b4e90db | Base |
-| Registry | TBD | Base |
+| Registry | 0xDe73808FdA366bbc029F3F050AF95003982c333C | Base |
+| MineCore | 0xee347D06436D0995abe28d5CE8ab402e79958D1e | Base |
+| SpinCore | 0xF6515c81C8e9Fa40f56cf6882f096825730cabD0 | Base |
+| FundCore | 0x5536baD2ec14EbeD83038AF448620634B452185b | Base |
+| MineMulticall | 0x1fE3B4f47D5B4824620676Aa2B8bd48007D36207 | Base |
+| SpinMulticall | 0x76eE857c437b9cb7EA12a4fBb0BfCD5098a387A2 | Base |
+| FundMulticall | 0x103161203A302E6e79f516d04848b376dE0A2C03 | Base |
+| UnitFactory | 0xD5c5e463d1BBC5D139c59ce920A35A0AB03E8882 | Base |
+| AuctionFactory | 0x1bede89EdFbE32D611AE0bCEB4C4F4d5Fa4e1Be9 | Base |

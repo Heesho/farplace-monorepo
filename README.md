@@ -7,7 +7,7 @@ A permissionless token launchpad on Base that distributes tokens through gamifie
 Farplace reimagines token distribution by turning it into a competitive game. When someone launches a token on Farplace:
 
 1. A new **Unit** token is created with minting controlled by a "Rig" contract
-2. Initial liquidity is created by pairing the Unit with DONUT on Uniswap V2
+2. Initial liquidity is created by pairing the Unit with USDC on Uniswap V2
 3. **The LP tokens are permanently burned** - liquidity can never be pulled
 4. Users compete through the Rig's mechanism to earn token emissions over time
 
@@ -18,10 +18,10 @@ This creates a fair launch environment where tokens are distributed based on par
 ### The Basic Flow
 
 ```
-Creator provides DONUT → Unit token created → LP created & burned → Rig deployed → Users compete to mine
+Creator provides USDC → Unit token created → LP created & burned → Rig deployed → Users compete to mine
 ```
 
-1. **Launch**: A creator provides DONUT tokens to launch. The system mints initial Unit tokens, creates a Unit/DONUT liquidity pool, and burns the LP tokens forever.
+1. **Launch**: A creator provides USDC to launch. The system mints initial Unit tokens, creates a Unit/USDC liquidity pool, and burns the LP tokens forever.
 
 2. **Mining**: Users interact with the Rig contract to earn Unit tokens. Each rig type has a different mechanic (slot mining, spinning, donations).
 
@@ -138,7 +138,7 @@ if (currentUps < tailUps) currentUps = tailUps
 ### Permanent Liquidity
 
 When a token is launched:
-1. Creator's DONUT + minted Units create initial LP on Uniswap V2
+1. Creator's USDC + minted Units create initial LP on Uniswap V2
 2. LP tokens are sent to the dead address (`0x...dEaD`)
 3. **Liquidity can never be removed**
 

@@ -28,19 +28,19 @@ const PROTOCOL_FEE_ADDRESS = "0xbA366c82815983fF130C23CED78bD95E1F2c18EA"; // TO
 const MULTISIG_ADDRESS = "0xeE0CB49D2805DA6bC0A979ddAd87bb793fbB765E";
 const MIN_USDC_FOR_LAUNCH = convert("1", 6); // 1 USDC minimum
 
-// Deployed Contract Addresses (paste after deployment)
-const REGISTRY = "0x2Bdb8f8F4f0cF545D919fA5C041F84a039f2c4A3"; // Deploy first, then paste address here
-const UNIT_FACTORY = "0xa26d78296565d5dC4FbD16B15573197340C10C62";
-const MINE_RIG_FACTORY = "0x5504e715c4D642a8930BCefc962A7E0e4b99ba4a";
-const SPIN_RIG_FACTORY = "0xb2cF3e483EfB335CEC66882E6d95C58b54c58b3F";
-const FUND_RIG_FACTORY = "0x0d64d89942f8FC116e446BC6642e8F7586c325fC";
-const AUCTION_FACTORY = "0xd7d38c87D91e64f4b05c919d361c79Ff6a93b743";
-const MINE_CORE = "0x504d4f579b5e16dB130d1ABd8579BA03087AE1b1";
-const SPIN_CORE = "0x2E392a607F94325871C74Ee9b9F5FBD44CcB5631";
-const FUND_CORE = "0x85f3e3135329272820ADC27F2561241f4b4e90db";
-const MINE_MULTICALL = "0xE59CD876ae177Ff513C1efB6922f9902e984946C";
-const SPIN_MULTICALL = "0x71Ff3f51b0bB61B9205BF2F6c4600E86D4F7CFa1";
-const FUND_MULTICALL = "0xC39AF527b30509e28EC265F847c00432d54cd9E6";
+// Deployed Contract Addresses
+const REGISTRY = "0xDe73808FdA366bbc029F3F050AF95003982c333C";
+const UNIT_FACTORY = "0xD5c5e463d1BBC5D139c59ce920A35A0AB03E8882";
+const MINE_RIG_FACTORY = "0x9DFd79bc5758A8438cE0ad0BF15BD7B4593D3121";
+const SPIN_RIG_FACTORY = "0x54f11F79f22847d7F72C9fDAa7C5388854899376";
+const FUND_RIG_FACTORY = "0xD30Ab91762bB468fDDa22FEAa8Ab222CD20aF2Df";
+const AUCTION_FACTORY = "0x1bede89EdFbE32D611AE0bCEB4C4F4d5Fa4e1Be9";
+const MINE_CORE = "0xee347D06436D0995abe28d5CE8ab402e79958D1e";
+const SPIN_CORE = "0xF6515c81C8e9Fa40f56cf6882f096825730cabD0";
+const FUND_CORE = "0x5536baD2ec14EbeD83038AF448620634B452185b";
+const MINE_MULTICALL = "0x1fE3B4f47D5B4824620676Aa2B8bd48007D36207";
+const SPIN_MULTICALL = "0x76eE857c437b9cb7EA12a4fBb0BfCD5098a387A2";
+const FUND_MULTICALL = "0x103161203A302E6e79f516d04848b376dE0A2C03";
 
 // Contract Variables
 let usdc,
@@ -64,90 +64,90 @@ let usdc,
 async function getContracts() {
   usdc = await ethers.getContractAt(
     "contracts/mocks/MockUSDC.sol:MockUSDC",
-    USDC_ADDRESS,
+    USDC_ADDRESS
   );
 
   if (REGISTRY) {
     registry = await ethers.getContractAt(
       "contracts/Registry.sol:Registry",
-      REGISTRY,
+      REGISTRY
     );
   }
 
   if (UNIT_FACTORY) {
     unitFactory = await ethers.getContractAt(
       "contracts/UnitFactory.sol:UnitFactory",
-      UNIT_FACTORY,
+      UNIT_FACTORY
     );
   }
 
   if (MINE_RIG_FACTORY) {
     mineRigFactory = await ethers.getContractAt(
       "contracts/rigs/mine/MineRigFactory.sol:MineRigFactory",
-      MINE_RIG_FACTORY,
+      MINE_RIG_FACTORY
     );
   }
 
   if (SPIN_RIG_FACTORY) {
     spinRigFactory = await ethers.getContractAt(
       "contracts/rigs/spin/SpinRigFactory.sol:SpinRigFactory",
-      SPIN_RIG_FACTORY,
+      SPIN_RIG_FACTORY
     );
   }
 
   if (FUND_RIG_FACTORY) {
     fundRigFactory = await ethers.getContractAt(
       "contracts/rigs/fund/FundRigFactory.sol:FundRigFactory",
-      FUND_RIG_FACTORY,
+      FUND_RIG_FACTORY
     );
   }
 
   if (AUCTION_FACTORY) {
     auctionFactory = await ethers.getContractAt(
       "contracts/AuctionFactory.sol:AuctionFactory",
-      AUCTION_FACTORY,
+      AUCTION_FACTORY
     );
   }
 
   if (MINE_CORE) {
     mineCore = await ethers.getContractAt(
       "contracts/rigs/mine/MineCore.sol:MineCore",
-      MINE_CORE,
+      MINE_CORE
     );
   }
 
   if (SPIN_CORE) {
     spinCore = await ethers.getContractAt(
       "contracts/rigs/spin/SpinCore.sol:SpinCore",
-      SPIN_CORE,
+      SPIN_CORE
     );
   }
 
   if (FUND_CORE) {
     fundCore = await ethers.getContractAt(
       "contracts/rigs/fund/FundCore.sol:FundCore",
-      FUND_CORE,
+      FUND_CORE
     );
   }
 
   if (MINE_MULTICALL) {
     mineMulticall = await ethers.getContractAt(
       "contracts/rigs/mine/MineMulticall.sol:MineMulticall",
-      MINE_MULTICALL,
+      MINE_MULTICALL
     );
   }
 
   if (SPIN_MULTICALL) {
     spinMulticall = await ethers.getContractAt(
       "contracts/rigs/spin/SpinMulticall.sol:SpinMulticall",
-      SPIN_MULTICALL,
+      SPIN_MULTICALL
     );
   }
 
   if (FUND_MULTICALL) {
     fundMulticall = await ethers.getContractAt(
       "contracts/rigs/fund/FundMulticall.sol:FundMulticall",
-      FUND_MULTICALL,
+      FUND_MULTICALL
     );
   }
 
@@ -239,7 +239,7 @@ async function deployMineCore() {
     ENTROPY_ADDRESS,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice },
+    { gasPrice: ethers.gasPrice }
   );
   mineCore = await contract.deployed();
   await sleep(5000);
@@ -273,7 +273,7 @@ async function deploySpinCore() {
     ENTROPY_ADDRESS,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice },
+    { gasPrice: ethers.gasPrice }
   );
   spinCore = await contract.deployed();
   await sleep(5000);
@@ -306,7 +306,7 @@ async function deployFundCore() {
     auctionFactory.address,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice },
+    { gasPrice: ethers.gasPrice }
   );
   fundCore = await contract.deployed();
   await sleep(5000);
@@ -531,7 +531,7 @@ async function verifyUnitByRigIndex(rigIndex) {
   const unitAddress = await mineCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -557,7 +557,7 @@ async function getUnitVerificationInfo(rigIndex) {
   const unitAddress = await mineCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -569,7 +569,7 @@ async function getUnitVerificationInfo(rigIndex) {
   const abiCoder = new ethers.utils.AbiCoder();
   const encodedArgs = abiCoder.encode(
     ["string", "string", "address"],
-    [name, symbol, coreAddress],
+    [name, symbol, coreAddress]
   );
   // Remove '0x' prefix for BaseScan
   const encodedArgsNoPrefix = encodedArgs.slice(2);
@@ -596,7 +596,7 @@ async function verifyRigByIndex(rigIndex) {
   const rigAddress = await mineCore.deployedRigs(rigIndex);
   const rig = await ethers.getContractAt(
     "contracts/rigs/mine/MineRig.sol:MineRig",
-    rigAddress,
+    rigAddress
   );
 
   // Read all constructor args from the deployed contract
@@ -641,7 +641,7 @@ async function verifyRigByIndex(rigIndex) {
   console.log("    Tail UPS:", tailUps.toString());
   console.log(
     "    UPS Multipliers:",
-    upsMultipliers.map((m) => m.toString()),
+    upsMultipliers.map((m) => m.toString())
   );
   console.log("    UPS Multiplier Duration:", upsMultiplierDuration.toString());
 
@@ -674,7 +674,7 @@ async function verifyAuctionByRigIndex(rigIndex) {
   const auctionAddress = await mineCore.rigToAuction(rigAddress);
   const auction = await ethers.getContractAt(
     "contracts/Auction.sol:Auction",
-    auctionAddress,
+    auctionAddress
   );
 
   // Read constructor args from the deployed contract
@@ -692,10 +692,10 @@ async function verifyAuctionByRigIndex(rigIndex) {
 
   if (!epochId.eq(0)) {
     console.log(
-      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice.",
+      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice."
     );
     console.log(
-      "  If verification fails, you may need to find the original auctionInitPrice from launch event.",
+      "  If verification fails, you may need to find the original auctionInitPrice from launch event."
     );
   }
 
@@ -729,7 +729,7 @@ async function verifySpinUnitByRigIndex(rigIndex) {
   const unitAddress = await spinCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -754,7 +754,7 @@ async function getSpinUnitVerificationInfo(rigIndex) {
   const unitAddress = await spinCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -764,7 +764,7 @@ async function getSpinUnitVerificationInfo(rigIndex) {
   const abiCoder = new ethers.utils.AbiCoder();
   const encodedArgs = abiCoder.encode(
     ["string", "string", "address"],
-    [name, symbol, coreAddress],
+    [name, symbol, coreAddress]
   );
   const encodedArgsNoPrefix = encodedArgs.slice(2);
 
@@ -790,7 +790,7 @@ async function verifySpinRigByIndex(rigIndex) {
   const rigAddress = await spinCore.deployedRigs(rigIndex);
   const rig = await ethers.getContractAt(
     "contracts/rigs/spin/SpinRig.sol:SpinRig",
-    rigAddress,
+    rigAddress
   );
 
   const unitAddress = await rig.unit();
@@ -829,7 +829,10 @@ async function verifySpinRigByIndex(rigIndex) {
   console.log("    Initial UPS:", initialUps.toString());
   console.log("    Halving Period:", halvingPeriod.toString());
   console.log("    Tail UPS:", tailUps.toString());
-  console.log("    Odds:", odds.map((o) => o.toString()));
+  console.log(
+    "    Odds:",
+    odds.map((o) => o.toString())
+  );
 
   await hre.run("verify:verify", {
     address: rigAddress,
@@ -859,7 +862,7 @@ async function verifySpinAuctionByRigIndex(rigIndex) {
   const auctionAddress = await spinCore.rigToAuction(rigAddress);
   const auction = await ethers.getContractAt(
     "contracts/Auction.sol:Auction",
-    auctionAddress,
+    auctionAddress
   );
 
   const paymentToken = await auction.paymentToken();
@@ -874,10 +877,10 @@ async function verifySpinAuctionByRigIndex(rigIndex) {
 
   if (!epochId.eq(0)) {
     console.log(
-      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice.",
+      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice."
     );
     console.log(
-      "  If verification fails, you may need to find the original auctionInitPrice from launch event.",
+      "  If verification fails, you may need to find the original auctionInitPrice from launch event."
     );
   }
 
@@ -911,7 +914,7 @@ async function verifyFundUnitByRigIndex(rigIndex) {
   const unitAddress = await fundCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -936,7 +939,7 @@ async function getFundUnitVerificationInfo(rigIndex) {
   const unitAddress = await fundCore.rigToUnit(rigAddress);
   const unit = await ethers.getContractAt(
     "contracts/Unit.sol:Unit",
-    unitAddress,
+    unitAddress
   );
 
   const name = await unit.name();
@@ -946,7 +949,7 @@ async function getFundUnitVerificationInfo(rigIndex) {
   const abiCoder = new ethers.utils.AbiCoder();
   const encodedArgs = abiCoder.encode(
     ["string", "string", "address"],
-    [name, symbol, coreAddress],
+    [name, symbol, coreAddress]
   );
   const encodedArgsNoPrefix = encodedArgs.slice(2);
 
@@ -972,7 +975,7 @@ async function verifyFundRigByIndex(rigIndex) {
   const rigAddress = await fundCore.deployedRigs(rigIndex);
   const rig = await ethers.getContractAt(
     "contracts/rigs/fund/FundRig.sol:FundRig",
-    rigAddress,
+    rigAddress
   );
 
   const paymentToken = await rig.paymentToken();
@@ -1019,7 +1022,7 @@ async function verifyFundAuctionByRigIndex(rigIndex) {
   const auctionAddress = await fundCore.rigToAuction(rigAddress);
   const auction = await ethers.getContractAt(
     "contracts/Auction.sol:Auction",
-    auctionAddress,
+    auctionAddress
   );
 
   const paymentToken = await auction.paymentToken();
@@ -1034,10 +1037,10 @@ async function verifyFundAuctionByRigIndex(rigIndex) {
 
   if (!epochId.eq(0)) {
     console.log(
-      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice.",
+      "  WARNING: Auction has been used (epochId > 0). Using minInitPrice as initPrice."
     );
     console.log(
-      "  If verification fails, you may need to find the original auctionInitPrice from launch event.",
+      "  If verification fails, you may need to find the original auctionInitPrice from launch event."
     );
   }
 
@@ -1121,51 +1124,51 @@ async function printDeployment() {
   console.log("\n--- Deployed Contracts ---");
   console.log(
     "Registry:            ",
-    registry?.address || REGISTRY || "NOT DEPLOYED",
+    registry?.address || REGISTRY || "NOT DEPLOYED"
   );
   console.log(
     "UnitFactory:         ",
-    unitFactory?.address || UNIT_FACTORY || "NOT DEPLOYED",
+    unitFactory?.address || UNIT_FACTORY || "NOT DEPLOYED"
   );
   console.log(
     "MineRigFactory:      ",
-    mineRigFactory?.address || MINE_RIG_FACTORY || "NOT DEPLOYED",
+    mineRigFactory?.address || MINE_RIG_FACTORY || "NOT DEPLOYED"
   );
   console.log(
     "SpinRigFactory:      ",
-    spinRigFactory?.address || SPIN_RIG_FACTORY || "NOT DEPLOYED",
+    spinRigFactory?.address || SPIN_RIG_FACTORY || "NOT DEPLOYED"
   );
   console.log(
     "FundRigFactory:      ",
-    fundRigFactory?.address || FUND_RIG_FACTORY || "NOT DEPLOYED",
+    fundRigFactory?.address || FUND_RIG_FACTORY || "NOT DEPLOYED"
   );
   console.log(
     "AuctionFactory:      ",
-    auctionFactory?.address || AUCTION_FACTORY || "NOT DEPLOYED",
+    auctionFactory?.address || AUCTION_FACTORY || "NOT DEPLOYED"
   );
   console.log(
     "MineCore:            ",
-    mineCore?.address || MINE_CORE || "NOT DEPLOYED",
+    mineCore?.address || MINE_CORE || "NOT DEPLOYED"
   );
   console.log(
     "SpinCore:            ",
-    spinCore?.address || SPIN_CORE || "NOT DEPLOYED",
+    spinCore?.address || SPIN_CORE || "NOT DEPLOYED"
   );
   console.log(
     "FundCore:            ",
-    fundCore?.address || FUND_CORE || "NOT DEPLOYED",
+    fundCore?.address || FUND_CORE || "NOT DEPLOYED"
   );
   console.log(
     "MineMulticall:       ",
-    mineMulticall?.address || MINE_MULTICALL || "NOT DEPLOYED",
+    mineMulticall?.address || MINE_MULTICALL || "NOT DEPLOYED"
   );
   console.log(
     "SpinMulticall:       ",
-    spinMulticall?.address || SPIN_MULTICALL || "NOT DEPLOYED",
+    spinMulticall?.address || SPIN_MULTICALL || "NOT DEPLOYED"
   );
   console.log(
     "FundMulticall:       ",
-    fundMulticall?.address || FUND_MULTICALL || "NOT DEPLOYED",
+    fundMulticall?.address || FUND_MULTICALL || "NOT DEPLOYED"
   );
 
   if (mineCore) {
@@ -1174,11 +1177,11 @@ async function printDeployment() {
     console.log("Protocol Fee Address:", await mineCore.protocolFeeAddress());
     console.log(
       "Min USDC:           ",
-      divDec(await mineCore.minUsdcForLaunch()),
+      divDec(await mineCore.minUsdcForLaunch())
     );
     console.log(
       "Deployed Rigs:       ",
-      (await mineCore.deployedRigsLength()).toString(),
+      (await mineCore.deployedRigsLength()).toString()
     );
   }
 
@@ -1188,11 +1191,11 @@ async function printDeployment() {
     console.log("Protocol Fee Address:", await spinCore.protocolFeeAddress());
     console.log(
       "Min USDC:           ",
-      divDec(await spinCore.minUsdcForLaunch()),
+      divDec(await spinCore.minUsdcForLaunch())
     );
     console.log(
       "Deployed Rigs:       ",
-      (await spinCore.deployedRigsLength()).toString(),
+      (await spinCore.deployedRigsLength()).toString()
     );
   }
 
@@ -1202,11 +1205,11 @@ async function printDeployment() {
     console.log("Protocol Fee Address:", await fundCore.protocolFeeAddress());
     console.log(
       "Min USDC:           ",
-      divDec(await fundCore.minUsdcForLaunch()),
+      divDec(await fundCore.minUsdcForLaunch())
     );
     console.log(
       "Deployed Rigs:       ",
-      (await fundCore.deployedRigsLength()).toString(),
+      (await fundCore.deployedRigsLength()).toString()
     );
   }
 
@@ -1220,13 +1223,13 @@ async function printCoreState(coreContract, label) {
   console.log("USDC:               ", await coreContract.usdcToken());
   console.log(
     "Min USDC:           ",
-    divDec(await coreContract.minUsdcForLaunch()),
+    divDec(await coreContract.minUsdcForLaunch())
   );
   console.log("Unit Factory:        ", await coreContract.unitFactory());
   console.log("Auction Factory:     ", await coreContract.auctionFactory());
   console.log(
     "Deployed Rigs:       ",
-    (await coreContract.deployedRigsLength()).toString(),
+    (await coreContract.deployedRigsLength()).toString()
   );
   console.log("");
 }
@@ -1241,35 +1244,35 @@ async function main() {
   console.log(
     "Account balance:",
     ethers.utils.formatEther(await wallet.getBalance()),
-    "ETH",
+    "ETH"
   );
   console.log("");
 
   await getContracts();
 
   //===================================================================
-  // 1. Deploy System
+  // 1. Deploy System (already deployed)
   //===================================================================
 
-  // --- Shared infrastructure ---
+  // // --- Shared infrastructure ---
   // console.log("Starting Deployment...");
-  // await deployRegistry(); // Deploy first - central registry for all rig types
+  // await deployRegistry();
   // await deployUnitFactory();
   // await deployAuctionFactory();
 
-  // --- MineCore ---
+  // // --- MineCore ---
   // await deployMineRigFactory();
   // await deployMineCore();
   // await approveMineCore();
   // await deployMineMulticall();
 
-  // --- SpinCore ---
+  // // --- SpinCore ---
   // await deploySpinRigFactory();
   // await deploySpinCore();
   // await approveSpinCore();
   // await deploySpinMulticall();
 
-  // --- FundCore ---
+  // // --- FundCore ---
   // await deployFundRigFactory();
   // await deployFundCore();
   // await approveFundCore();
@@ -1280,7 +1283,7 @@ async function main() {
   //===================================================================
 
   // --- Shared infrastructure ---
-  console.log("Starting Verification...");
+  // console.log("Starting Verification...");
   // await verifyRegistry();
   // await sleep(5000);
   // await verifyUnitFactory();
@@ -1288,7 +1291,7 @@ async function main() {
   // await verifyAuctionFactory();
   // await sleep(5000);
 
-  // --- MineCore ---
+  // // --- MineCore ---
   // await verifyMineRigFactory();
   // await sleep(5000);
   // await verifyMineCore();
@@ -1296,7 +1299,7 @@ async function main() {
   // await verifyMineMulticall();
   // await sleep(5000);
 
-  // --- SpinCore ---
+  // // --- SpinCore ---
   // await verifySpinRigFactory();
   // await sleep(5000);
   // await verifySpinCore();
@@ -1304,7 +1307,7 @@ async function main() {
   // await verifySpinMulticall();
   // await sleep(5000);
 
-  // --- FundCore ---
+  // // --- FundCore ---
   // await verifyFundRigFactory();
   // await sleep(5000);
   // await verifyFundCore();
