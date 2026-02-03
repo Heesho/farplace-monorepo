@@ -82,7 +82,7 @@ const DEFAULTS = {
     auctionEpochPeriod: 3600, // 1 hour
     auctionPriceMultiplier: 2, // 2x
     auctionMinInitPrice: 1, // 1 LP
-    upsMultipliers: [] as number[], // empty = no multipliers
+    upsMultipliers: [1, 1, 1, 1, 1, 2, 2, 2, 3, 5] as number[], // ~1.9x average
     upsMultiplierDuration: 86400, // 24h
   },
   spin: {
@@ -98,7 +98,7 @@ const DEFAULTS = {
     auctionEpochPeriod: 3600,
     auctionPriceMultiplier: 2,
     auctionMinInitPrice: 1,
-    odds: [10] as number[], // 0.1% single entry
+    odds: [100, 100, 100, 100, 200, 200, 200, 500, 500, 1000] as number[], // ~3% average payout
   },
   fund: {
     usdcAmount: 1000,
