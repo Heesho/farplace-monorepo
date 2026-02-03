@@ -61,7 +61,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     address public immutable unit;
     address public immutable quote;
     address public immutable core;
-    IEntropyV2 public immutable entropy;
+    address public immutable entropy;
     uint256 public immutable startTime;
 
     // Configurable emission parameters
@@ -200,7 +200,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
         unit = _unit;
         quote = _quote;
-        entropy = IEntropyV2(_entropy);
+        entropy = _entropy;
         treasury = _treasury;
         core = _core;
 
@@ -290,9 +290,9 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
         if (entropyEnabled) {
             // Request VRF for spin outcome
-            uint128 fee = entropy.getFeeV2();
+            uint128 fee = IEntropyV2(entropy).getFeeV2();
             if (msg.value < fee) revert SpinRig__InsufficientFee();
-            uint64 seq = entropy.requestV2{value: fee}();
+            uint64 seq = IEntropyV2(entropy).requestV2{value: fee}();
             sequenceToSpinner[seq] = spinner;
             sequenceToEpoch[seq] = currentEpochId;
             emit SpinRig__EntropyRequested(currentEpochId, seq);
@@ -436,7 +436,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      * @notice Get the current VRF fee required for a spin.
      */
     function getEntropyFee() external view returns (uint256) {
-        return entropy.getFeeV2();
+        return IEntropyV2(entropy).getFeeV2();
     }
 
     /**

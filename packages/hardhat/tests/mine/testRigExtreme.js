@@ -29,7 +29,7 @@ async function deployFreshRig(params = {}) {
     quoteToken: weth.address,
     tokenName: params.tokenName || "Test Unit",
     tokenSymbol: params.tokenSymbol || "TUNIT",
-    uri: params.uri || "",
+    uri: params.uri || "https://example.com/rig",
     usdcAmount: params.usdcAmount || convert("200", 6), // Reduced from 500
     unitAmount: params.unitAmount || convert("1000000", 18),
     initialUps: params.initialUps || convert("4", 18),
@@ -38,7 +38,7 @@ async function deployFreshRig(params = {}) {
     rigEpochPeriod: params.rigEpochPeriod || 3600,
     rigPriceMultiplier: params.rigPriceMultiplier || convert("2", 18),
     rigMinInitPrice: params.rigMinInitPrice || convert("0.0001", 18),
-    upsMultipliers: params.upsMultipliers || [],
+    upsMultipliers: params.upsMultipliers || [convert("1", 18)],
     upsMultiplierDuration: params.upsMultiplierDuration || 86400,
     auctionInitPrice: params.auctionInitPrice || convert("1", 18),
     auctionEpochPeriod: params.auctionEpochPeriod || 86400,
@@ -51,8 +51,13 @@ async function deployFreshRig(params = {}) {
   const receipt = await tx.wait();
   const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
 
+  const rigContract = await ethers.getContractAt("MineRig", launchEvent.args.rig);
+
+  // Disable entropy for tests that don't send ETH for VRF fees
+  await rigContract.connect(user0).setEntropyEnabled(false);
+
   return {
-    rig: await ethers.getContractAt("MineRig", launchEvent.args.rig),
+    rig: rigContract,
     unit: await ethers.getContractAt("Unit", launchEvent.args.unit),
     auction: launchEvent.args.auction,
     lpToken: launchEvent.args.lpToken,

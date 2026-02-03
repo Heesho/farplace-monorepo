@@ -12,6 +12,7 @@ interface ISpinCore {
         address quoteToken;
         string tokenName;
         string tokenSymbol;
+        string uri;
         uint256 usdcAmount;
         uint256 unitAmount;
         uint256 initialUps;
@@ -70,6 +71,7 @@ interface ISpinCore {
         address quoteToken,
         string tokenName,
         string tokenSymbol,
+        string uri,
         uint256 usdcAmount,
         uint256 unitAmount,
         uint256 initialUps,

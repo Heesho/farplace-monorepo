@@ -47,6 +47,7 @@ interface ISpinRig {
     function odds(uint256 index) external view returns (uint256);
     function sequenceToSpinner(uint64 sequenceNumber) external view returns (address);
     function sequenceToEpoch(uint64 sequenceNumber) external view returns (uint256);
+    function entropyEnabled() external view returns (bool);
     function uri() external view returns (string memory);
 
     // Functions
@@ -60,6 +61,7 @@ interface ISpinRig {
     // Restricted functions
     function setTreasury(address _treasury) external;
     function setTeam(address _team) external;
+    function setEntropyEnabled(bool _enabled) external;
     function setUri(string calldata _uri) external;
     function transferOwnership(address newOwner) external;
 

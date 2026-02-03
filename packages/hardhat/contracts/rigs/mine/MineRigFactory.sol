@@ -15,7 +15,7 @@ contract MineRigFactory {
      * @param _unit Unit token address (deployed separately by Core)
      * @param _quote Payment token address (e.g., USDC)
      * @param _entropy Pyth Entropy contract address
-     * @param _protocol Protocol fee recipient address
+     * @param _core Core contract address (source of protocol fee recipient)
      * @param _treasury Treasury address for fee collection
      * @param _epochPeriod Duration of each Dutch auction epoch
      * @param _priceMultiplier Price multiplier for next epoch
@@ -29,7 +29,7 @@ contract MineRigFactory {
         address _unit,
         address _quote,
         address _entropy,
-        address _protocol,
+        address _core,
         address _treasury,
         uint256 _epochPeriod,
         uint256 _priceMultiplier,
@@ -55,7 +55,7 @@ contract MineRigFactory {
             _unit,
             _quote,
             _entropy,
-            _protocol,
+            _core,
             _treasury,
             config
         );

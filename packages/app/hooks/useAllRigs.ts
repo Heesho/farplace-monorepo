@@ -102,7 +102,7 @@ export function useExploreRigs(
   // Convert subgraph data to RigListItem[]
   const rigs: RigListItem[] = useMemo(() => {
     return units
-      .filter(u => u.rig?.uri?.startsWith("ipfs://")) // filter valid rigs
+      .filter(u => !!u.rig)
       .map(unitToRigListItem);
   }, [units]);
 

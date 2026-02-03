@@ -69,6 +69,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         address quoteToken; // ERC20 payment token for spinning (e.g., USDC, WETH)
         string tokenName; // Unit token name
         string tokenSymbol; // Unit token symbol
+        string uri; // metadata URI for the rig
         uint256 usdcAmount; // USDC to provide for LP
         uint256 unitAmount; // Unit tokens minted for initial LP
         uint256 initialUps; // starting units per second
@@ -91,6 +92,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
     error SpinCore__ZeroQuoteToken();
     error SpinCore__EmptyTokenName();
     error SpinCore__EmptyTokenSymbol();
+    error SpinCore__EmptyUri();
     error SpinCore__ZeroUnitAmount();
     error SpinCore__ZeroAddress();
 
@@ -105,6 +107,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         address quoteToken,
         string tokenName,
         string tokenSymbol,
+        string uri,
         uint256 usdcAmount,
         uint256 unitAmount,
         uint256 initialUps,
@@ -228,11 +231,12 @@ contract SpinCore is Ownable, ReentrancyGuard {
         );
 
         // Deploy SpinRig via factory
-        // Treasury is the Auction contract (receives 90% of spin fees)
+        // Treasury is the Auction contract (receives 95% of spin fees)
         rig = ISpinRigFactory(spinRigFactory).deploy(
             unit,
             params.quoteToken,
             entropy,
+            address(this), // core
             auction, // treasury
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
@@ -245,6 +249,12 @@ contract SpinCore is Ownable, ReentrancyGuard {
 
         // Transfer Unit minting rights to SpinRig (permanently locked)
         IUnit(unit).setRig(rig);
+
+        // Default team to launcher
+        ISpinRig(rig).setTeam(params.launcher);
+
+        // Set initial URI for the rig (required)
+        ISpinRig(rig).setUri(params.uri);
 
         // Transfer SpinRig ownership to launcher
         ISpinRig(rig).transferOwnership(params.launcher);
@@ -268,6 +278,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
             params.quoteToken,
             params.tokenName,
             params.tokenSymbol,
+            params.uri,
             params.usdcAmount,
             params.unitAmount,
             params.initialUps,
@@ -319,6 +330,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         if (params.usdcAmount < minUsdcForLaunch) revert SpinCore__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert SpinCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert SpinCore__EmptyTokenSymbol();
+        if (bytes(params.uri).length == 0) revert SpinCore__EmptyUri();
         if (params.unitAmount == 0) revert SpinCore__ZeroUnitAmount();
     }
 

@@ -114,7 +114,7 @@ describe("Core Tests", function () {
       quoteToken: weth.address,
       tokenName: "Test Unit",
       tokenSymbol: "TUNIT",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("500", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("4", 18),
@@ -123,7 +123,7 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600, // 1 hour
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400, // 1 day
@@ -144,6 +144,10 @@ describe("Core Tests", function () {
     unit = launchEvent.args.unit;
     auction = launchEvent.args.auction;
     lpToken = launchEvent.args.lpToken;
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    const rigContract = await ethers.getContractAt("MineRig", rig);
+    await rigContract.connect(user0).setEntropyEnabled(false);
 
     console.log("Rig deployed at:", rig);
     console.log("Unit token deployed at:", unit);
@@ -175,9 +179,11 @@ describe("Core Tests", function () {
     console.log("Halving Amount:", divDec(await rigContract.halvingAmount()));
     console.log("Epoch Period:", (await rigContract.epochPeriod()).toString());
     console.log("Treasury:", await rigContract.treasury());
-    console.log("Protocol:", await rigContract.protocol());
+    console.log("Core:", await rigContract.core());
+    console.log("Protocol:", await core.protocolFeeAddress());
 
     expect(await rigContract.treasury()).to.equal(auction);
+    expect(await rigContract.core()).to.equal(core.address);
   });
 
   it("Verify LP tokens burned", async function () {
@@ -324,7 +330,7 @@ describe("Core Tests", function () {
       quoteToken: weth.address,
       tokenName: "Test Unit 2",
       tokenSymbol: "TUNIT2",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("100", 6), // Less than minUsdcForLaunch (200)
       unitAmount: convert("1000000", 18),
       initialUps: convert("4", 18),
@@ -333,7 +339,7 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400,
@@ -358,7 +364,7 @@ describe("Core Tests", function () {
       quoteToken: weth.address,
       tokenName: "",
       tokenSymbol: "TUNIT2",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("500", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("4", 18),
@@ -367,7 +373,7 @@ describe("Core Tests", function () {
       rigEpochPeriod: 3600,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: 86400,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: 86400,

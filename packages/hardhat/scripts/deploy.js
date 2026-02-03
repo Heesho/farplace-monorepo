@@ -29,18 +29,18 @@ const MULTISIG_ADDRESS = "0xeE0CB49D2805DA6bC0A979ddAd87bb793fbB765E";
 const MIN_USDC_FOR_LAUNCH = convert("1", 6); // 1 USDC minimum
 
 // Deployed Contract Addresses
-const REGISTRY = "";
-const UNIT_FACTORY = "";
-const MINE_RIG_FACTORY = "";
-const SPIN_RIG_FACTORY = "";
-const FUND_RIG_FACTORY = "";
-const AUCTION_FACTORY = "";
-const MINE_CORE = "";
-const SPIN_CORE = "";
-const FUND_CORE = "";
-const MINE_MULTICALL = "";
-const SPIN_MULTICALL = "";
-const FUND_MULTICALL = "";
+const REGISTRY = "0xb0F83aA4BB35FE43027F2eae1EcDca9E9A27501F";
+const UNIT_FACTORY = "0x7914e1D147120A7a9896102d624d9bD767C8cf65";
+const MINE_RIG_FACTORY = "0xF782Bb6F144242B9f6B384825e6CbA73A085eC8b";
+const SPIN_RIG_FACTORY = "0x8332f44c69Ca1A9bE63f14Ca12b0C09d00Be2708";
+const FUND_RIG_FACTORY = "0xE2666C5Fe04304C757415b41902EE26C1464A64e";
+const AUCTION_FACTORY = "0xeeB4A51Ea65fD226bd5E44484Ec02D8a564e4499";
+const MINE_CORE = "0x56EeA24F447A1609784566c84f40554B5742f7B6";
+const SPIN_CORE = "0x3CD87981596590E08dfad6Bf294406f05A6f5481";
+const FUND_CORE = "0x9517B14d24DD4644347c80985473627866a6Eb40";
+const MINE_MULTICALL = "0xD84568ad3876f9f707A6034292D69fE26827D0C7";
+const SPIN_MULTICALL = "0x81Af1ba8f13A1Bc79e76cb0dD62Ce9313d88C0EA";
+const FUND_MULTICALL = "0x015ceD893eBcC1403662587CdbEfe25738e61A7F";
 
 // Contract Variables
 let usdc,
@@ -1250,29 +1250,29 @@ async function main() {
   // 1. Deploy System (already deployed)
   //===================================================================
 
-  // // --- Shared infrastructure ---
-  console.log("Starting Deployment...");
-  await deployRegistry();
-  await deployUnitFactory();
-  await deployAuctionFactory();
+  // --- Shared infrastructure ---
+  // console.log("Starting Deployment...");
+  // await deployRegistry();
+  // await deployUnitFactory();
+  // await deployAuctionFactory();
 
-  // // --- MineCore ---
-  await deployMineRigFactory();
-  await deployMineCore();
-  await approveMineCore();
-  await deployMineMulticall();
+  // --- MineCore ---
+  // await deployMineRigFactory();
+  // await deployMineCore();
+  // await approveMineCore();
+  // await deployMineMulticall();
 
-  // // --- SpinCore ---
-  await deploySpinRigFactory();
-  await deploySpinCore();
-  await approveSpinCore();
-  await deploySpinMulticall();
+  // --- SpinCore ---
+  // await deploySpinRigFactory();
+  // await deploySpinCore();
+  // await approveSpinCore();
+  // await deploySpinMulticall();
 
-  // // --- FundCore ---
-  await deployFundRigFactory();
-  await deployFundCore();
-  await approveFundCore();
-  await deployFundMulticall();
+  // --- FundCore ---
+  // await deployFundRigFactory();
+  // await deployFundCore();
+  // await approveFundCore();
+  // await deployFundMulticall();
 
   //===================================================================
   // 2. Verify Contracts

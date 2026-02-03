@@ -93,6 +93,7 @@ contract MineCore is Ownable, ReentrancyGuard {
     error Core__ZeroQuoteToken();
     error Core__EmptyTokenName();
     error Core__EmptyTokenSymbol();
+    error Core__EmptyUri();
     error Core__ZeroUnitAmount();
     error Core__ZeroAddress();
 
@@ -236,7 +237,7 @@ contract MineCore is Ownable, ReentrancyGuard {
             unit,
             params.quoteToken,
             entropy,
-            protocolFeeAddress,
+            address(this),
             auction,
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
@@ -251,10 +252,11 @@ contract MineCore is Ownable, ReentrancyGuard {
         // Transfer Unit minting rights to MineRig (permanently locked since MineRig has no setRig function)
         IUnit(unit).setRig(rig);
 
-        // Set initial URI for the rig (logo, description, links, etc.)
-        if (bytes(params.uri).length > 0) {
-            IMineRig(rig).setUri(params.uri);
-        }
+        // Default team to launcher
+        IMineRig(rig).setTeam(params.launcher);
+
+        // Set initial URI for the rig (required)
+        IMineRig(rig).setUri(params.uri);
 
         // Transfer MineRig ownership to launcher
         IMineRig(rig).transferOwnership(params.launcher);
@@ -340,6 +342,7 @@ contract MineCore is Ownable, ReentrancyGuard {
         if (params.usdcAmount < minUsdcForLaunch) revert Core__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert Core__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert Core__EmptyTokenSymbol();
+        if (bytes(params.uri).length == 0) revert Core__EmptyUri();
         if (params.unitAmount == 0) revert Core__ZeroUnitAmount();
     }
 

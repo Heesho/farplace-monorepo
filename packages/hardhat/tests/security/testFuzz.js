@@ -108,7 +108,7 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
       quoteToken: weth.address,
       tokenName: "Fuzz Test Unit",
       tokenSymbol: "FUZZ",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("1000", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("10", 18),
@@ -117,7 +117,7 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: ONE_DAY,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
@@ -136,6 +136,9 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
 
     rigContract = await ethers.getContractAt("MineRig", rig);
     unitContract = await ethers.getContractAt("Unit", unit);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(user0).setEntropyEnabled(false);
 
     // Set team for full fee split testing
     await rigContract.connect(user0).setTeam(team.address);
@@ -180,7 +183,7 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
         );
 
         const receipt = await tx.wait();
-        const mineEvent = receipt.events.find(e => e.event === "Rig__Mine");
+        const mineEvent = receipt.events.find(e => e.event === "MineRig__Mine");
         const actualPrice = mineEvent.args.price;
 
         const minerFee = (await rigContract.accountToClaimable(prevMiner)).sub(minerClaimableBefore);
@@ -251,7 +254,7 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
         );
 
         const receipt = await tx.wait();
-        const mineEvent = receipt.events.find(e => e.event === "Rig__Mine");
+        const mineEvent = receipt.events.find(e => e.event === "MineRig__Mine");
         const actualPrice = mineEvent.args.price;
 
         const minerFee = (await rigContract.accountToClaimable(prevMiner)).sub(minerClaimableBefore);
@@ -345,7 +348,7 @@ describe("FUZZ Category 2: Random totalMinted - Halving UPS Correctness", functi
       quoteToken: weth.address,
       tokenName: "Halving Fuzz Unit",
       tokenSymbol: "HFUZZ",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("1000", 6),
       unitAmount: convert("1000000", 18),
       initialUps: INITIAL_UPS,
@@ -354,7 +357,7 @@ describe("FUZZ Category 2: Random totalMinted - Halving UPS Correctness", functi
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: ONE_DAY,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
@@ -371,6 +374,9 @@ describe("FUZZ Category 2: Random totalMinted - Halving UPS Correctness", functi
 
     rigContract = await ethers.getContractAt("MineRig", rig);
     unitContract = await ethers.getContractAt("Unit", launchEvent.args.unit);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(user0).setEntropyEnabled(false);
   });
 
   // Test with logarithmic range of totalMinted values to cover halving boundaries
@@ -682,7 +688,7 @@ describe("FUZZ Category 4: Random Time Points - Dutch Auction Price Decay", func
         quoteToken: weth.address,
         tokenName: "Decay Fuzz Unit",
         tokenSymbol: "DFUZZ",
-        uri: "",
+        uri: "https://example.com/rig",
         usdcAmount: convert("1000", 6),
         unitAmount: convert("1000000", 18),
         initialUps: convert("10", 18),
@@ -691,7 +697,7 @@ describe("FUZZ Category 4: Random Time Points - Dutch Auction Price Decay", func
         rigEpochPeriod: ONE_HOUR,
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.001", 18),
-        upsMultipliers: [],
+        upsMultipliers: [convert("1", 18)],
         upsMultiplierDuration: ONE_DAY,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: ONE_DAY,
@@ -706,6 +712,9 @@ describe("FUZZ Category 4: Random Time Points - Dutch Auction Price Decay", func
       const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
       rig = launchEvent.args.rig;
       rigContract = await ethers.getContractAt("MineRig", rig);
+
+      // Disable entropy for tests that don't send ETH for VRF fees
+      await rigContract.connect(user0).setEntropyEnabled(false);
     });
 
     for (let i = 0; i < 20; i++) {
@@ -1053,7 +1062,7 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
       quoteToken: weth.address,
       tokenName: "Capacity Fuzz Unit",
       tokenSymbol: "CAPFUZZ",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("1000", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("256", 18), // Divisible by many capacity values
@@ -1062,7 +1071,7 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.0001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: ONE_DAY,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
@@ -1077,6 +1086,9 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
     const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
     rig = launchEvent.args.rig;
     rigContract = await ethers.getContractAt("MineRig", rig);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(user0).setEntropyEnabled(false);
   });
 
   // Test capacities: 1, 2, 4, 8, 16, 32, 64, 128, 256

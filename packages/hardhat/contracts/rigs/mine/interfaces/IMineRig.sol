@@ -42,7 +42,7 @@ interface IMineRig {
     function unit() external view returns (address);
     function quote() external view returns (address);
     function entropy() external view returns (address);
-    function protocol() external view returns (address);
+    function core() external view returns (address);
     function treasury() external view returns (address);
     function team() external view returns (address);
     function capacity() external view returns (uint256);

@@ -117,7 +117,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Multicall Unit",
                 tokenSymbol: "MUNIT",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("500", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("4", 18),
@@ -126,7 +126,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("2", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -163,7 +163,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Override Test",
                 tokenSymbol: "OVRD",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("1", 18),
@@ -172,7 +172,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -197,7 +197,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "No Approve",
                 tokenSymbol: "NOAP",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("1", 18),
@@ -206,7 +206,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -226,7 +226,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "No Balance",
                 tokenSymbol: "NOBAL",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("10000", 6), // More than user has
                 initialUps: convert("1", 18),
                 tailUps: convert("0.01", 18),
@@ -234,7 +234,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -262,7 +262,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Mining Test Unit",
                 tokenSymbol: "MTEST",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("300", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("10", 18),
@@ -271,7 +271,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("2", 18),
                 rigMinInitPrice: convert("0.001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -287,6 +287,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             rig = await ethers.getContractAt("MineRig", launchEvent.args.rig);
             unit = await ethers.getContractAt("Unit", launchEvent.args.unit);
             auction = await ethers.getContractAt("Auction", launchEvent.args.auction);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
         });
 
         it("Can mine with USDC via Multicall", async function () {
@@ -506,7 +509,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "State Test Unit",
                 tokenSymbol: "STATE",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("400", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("5", 18),
@@ -515,7 +518,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 1800,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0005", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("2", 18),
                 auctionEpochPeriod: 43200,
@@ -532,6 +535,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             unit = await ethers.getContractAt("Unit", launchEvent.args.unit);
             auction = await ethers.getContractAt("Auction", launchEvent.args.auction);
             lpToken = await ethers.getContractAt("IERC20", launchEvent.args.lpToken);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
         });
 
         it("getRig returns correct initial state", async function () {
@@ -722,7 +728,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Buy Test Unit",
                 tokenSymbol: "BUYTEST",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("300", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("5", 18),
@@ -731,7 +737,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 1800,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
@@ -748,6 +754,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             unit = await ethers.getContractAt("Unit", launchEvent.args.unit);
             auction = await ethers.getContractAt("Auction", launchEvent.args.auction);
             lpToken = await ethers.getContractAt("MockLP", launchEvent.args.lpToken);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
 
             // Generate some USDC in the auction via mining
             const slot = await rig.getSlot(0);
@@ -864,7 +873,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Lifecycle Test",
                 tokenSymbol: "LIFE",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("500", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("100", 18),
@@ -873,7 +882,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
@@ -892,6 +901,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             const auctionAddr = launchEvent.args.auction;
             const rig = await ethers.getContractAt("MineRig", rigAddr);
             const unit = await ethers.getContractAt("Unit", unitAddr);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
 
             // 2. Read initial state via Multicall
             let state = await multicall.getRig(rigAddr, 0, user1.address);
@@ -965,7 +977,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Multi User Test",
                 tokenSymbol: "MULTI",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("300", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("50", 18),
@@ -974,7 +986,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.2", 18),
                 rigMinInitPrice: convert("0.00001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
@@ -990,6 +1002,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             const unitAddr = launchEvent.args.unit;
             const rig = await ethers.getContractAt("MineRig", rigAddr);
             const unit = await ethers.getContractAt("Unit", unitAddr);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
 
             const users = [user0, user1, user2, user3];
 
@@ -1031,7 +1046,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Frontend Sim",
                 tokenSymbol: "FRONT",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("10", 18),
@@ -1040,7 +1055,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
@@ -1065,6 +1080,10 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
 
             // Frontend step 2: User decides to mine
             const rig = await ethers.getContractAt("MineRig", rigAddr);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user1).setEntropyEnabled(false);
+
             const epochId = initialState.epochId;
             const price = initialState.price;
             const deadline = await getFutureDeadline();
@@ -1104,7 +1123,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Edge Case Test",
                 tokenSymbol: "EDGE",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("5", 18),
@@ -1113,7 +1132,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 3600,
@@ -1127,6 +1146,9 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             const launchEvent = await parseLaunchEvent(receipt);
             rig = await ethers.getContractAt("MineRig", launchEvent.args.rig);
             auction = await ethers.getContractAt("Auction", launchEvent.args.auction);
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            await rig.connect(user0).setEntropyEnabled(false);
         });
 
         it("Mine with exact price (no excess refund)", async function () {
@@ -1231,7 +1253,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Gas Rig",
                 tokenSymbol: "GRIG",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("1", 18),
@@ -1240,7 +1262,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,
@@ -1253,6 +1275,10 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             const receipt = await tx.wait();
             const launchEvent = await parseLaunchEvent(receipt);
             gasRigAddr = launchEvent.args.rig;
+
+            // Disable entropy for tests that don't send ETH for VRF fees
+            const gasRig = await ethers.getContractAt("MineRig", gasRigAddr);
+            await gasRig.connect(user0).setEntropyEnabled(false);
         });
 
         it("Launch gas cost", async function () {
@@ -1261,7 +1287,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 quoteToken: weth.address,
                 tokenName: "Gas Test",
                 tokenSymbol: "GAS",
-                uri: "",
+                uri: "https://example.com/rig",
                 usdcAmount: convert("200", 6),
                 unitAmount: convert("1000000", 18),
                 initialUps: convert("1", 18),
@@ -1270,7 +1296,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
                 rigEpochPeriod: 3600,
                 rigPriceMultiplier: convert("1.5", 18),
                 rigMinInitPrice: convert("0.0001", 18),
-                upsMultipliers: [],
+                upsMultipliers: [convert("1", 18)],
                 upsMultiplierDuration: 86400,
                 auctionInitPrice: convert("1", 18),
                 auctionEpochPeriod: 86400,

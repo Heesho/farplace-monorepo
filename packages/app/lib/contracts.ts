@@ -1,15 +1,15 @@
 export const CONTRACT_ADDRESSES = {
   // Per-rig-type Core contracts
-  mineCore: "0xF719bfBB8CdBb7bcC22Df99554d4ef6c0965e362",
-  spinCore: "0x2444eaA70e3669Fc5a01bD05DBA716f94305466c",
-  fundCore: "0xbc40b29417f823b2Ae8cBE393c309F2d8A3BA6BE",
+  mineCore: "0x56EeA24F447A1609784566c84f40554B5742f7B6",
+  spinCore: "0x3CD87981596590E08dfad6Bf294406f05A6f5481",
+  fundCore: "0x9517B14d24DD4644347c80985473627866a6Eb40",
   // Per-rig-type Multicall contracts
-  mineMulticall: "0x6504E919c26E94f3f60e76B39C7921a66D2Fb39b",
-  spinMulticall: "0xa33F8b4E42e967A99B352eE4F4D8FAD89Ef3a2C8",
-  fundMulticall: "0x9d6dCbbc614425EC524fA754f8212901a980F49c",
+  mineMulticall: "0xD84568ad3876f9f707A6034292D69fE26827D0C7",
+  spinMulticall: "0x81Af1ba8f13A1Bc79e76cb0dD62Ce9313d88C0EA",
+  fundMulticall: "0x015ceD893eBcC1403662587CdbEfe25738e61A7F",
   // Legacy aliases (point to mine variants for backwards compat)
-  core: "0xF719bfBB8CdBb7bcC22Df99554d4ef6c0965e362",
-  multicall: "0x6504E919c26E94f3f60e76B39C7921a66D2Fb39b",
+  core: "0x56EeA24F447A1609784566c84f40554B5742f7B6",
+  multicall: "0xD84568ad3876f9f707A6034292D69fE26827D0C7",
   // Token addresses (Mock tokens for staging)
   usdc: "0xe90495BE187d434e23A9B1FeC0B6Ce039700870e", // Mock USDC
   // Uniswap V2 on Base
@@ -449,6 +449,45 @@ export const SPIN_MULTICALL_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // launch function - launch a new spin rig
+  {
+    inputs: [
+      {
+        components: [
+          { internalType: "address", name: "launcher", type: "address" },
+          { internalType: "address", name: "quoteToken", type: "address" },
+          { internalType: "string", name: "tokenName", type: "string" },
+          { internalType: "string", name: "tokenSymbol", type: "string" },
+          { internalType: "string", name: "uri", type: "string" },
+          { internalType: "uint256", name: "usdcAmount", type: "uint256" },
+          { internalType: "uint256", name: "unitAmount", type: "uint256" },
+          { internalType: "uint256", name: "initialUps", type: "uint256" },
+          { internalType: "uint256", name: "tailUps", type: "uint256" },
+          { internalType: "uint256", name: "halvingPeriod", type: "uint256" },
+          { internalType: "uint256", name: "rigEpochPeriod", type: "uint256" },
+          { internalType: "uint256", name: "rigPriceMultiplier", type: "uint256" },
+          { internalType: "uint256", name: "rigMinInitPrice", type: "uint256" },
+          { internalType: "uint256[]", name: "odds", type: "uint256[]" },
+          { internalType: "uint256", name: "auctionInitPrice", type: "uint256" },
+          { internalType: "uint256", name: "auctionEpochPeriod", type: "uint256" },
+          { internalType: "uint256", name: "auctionPriceMultiplier", type: "uint256" },
+          { internalType: "uint256", name: "auctionMinInitPrice", type: "uint256" },
+        ],
+        internalType: "struct ISpinCore.LaunchParams",
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "launch",
+    outputs: [
+      { internalType: "address", name: "unit", type: "address" },
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "auction", type: "address" },
+      { internalType: "address", name: "lpToken", type: "address" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const;
 
 // FundMulticall ABI - for fund rig batched operations and state queries
@@ -599,6 +638,42 @@ export const FUND_MULTICALL_ABI = [
     ],
     name: "buy",
     outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // launch function - launch a new fund rig
+  {
+    inputs: [
+      {
+        components: [
+          { internalType: "address", name: "launcher", type: "address" },
+          { internalType: "address", name: "quoteToken", type: "address" },
+          { internalType: "address", name: "recipient", type: "address" },
+          { internalType: "string", name: "tokenName", type: "string" },
+          { internalType: "string", name: "tokenSymbol", type: "string" },
+          { internalType: "string", name: "uri", type: "string" },
+          { internalType: "uint256", name: "usdcAmount", type: "uint256" },
+          { internalType: "uint256", name: "unitAmount", type: "uint256" },
+          { internalType: "uint256", name: "initialEmission", type: "uint256" },
+          { internalType: "uint256", name: "minEmission", type: "uint256" },
+          { internalType: "uint256", name: "halvingPeriod", type: "uint256" },
+          { internalType: "uint256", name: "auctionInitPrice", type: "uint256" },
+          { internalType: "uint256", name: "auctionEpochPeriod", type: "uint256" },
+          { internalType: "uint256", name: "auctionPriceMultiplier", type: "uint256" },
+          { internalType: "uint256", name: "auctionMinInitPrice", type: "uint256" },
+        ],
+        internalType: "struct IFundCore.LaunchParams",
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "launch",
+    outputs: [
+      { internalType: "address", name: "unit", type: "address" },
+      { internalType: "address", name: "rig", type: "address" },
+      { internalType: "address", name: "auction", type: "address" },
+      { internalType: "address", name: "lpToken", type: "address" },
+    ],
     stateMutability: "nonpayable",
     type: "function",
   },

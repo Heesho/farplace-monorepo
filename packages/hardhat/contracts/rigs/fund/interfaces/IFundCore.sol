@@ -13,6 +13,7 @@ interface IFundCore {
         address recipient;
         string tokenName;
         string tokenSymbol;
+        string uri;
         uint256 usdcAmount;
         uint256 unitAmount;
         uint256 initialEmission;
@@ -27,14 +28,6 @@ interface IFundCore {
     // Constants
     function RIG_TYPE() external view returns (string memory);
     function DEAD_ADDRESS() external view returns (address);
-    function MIN_INITIAL_EMISSION() external view returns (uint256);
-    function MAX_INITIAL_EMISSION() external view returns (uint256);
-    function AUCTION_MIN_EPOCH_PERIOD() external view returns (uint256);
-    function AUCTION_MAX_EPOCH_PERIOD() external view returns (uint256);
-    function AUCTION_MIN_PRICE_MULTIPLIER() external view returns (uint256);
-    function AUCTION_MAX_PRICE_MULTIPLIER() external view returns (uint256);
-    function AUCTION_ABS_MIN_INIT_PRICE() external view returns (uint256);
-    function AUCTION_ABS_MAX_INIT_PRICE() external view returns (uint256);
 
     // Immutables
     function registry() external view returns (address);
@@ -75,6 +68,7 @@ interface IFundCore {
         address quoteToken,
         string tokenName,
         string tokenSymbol,
+        string uri,
         uint256 usdcAmount,
         uint256 unitAmount,
         uint256 initialEmission,

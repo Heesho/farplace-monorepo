@@ -109,7 +109,7 @@ describe("Comprehensive Security Tests", function () {
             quoteToken: WETH.address,
             tokenName: "Test Unit",
             tokenSymbol: "TUNIT",
-            uri: "",
+            uri: "https://example.com/rig",
             usdcAmount: convert("150", 6),
             unitAmount: convert("1000000", 18),
             initialUps: convert("4", 18),
@@ -118,7 +118,7 @@ describe("Comprehensive Security Tests", function () {
             rigEpochPeriod: 3600,
             rigPriceMultiplier: convert("2", 18),
             rigMinInitPrice: convert("0.0001", 18),
-            upsMultipliers: [],
+            upsMultipliers: [convert("1", 18)],
             upsMultiplierDuration: 86400,
             auctionInitPrice: convert("1", 18),
             auctionEpochPeriod: 3600,
@@ -142,6 +142,9 @@ describe("Comprehensive Security Tests", function () {
         const unit = await ethers.getContractAt("Unit", launchEvent.args.unit);
         const auction = await ethers.getContractAt("Auction", launchEvent.args.auction);
         const lpToken = await ethers.getContractAt("MockLP", launchEvent.args.lpToken);
+
+        // Disable entropy for tests that don't send ETH for VRF fees
+        await rig.connect(launcher).setEntropyEnabled(false);
 
         return { rig, unit, auction, lpToken };
     }

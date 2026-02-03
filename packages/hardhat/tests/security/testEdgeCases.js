@@ -165,7 +165,7 @@ describe("Edge Case Security Audit Tests", function () {
       quoteToken: overrides.quoteToken || weth.address,
       tokenName: overrides.tokenName || `MineEdge${launchCounter}`,
       tokenSymbol: overrides.tokenSymbol || `ME${launchCounter}`,
-      uri: overrides.uri !== undefined ? overrides.uri : "",
+      uri: overrides.uri !== undefined ? overrides.uri : "https://example.com/rig",
       usdcAmount: overrides.usdcAmount || convert("100", 6),
       unitAmount: overrides.unitAmount || convert("1000000", 18),
       initialUps: overrides.initialUps || convert("4", 18),
@@ -174,7 +174,7 @@ describe("Edge Case Security Audit Tests", function () {
       rigEpochPeriod: overrides.rigEpochPeriod || 3600,
       rigPriceMultiplier: overrides.rigPriceMultiplier || convert("2", 18),
       rigMinInitPrice: overrides.rigMinInitPrice || convert("0.0001", 18),
-      upsMultipliers: overrides.upsMultipliers || [],
+      upsMultipliers: overrides.upsMultipliers || [convert("1", 18)],
       upsMultiplierDuration: overrides.upsMultiplierDuration || ONE_DAY,
       auctionInitPrice: overrides.auctionInitPrice || convert("1", 18),
       auctionEpochPeriod: overrides.auctionEpochPeriod || ONE_HOUR,
@@ -188,6 +188,10 @@ describe("Edge Case Security Audit Tests", function () {
     const ev = receipt.events.find((e) => e.event === "MineCore__Launched");
 
     const rigContract = await ethers.getContractAt("MineRig", ev.args.rig);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(launcher).setEntropyEnabled(false);
+
     const unitContract = await ethers.getContractAt("Unit", ev.args.unit);
     const auctionContract = await ethers.getContractAt("Auction", ev.args.auction);
 
@@ -209,6 +213,7 @@ describe("Edge Case Security Audit Tests", function () {
       quoteToken: overrides.quoteToken || weth.address,
       tokenName: overrides.tokenName || `SpinEdge${launchCounter}`,
       tokenSymbol: overrides.tokenSymbol || `SE${launchCounter}`,
+      uri: overrides.uri !== undefined ? overrides.uri : "https://example.com/rig",
       usdcAmount: overrides.usdcAmount || convert("100", 6),
       unitAmount: overrides.unitAmount || convert("1000000", 18),
       initialUps: overrides.initialUps || convert("4", 18),
@@ -252,6 +257,7 @@ describe("Edge Case Security Audit Tests", function () {
       recipient: overrides.recipient || user1.address,
       tokenName: overrides.tokenName || `FundEdge${launchCounter}`,
       tokenSymbol: overrides.tokenSymbol || `FE${launchCounter}`,
+      uri: overrides.uri !== undefined ? overrides.uri : "https://example.com/rig",
       usdcAmount: overrides.usdcAmount || convert("100", 6),
       unitAmount: overrides.unitAmount || convert("1000000", 18),
       initialEmission: overrides.initialEmission || convert("1000", 18),
@@ -848,13 +854,13 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with epochPeriod below minimum", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18),
           rigEpochPeriod: 599,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -865,12 +871,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with priceMultiplier below minimum (1.1e18)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("1", 18),
-          rigMinInitPrice: convert("0.0001", 18), upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          rigMinInitPrice: convert("0.0001", 18), upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -881,12 +887,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with initialUps = 0", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: 0, tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -897,12 +903,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with initialUps exceeding MAX (1e24)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: ethers.BigNumber.from("1000000000000000000000001"),
           tailUps: convert("0.01", 18), halvingAmount: convert("10000000", 18),
           rigEpochPeriod: ONE_HOUR, rigPriceMultiplier: convert("2", 18),
-          rigMinInitPrice: convert("0.0001", 18), upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          rigMinInitPrice: convert("0.0001", 18), upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -913,12 +919,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with tailUps > initialUps", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("1", 18), tailUps: convert("2", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -929,12 +935,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with halvingAmount below MIN_HALVING_AMOUNT", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("999", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -945,12 +951,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with minInitPrice below ABS_MIN_INIT_PRICE", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: 999999,
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1000,7 +1006,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with halvingPeriod below minimum (7 days)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS - 1,
@@ -1016,7 +1022,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with empty odds array", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS, rigEpochPeriod: ONE_HOUR,
@@ -1032,7 +1038,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with odds below MIN_ODDS_BPS (10)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS, rigEpochPeriod: ONE_HOUR,
@@ -1048,7 +1054,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with odds above MAX_ODDS_BPS (8000)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS, rigEpochPeriod: ONE_HOUR,
@@ -1097,7 +1103,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with halvingPeriod below minimum (7)", async function () {
         const params = {
           launcher: user0.address, quoteToken: usdc.address, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
           halvingPeriod: 6,
@@ -1111,7 +1117,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with halvingPeriod above maximum (365)", async function () {
         const params = {
           launcher: user0.address, quoteToken: usdc.address, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
           halvingPeriod: 366,
@@ -1125,7 +1131,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with initialEmission below minimum (1e18)", async function () {
         const params = {
           launcher: user0.address, quoteToken: usdc.address, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: ethers.BigNumber.from("999999999999999999"),
           minEmission: ethers.BigNumber.from("999999999999999999"),
@@ -1140,7 +1146,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with minEmission > initialEmission", async function () {
         const params = {
           launcher: user0.address, quoteToken: usdc.address, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("100", 18), minEmission: convert("200", 18),
           halvingPeriod: 30,
@@ -1154,7 +1160,7 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with zero recipient", async function () {
         const params = {
           launcher: user0.address, quoteToken: usdc.address, recipient: AddressZero,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
           halvingPeriod: 30,
@@ -1170,12 +1176,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with auctionInitPrice < auctionMinInitPrice", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("0.01", 18),
           auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
@@ -1187,12 +1193,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with auctionEpochPeriod below minimum (1 hour)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18),
           auctionEpochPeriod: ONE_HOUR - 1,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
@@ -1204,12 +1210,12 @@ describe("Edge Case Security Audit Tests", function () {
       it("Should revert with auctionPriceMultiplier above maximum (3e18)", async function () {
         const params = {
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: ethers.BigNumber.from("3000000000000000001"),
           auctionMinInitPrice: convert("0.1", 18),
@@ -1225,12 +1231,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: AddressZero, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__ZeroLauncher()");
@@ -1239,7 +1245,7 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
         await expect(spinCore.connect(user0).launch({
           launcher: AddressZero, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS, rigEpochPeriod: ONE_HOUR,
@@ -1253,7 +1259,7 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(fundCore.address, convert("100", 6));
         await expect(fundCore.connect(user0).launch({
           launcher: AddressZero, quoteToken: usdc.address, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
           halvingPeriod: 30,
@@ -1266,12 +1272,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: user0.address, quoteToken: AddressZero,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__ZeroQuoteToken()");
@@ -1279,7 +1285,7 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
         await expect(spinCore.connect(user0).launch({
           launcher: user0.address, quoteToken: AddressZero,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingPeriod: SEVEN_DAYS, rigEpochPeriod: ONE_HOUR,
@@ -1292,7 +1298,7 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(fundCore.address, convert("100", 6));
         await expect(fundCore.connect(user0).launch({
           launcher: user0.address, quoteToken: AddressZero, recipient: user1.address,
-          tokenName: "Bad", tokenSymbol: "BAD",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
           halvingPeriod: 30,
@@ -1305,12 +1311,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "", tokenSymbol: "X", uri: "",
+          tokenName: "", tokenSymbol: "X", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__EmptyTokenName()");
@@ -1318,12 +1324,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "X", tokenSymbol: "", uri: "",
+          tokenName: "X", tokenSymbol: "", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__EmptyTokenSymbol()");
@@ -1333,12 +1339,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: 0,
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__ZeroUnitAmount()");
@@ -1348,12 +1354,12 @@ describe("Edge Case Security Audit Tests", function () {
         await usdc.connect(user0).approve(mineCore.address, convert("50", 6));
         await expect(mineCore.connect(user0).launch({
           launcher: user0.address, quoteToken: weth.address,
-          tokenName: "Bad", tokenSymbol: "BAD", uri: "",
+          tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("50", 6), unitAmount: convert("1000000", 18),
           initialUps: convert("4", 18), tailUps: convert("0.01", 18),
           halvingAmount: convert("10000000", 18), rigEpochPeriod: ONE_HOUR,
           rigPriceMultiplier: convert("2", 18), rigMinInitPrice: convert("0.0001", 18),
-          upsMultipliers: [], upsMultiplierDuration: ONE_DAY,
+          upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("Core__InsufficientUsdc()");

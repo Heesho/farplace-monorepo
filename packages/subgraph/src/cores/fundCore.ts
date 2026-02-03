@@ -34,7 +34,7 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
 
   // Event params for FundCore:
   // launcher (indexed), rig (indexed), unit (indexed), recipient, auction, lpToken, quoteToken,
-  // tokenName, tokenSymbol, usdcAmount, unitAmount, initialEmission, minEmission,
+  // tokenName, tokenSymbol, uri, usdcAmount, unitAmount, initialEmission, minEmission,
   // minDonation, halvingPeriod, auctionInitPrice, auctionEpochPeriod, auctionPriceMultiplier, auctionMinInitPrice
 
   let unitAddress = event.params.unit
@@ -61,7 +61,7 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   rig.launcher = launcher.id
   rig.auction = event.params.auction
   rig.quoteToken = quoteToken
-  rig.uri = '' // FundCore doesn't have uri param
+  rig.uri = event.params.uri
   rig.initialUps = event.params.initialEmission
   rig.tailUps = event.params.minEmission
   rig.halvingPeriod = ZERO_BI // FundRig uses daily emissions, not halving

@@ -8,6 +8,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IEntropyV2} from "@pythnetwork/entropy-sdk-solidity/IEntropyV2.sol";
 import {IEntropyConsumer} from "@pythnetwork/entropy-sdk-solidity/IEntropyConsumer.sol";
 import {IUnit} from "../../interfaces/IUnit.sol";
+import {IMineCore} from "./interfaces/IMineCore.sol";
 
 /**
  * @title MineRig
@@ -63,7 +64,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     address public immutable unit;      // Unit token to be minted
     address public immutable quote;     // Payment token (e.g., USDC)
     address public immutable entropy;   // Pyth Entropy contract
-    address public immutable protocol;  // Protocol fee recipient
+    address public immutable core;      // Mine core contract
     uint256 public immutable startTime; // Contract deployment timestamp
 
     uint256 public immutable epochPeriod;       // Duration of each Dutch auction
@@ -115,32 +116,33 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /*----------  ERRORS  -----------------------------------------------*/
 
-    error Rig__ZeroAddress();
-    error Rig__ZeroMiner();
-    error Rig__IndexOutOfBounds();
-    error Rig__EpochIdMismatch();
-    error Rig__MaxPriceExceeded();
-    error Rig__DeadlinePassed();
-    error Rig__InsufficientFee();
-    error Rig__NoEntropyRequired();
-    error Rig__ZeroTreasury();
-    error Rig__CapacityBelowCurrent();
-    error Rig__CapacityExceedsMax();
-    error Rig__UpsMultiplierOutOfRange();
-    error Rig__UpsMultiplierDurationOutOfRange();
-    error Rig__EpochPeriodOutOfRange();
-    error Rig__PriceMultiplierOutOfRange();
-    error Rig__MinInitPriceOutOfRange();
-    error Rig__ZeroInitialUps();
-    error Rig__InitialUpsExceedsMax();
-    error Rig__TailUpsOutOfRange();
-    error Rig__ZeroHalvingAmount();
-    error Rig__HalvingAmountBelowMin();
-    error Rig__NothingToClaim();
+    error MineRig__ZeroAddress();
+    error MineRig__ZeroMiner();
+    error MineRig__IndexOutOfBounds();
+    error MineRig__EpochIdMismatch();
+    error MineRig__MaxPriceExceeded();
+    error MineRig__DeadlinePassed();
+    error MineRig__InsufficientFee();
+    error MineRig__NoEntropyRequired();
+    error MineRig__ZeroTreasury();
+    error MineRig__CapacityBelowCurrent();
+    error MineRig__CapacityExceedsMax();
+    error MineRig__UpsMultiplierOutOfRange();
+    error MineRig__UpsMultipliersEmpty();
+    error MineRig__UpsMultiplierDurationOutOfRange();
+    error MineRig__EpochPeriodOutOfRange();
+    error MineRig__PriceMultiplierOutOfRange();
+    error MineRig__MinInitPriceOutOfRange();
+    error MineRig__ZeroInitialUps();
+    error MineRig__InitialUpsExceedsMax();
+    error MineRig__TailUpsOutOfRange();
+    error MineRig__ZeroHalvingAmount();
+    error MineRig__HalvingAmountBelowMin();
+    error MineRig__NothingToClaim();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event Rig__Mine(
+    event MineRig__Mine(
         address sender,
         address indexed miner,
         uint256 indexed index,
@@ -148,19 +150,19 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 price,
         string uri
     );
-    event Rig__UpsMultiplierSet(uint256 indexed index, uint256 indexed epochId, uint256 upsMultiplier);
-    event Rig__EntropyRequested(uint256 indexed index, uint256 indexed epochId, uint64 indexed sequenceNumber);
-    event Rig__ProtocolFee(address indexed protocol, uint256 indexed index, uint256 indexed epochId, uint256 amount);
-    event Rig__TreasuryFee(address indexed treasury, uint256 indexed index, uint256 indexed epochId, uint256 amount);
-    event Rig__TeamFee(address indexed team, uint256 indexed index, uint256 indexed epochId, uint256 amount);
-    event Rig__MinerFee(address indexed miner, uint256 indexed index, uint256 indexed epochId, uint256 amount);
-    event Rig__Mint(address indexed miner, uint256 indexed index, uint256 indexed epochId, uint256 amount);
-    event Rig__TreasurySet(address indexed treasury);
-    event Rig__TeamSet(address indexed team);
-    event Rig__CapacitySet(uint256 capacity);
-    event Rig__EntropyEnabledSet(bool enabled);
-    event Rig__UriSet(string uri);
-    event Rig__Claimed(address indexed account, uint256 amount);
+    event MineRig__UpsMultiplierSet(uint256 indexed index, uint256 indexed epochId, uint256 upsMultiplier);
+    event MineRig__EntropyRequested(uint256 indexed index, uint256 indexed epochId, uint64 indexed sequenceNumber);
+    event MineRig__ProtocolFee(address indexed protocol, uint256 indexed index, uint256 indexed epochId, uint256 amount);
+    event MineRig__TreasuryFee(address indexed treasury, uint256 indexed index, uint256 indexed epochId, uint256 amount);
+    event MineRig__TeamFee(address indexed team, uint256 indexed index, uint256 indexed epochId, uint256 amount);
+    event MineRig__MinerFee(address indexed miner, uint256 indexed index, uint256 indexed epochId, uint256 amount);
+    event MineRig__Mint(address indexed miner, uint256 indexed index, uint256 indexed epochId, uint256 amount);
+    event MineRig__TreasurySet(address indexed treasury);
+    event MineRig__TeamSet(address indexed team);
+    event MineRig__CapacitySet(uint256 capacity);
+    event MineRig__EntropyEnabledSet(bool enabled);
+    event MineRig__UriSet(string uri);
+    event MineRig__Claimed(address indexed account, uint256 amount);
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
 
@@ -168,51 +170,53 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         address _unit,
         address _quote,
         address _entropy,
-        address _protocol,
+        address _core,
         address _treasury,
         Config memory _config
     ) {
-        // Validate addresses (protocol can be zero - fee redirects to treasury)
-        if (_unit == address(0)) revert Rig__ZeroAddress();
-        if (_quote == address(0)) revert Rig__ZeroAddress();
-        if (_entropy == address(0)) revert Rig__ZeroAddress();
-        if (_treasury == address(0)) revert Rig__ZeroAddress();
+        // Validate addresses (protocol is resolved via core)
+        if (_unit == address(0)) revert MineRig__ZeroAddress();
+        if (_quote == address(0)) revert MineRig__ZeroAddress();
+        if (_entropy == address(0)) revert MineRig__ZeroAddress();
+        if (_core == address(0)) revert MineRig__ZeroAddress();
+        if (_treasury == address(0)) revert MineRig__ZeroAddress();
 
         // Validate epoch period
         if (_config.epochPeriod < MIN_EPOCH_PERIOD || _config.epochPeriod > MAX_EPOCH_PERIOD) {
-            revert Rig__EpochPeriodOutOfRange();
+            revert MineRig__EpochPeriodOutOfRange();
         }
 
         // Validate price multiplier
         if (_config.priceMultiplier < MIN_PRICE_MULTIPLIER || _config.priceMultiplier > MAX_PRICE_MULTIPLIER) {
-            revert Rig__PriceMultiplierOutOfRange();
+            revert MineRig__PriceMultiplierOutOfRange();
         }
 
         // Validate min init price
         if (_config.minInitPrice < ABS_MIN_INIT_PRICE || _config.minInitPrice > ABS_MAX_INIT_PRICE) {
-            revert Rig__MinInitPriceOutOfRange();
+            revert MineRig__MinInitPriceOutOfRange();
         }
 
         // Validate initial UPS
-        if (_config.initialUps == 0) revert Rig__ZeroInitialUps();
-        if (_config.initialUps > MAX_INITIAL_UPS) revert Rig__InitialUpsExceedsMax();
+        if (_config.initialUps == 0) revert MineRig__ZeroInitialUps();
+        if (_config.initialUps > MAX_INITIAL_UPS) revert MineRig__InitialUpsExceedsMax();
 
         // Validate tail UPS
-        if (_config.tailUps == 0 || _config.tailUps > _config.initialUps) revert Rig__TailUpsOutOfRange();
+        if (_config.tailUps == 0 || _config.tailUps > _config.initialUps) revert MineRig__TailUpsOutOfRange();
 
         // Validate halving amount
-        if (_config.halvingAmount == 0) revert Rig__ZeroHalvingAmount();
-        if (_config.halvingAmount < MIN_HALVING_AMOUNT) revert Rig__HalvingAmountBelowMin();
+        if (_config.halvingAmount == 0) revert MineRig__ZeroHalvingAmount();
+        if (_config.halvingAmount < MIN_HALVING_AMOUNT) revert MineRig__HalvingAmountBelowMin();
 
         // Validate upsMultiplierDuration
         if (_config.upsMultiplierDuration < MIN_UPS_MULTIPLIER_DURATION || _config.upsMultiplierDuration > MAX_UPS_MULTIPLIER_DURATION) {
-            revert Rig__UpsMultiplierDurationOutOfRange();
+            revert MineRig__UpsMultiplierDurationOutOfRange();
         }
 
-        // Validate upsMultipliers (empty is OK - means no multipliers, always 1x)
+        // Validate upsMultipliers (must have at least one)
+        if (_config.upsMultipliers.length == 0) revert MineRig__UpsMultipliersEmpty();
         for (uint256 i = 0; i < _config.upsMultipliers.length;) {
             if (_config.upsMultipliers[i] < MIN_UPS_MULTIPLIER || _config.upsMultipliers[i] > MAX_UPS_MULTIPLIER) {
-                revert Rig__UpsMultiplierOutOfRange();
+                revert MineRig__UpsMultiplierOutOfRange();
             }
             unchecked { ++i; }
         }
@@ -221,7 +225,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         unit = _unit;
         quote = _quote;
         entropy = _entropy;
-        protocol = _protocol;
+        core = _core;
         startTime = block.timestamp;
 
         epochPeriod = _config.epochPeriod;
@@ -235,6 +239,8 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         // Set initial state
         treasury = _treasury;
         upsMultipliers = _config.upsMultipliers;
+        entropyEnabled = true;
+
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -257,16 +263,16 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 maxPrice,
         string calldata _uri
     ) external payable nonReentrant returns (uint256 price) {
-        if (miner == address(0)) revert Rig__ZeroMiner();
-        if (block.timestamp > deadline) revert Rig__DeadlinePassed();
-        if (index >= capacity) revert Rig__IndexOutOfBounds();
+        if (miner == address(0)) revert MineRig__ZeroMiner();
+        if (block.timestamp > deadline) revert MineRig__DeadlinePassed();
+        if (index >= capacity) revert MineRig__IndexOutOfBounds();
 
         Slot memory slotCache = indexToSlot[index];
 
-        if (epochId != slotCache.epochId) revert Rig__EpochIdMismatch();
+        if (epochId != slotCache.epochId) revert MineRig__EpochIdMismatch();
 
         price = _getPriceFromCache(slotCache);
-        if (price > maxPrice) revert Rig__MaxPriceExceeded();
+        if (price > maxPrice) revert MineRig__MaxPriceExceeded();
 
         if (price > 0) {
             // Transfer full price to this contract
@@ -274,25 +280,26 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
             // Calculate fees
             uint256 minerFee = price * (DIVISOR - TOTAL_BPS) / DIVISOR;
+            address protocol = IMineCore(core).protocolFeeAddress();
             uint256 protocolFee = protocol != address(0) ? price * PROTOCOL_BPS / DIVISOR : 0;
             uint256 teamFee = team != address(0) ? price * TEAM_BPS / DIVISOR : 0;
             uint256 treasuryFee = price - minerFee - protocolFee - teamFee; // remainder collects dust
 
             // Distribute fees
             accountToClaimable[slotCache.miner] += minerFee;
-            emit Rig__MinerFee(slotCache.miner, index, epochId, minerFee);
+            emit MineRig__MinerFee(slotCache.miner, index, epochId, minerFee);
 
             IERC20(quote).safeTransfer(treasury, treasuryFee);
-            emit Rig__TreasuryFee(treasury, index, epochId, treasuryFee);
+            emit MineRig__TreasuryFee(treasury, index, epochId, treasuryFee);
 
             if (protocolFee > 0) {
                 IERC20(quote).safeTransfer(protocol, protocolFee);
-                emit Rig__ProtocolFee(protocol, index, epochId, protocolFee);
+                emit MineRig__ProtocolFee(protocol, index, epochId, protocolFee);
             }
 
             if (teamFee > 0) {
                 IERC20(quote).safeTransfer(team, teamFee);
-                emit Rig__TeamFee(team, index, epochId, teamFee);
+                emit MineRig__TeamFee(team, index, epochId, teamFee);
             }
         }
 
@@ -310,7 +317,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         if (slotCache.miner != address(0)) {
             totalMinted += minedAmount;
             IUnit(unit).mint(slotCache.miner, minedAmount);
-            emit Rig__Mint(slotCache.miner, index, epochId, minedAmount);
+            emit MineRig__Mint(slotCache.miner, index, epochId, minedAmount);
         }
 
         unchecked {
@@ -326,24 +333,24 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         if (shouldUpdateUpsMultiplier) {
             slotCache.upsMultiplier = DEFAULT_UPS_MULTIPLIER;
             slotCache.lastUpsMultiplierTime = block.timestamp;
-            emit Rig__UpsMultiplierSet(index, slotCache.epochId, DEFAULT_UPS_MULTIPLIER);
+            emit MineRig__UpsMultiplierSet(index, slotCache.epochId, DEFAULT_UPS_MULTIPLIER);
         }
 
         indexToSlot[index] = slotCache;
 
-        emit Rig__Mine(msg.sender, miner, index, epochId, price, _uri);
+        emit MineRig__Mine(msg.sender, miner, index, epochId, price, _uri);
 
         // Only request entropy if randomness is enabled and upsMultiplier needs updating
         if (entropyEnabled && shouldUpdateUpsMultiplier) {
             uint128 fee = IEntropyV2(entropy).getFeeV2();
-            if (msg.value < fee) revert Rig__InsufficientFee();
+            if (msg.value < fee) revert MineRig__InsufficientFee();
             uint64 seq = IEntropyV2(entropy).requestV2{value: fee}();
             sequenceToIndex[seq] = index;
             sequenceToEpoch[seq] = slotCache.epochId;
-            emit Rig__EntropyRequested(index, slotCache.epochId, seq);
+            emit MineRig__EntropyRequested(index, slotCache.epochId, seq);
             // Excess ETH stays in contract
         } else if (msg.value > 0) {
-            revert Rig__NoEntropyRequired();
+            revert MineRig__NoEntropyRequired();
         }
 
         return price;
@@ -356,11 +363,12 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      * @param account The account to claim for
      */
     function claim(address account) external nonReentrant {
+        if (account == address(0)) revert MineRig__ZeroAddress();
         uint256 amount = accountToClaimable[account];
-        if (amount == 0) revert Rig__NothingToClaim();
+        if (amount == 0) revert MineRig__NothingToClaim();
         accountToClaimable[account] = 0;
         IERC20(quote).safeTransfer(account, amount);
-        emit Rig__Claimed(account, amount);
+        emit MineRig__Claimed(account, amount);
     }
 
     /**
@@ -385,7 +393,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         slotCache.lastUpsMultiplierTime = block.timestamp;
 
         indexToSlot[index] = slotCache;
-        emit Rig__UpsMultiplierSet(index, epoch, upsMultiplier);
+        emit MineRig__UpsMultiplierSet(index, epoch, upsMultiplier);
     }
 
     /**
@@ -463,9 +471,9 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      * @param _treasury New treasury address (cannot be zero)
      */
     function setTreasury(address _treasury) external onlyOwner {
-        if (_treasury == address(0)) revert Rig__ZeroTreasury();
+        if (_treasury == address(0)) revert MineRig__ZeroTreasury();
         treasury = _treasury;
-        emit Rig__TreasurySet(_treasury);
+        emit MineRig__TreasurySet(_treasury);
     }
 
     /**
@@ -475,7 +483,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      */
     function setTeam(address _team) external onlyOwner {
         team = _team;
-        emit Rig__TeamSet(_team);
+        emit MineRig__TeamSet(_team);
     }
 
     /**
@@ -484,10 +492,10 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      * @param _capacity New capacity (must be greater than current)
      */
     function setCapacity(uint256 _capacity) external onlyOwner {
-        if (_capacity <= capacity) revert Rig__CapacityBelowCurrent();
-        if (_capacity > MAX_CAPACITY) revert Rig__CapacityExceedsMax();
+        if (_capacity <= capacity) revert MineRig__CapacityBelowCurrent();
+        if (_capacity > MAX_CAPACITY) revert MineRig__CapacityExceedsMax();
         capacity = _capacity;
-        emit Rig__CapacitySet(_capacity);
+        emit MineRig__CapacitySet(_capacity);
     }
 
     /**
@@ -496,7 +504,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      */
     function setEntropyEnabled(bool _enabled) external onlyOwner {
         entropyEnabled = _enabled;
-        emit Rig__EntropyEnabledSet(_enabled);
+        emit MineRig__EntropyEnabledSet(_enabled);
     }
 
     /**
@@ -505,7 +513,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
      */
     function setUri(string calldata _uri) external onlyOwner {
         uri = _uri;
-        emit Rig__UriSet(_uri);
+        emit MineRig__UriSet(_uri);
     }
 
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/

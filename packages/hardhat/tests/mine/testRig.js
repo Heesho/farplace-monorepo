@@ -99,7 +99,7 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 3600,
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
-        upsMultipliers: [],
+        upsMultipliers: [convert("1", 18)],
         upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
@@ -120,11 +120,15 @@ describe("Rig Comprehensive Tests", function () {
       rigContract = await ethers.getContractAt("MineRig", rig);
       unitContract = await ethers.getContractAt("Unit", unit);
 
+      // Disable entropy for tests that don't send ETH for VRF fees
+      await rigContract.connect(user0).setEntropyEnabled(false);
+
       expect(await rigContract.owner()).to.equal(user0.address);
       expect(await rigContract.unit()).to.equal(unit);
       expect(await rigContract.quote()).to.equal(weth.address);
       expect(await rigContract.treasury()).to.equal(auction);
-      expect(await rigContract.protocol()).to.equal(protocol.address);
+      expect(await rigContract.core()).to.equal(core.address);
+      expect(await core.protocolFeeAddress()).to.equal(protocol.address);
       expect(await rigContract.epochPeriod()).to.equal(3600);
       expect(await rigContract.priceMultiplier()).to.equal(convert("2", 18));
       expect(await rigContract.minInitPrice()).to.equal(convert("0.0001", 18));
@@ -546,7 +550,7 @@ describe("Rig Comprehensive Tests", function () {
           user1.address, 0, slot.epochId, 1961439882, price.add(convert("1", 18)), "",
           { value: entropyFee }
         )
-      ).to.emit(rigContract, "Rig__EntropyRequested");
+      ).to.emit(rigContract, "MineRig__EntropyRequested");
     });
 
     it("Should update UPS multiplier when entropy callback is called", async function () {
@@ -566,7 +570,7 @@ describe("Rig Comprehensive Tests", function () {
       );
 
       // Check event was emitted indicating entropy was requested
-      await expect(tx).to.emit(rigContract, "Rig__EntropyRequested");
+      await expect(tx).to.emit(rigContract, "MineRig__EntropyRequested");
 
       // Note: Full callback testing would require MockEntropy to track and fulfill
       // For now, we verify the request was made
@@ -627,23 +631,23 @@ describe("Rig Comprehensive Tests", function () {
 
     it("Should emit events for owner functions", async function () {
       await expect(rigContract.connect(user0).setTreasury(user1.address))
-        .to.emit(rigContract, "Rig__TreasurySet")
+        .to.emit(rigContract, "MineRig__TreasurySet")
         .withArgs(user1.address);
 
       await expect(rigContract.connect(user0).setTeam(team.address))
-        .to.emit(rigContract, "Rig__TeamSet")
+        .to.emit(rigContract, "MineRig__TeamSet")
         .withArgs(team.address);
 
       await expect(rigContract.connect(user0).setCapacity(10))
-        .to.emit(rigContract, "Rig__CapacitySet")
+        .to.emit(rigContract, "MineRig__CapacitySet")
         .withArgs(10);
 
       await expect(rigContract.connect(user0).setEntropyEnabled(true))
-        .to.emit(rigContract, "Rig__EntropyEnabledSet")
+        .to.emit(rigContract, "MineRig__EntropyEnabledSet")
         .withArgs(true);
 
       await expect(rigContract.connect(user0).setUri("test-uri"))
-        .to.emit(rigContract, "Rig__UriSet")
+        .to.emit(rigContract, "MineRig__UriSet")
         .withArgs("test-uri");
     });
 
@@ -751,7 +755,7 @@ describe("Rig Comprehensive Tests", function () {
   });
 
   describe("Events", function () {
-    it("Should emit Rig__Mine event", async function () {
+    it("Should emit MineRig__Mine event", async function () {
       const slot = await rigContract.getSlot(0);
       const price = await rigContract.getPrice(0);
 
@@ -761,10 +765,10 @@ describe("Rig Comprehensive Tests", function () {
         rigContract.connect(user1).mine(
           user1.address, 0, slot.epochId, 1961439882, price.add(convert("1", 18)), "test-uri"
         )
-      ).to.emit(rigContract, "Rig__Mine");
+      ).to.emit(rigContract, "MineRig__Mine");
     });
 
-    it("Should emit Rig__Mint event when previous miner exists", async function () {
+    it("Should emit MineRig__Mint event when previous miner exists", async function () {
       const slot = await rigContract.getSlot(0);
       const price = await rigContract.getPrice(0);
 
@@ -778,7 +782,7 @@ describe("Rig Comprehensive Tests", function () {
         rigContract.connect(user2).mine(
           user2.address, 0, slot.epochId, 1961439882, price.add(convert("1", 18)), ""
         )
-      ).to.emit(rigContract, "Rig__Mint");
+      ).to.emit(rigContract, "MineRig__Mint");
     });
 
     it("Should emit fee events when price > 0", async function () {
@@ -799,10 +803,10 @@ describe("Rig Comprehensive Tests", function () {
         user3.address, 0, slot.epochId, 1961439882, price.add(convert("1", 18)), ""
       );
 
-      await expect(tx).to.emit(rigContract, "Rig__ProtocolFee");
-      await expect(tx).to.emit(rigContract, "Rig__TreasuryFee");
-      await expect(tx).to.emit(rigContract, "Rig__TeamFee");
-      await expect(tx).to.emit(rigContract, "Rig__MinerFee");
+      await expect(tx).to.emit(rigContract, "MineRig__ProtocolFee");
+      await expect(tx).to.emit(rigContract, "MineRig__TreasuryFee");
+      await expect(tx).to.emit(rigContract, "MineRig__TeamFee");
+      await expect(tx).to.emit(rigContract, "MineRig__MinerFee");
     });
   });
 
@@ -816,7 +820,7 @@ describe("Rig Comprehensive Tests", function () {
         quoteToken: weth.address,
         tokenName: "Halving Test",
         tokenSymbol: "HALV",
-        uri: "",
+        uri: "https://example.com/rig",
         usdcAmount: convert("500", 6),
         unitAmount: convert("1000000", 18),
         initialUps: convert("10000", 18), // Very high UPS for fast minting
@@ -825,7 +829,7 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 600, // 10 minutes
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
-        upsMultipliers: [],
+        upsMultipliers: [convert("1", 18)],
         upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
@@ -843,6 +847,9 @@ describe("Rig Comprehensive Tests", function () {
 
       halveRigContract = await ethers.getContractAt("MineRig", halveRig);
       halveUnitContract = await ethers.getContractAt("Unit", halveUnit);
+
+      // Disable entropy for tests that don't send ETH for VRF fees
+      await halveRigContract.connect(user0).setEntropyEnabled(false);
     });
 
     it("Should start with initial UPS", async function () {
@@ -897,7 +904,7 @@ describe("Rig Comprehensive Tests", function () {
         quoteToken: weth.address,
         tokenName: "Multi Slot",
         tokenSymbol: "MULTI",
-        uri: "",
+        uri: "https://example.com/rig",
         usdcAmount: convert("500", 6),
         unitAmount: convert("1000000", 18),
         initialUps: convert("4", 18),
@@ -906,7 +913,7 @@ describe("Rig Comprehensive Tests", function () {
         rigEpochPeriod: 3600,
         rigPriceMultiplier: convert("2", 18),
         rigMinInitPrice: convert("0.0001", 18),
-        upsMultipliers: [],
+        upsMultipliers: [convert("1", 18)],
         upsMultiplierDuration: 86400,
         auctionInitPrice: convert("1", 18),
         auctionEpochPeriod: 86400,
@@ -921,6 +928,9 @@ describe("Rig Comprehensive Tests", function () {
       const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
       multiRig = launchEvent.args.rig;
       multiRigContract = await ethers.getContractAt("MineRig", multiRig);
+
+      // Disable entropy for tests that don't send ETH for VRF fees
+      await multiRigContract.connect(user0).setEntropyEnabled(false);
 
       // Increase capacity to 10
       await multiRigContract.connect(user0).setCapacity(10);

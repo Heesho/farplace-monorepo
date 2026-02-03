@@ -108,7 +108,7 @@ describe("Unit Invariants", function () {
       quoteToken: weth.address,
       tokenName: "Unit Invariant Test",
       tokenSymbol: "UINV",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("1000", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("10", 18),
@@ -117,7 +117,7 @@ describe("Unit Invariants", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: ONE_DAY,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
@@ -136,6 +136,9 @@ describe("Unit Invariants", function () {
 
     rigContract = await ethers.getContractAt("MineRig", rigAddress);
     unitContract = await ethers.getContractAt("Unit", unitAddress);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(user0).setEntropyEnabled(false);
 
     await rigContract.connect(user0).setTeam(team.address);
   });
@@ -283,7 +286,7 @@ describe("MineRig Invariants", function () {
       quoteToken: weth.address,
       tokenName: "Mine Invariant Test",
       tokenSymbol: "MINV",
-      uri: "",
+      uri: "https://example.com/rig",
       usdcAmount: convert("1000", 6),
       unitAmount: convert("1000000", 18),
       initialUps: convert("10", 18),
@@ -292,7 +295,7 @@ describe("MineRig Invariants", function () {
       rigEpochPeriod: ONE_HOUR,
       rigPriceMultiplier: convert("2", 18),
       rigMinInitPrice: convert("0.001", 18),
-      upsMultipliers: [],
+      upsMultipliers: [convert("1", 18)],
       upsMultiplierDuration: ONE_DAY,
       auctionInitPrice: convert("1", 18),
       auctionEpochPeriod: ONE_DAY,
@@ -311,6 +314,9 @@ describe("MineRig Invariants", function () {
 
     rigContract = await ethers.getContractAt("MineRig", rigAddress);
     unitContract = await ethers.getContractAt("Unit", unitAddress);
+
+    // Disable entropy for tests that don't send ETH for VRF fees
+    await rigContract.connect(user0).setEntropyEnabled(false);
 
     await rigContract.connect(user0).setTeam(team.address);
   });
@@ -390,7 +396,7 @@ describe("MineRig Invariants", function () {
       deadline = await getFutureDeadline();
       const tx = await rigContract.connect(user2).mine(user2.address, 0, slot.epochId, deadline, price.add(convert("1", 18)), "");
       const receipt = await tx.wait();
-      const mineEvent = receipt.events.find(e => e.event === "Rig__Mine");
+      const mineEvent = receipt.events.find(e => e.event === "MineRig__Mine");
       const actualPrice = mineEvent.args.price;
 
       const minerClaimableAfter = await rigContract.accountToClaimable(prevMiner);

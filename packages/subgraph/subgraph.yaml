@@ -11,9 +11,9 @@ dataSources:
     name: MineCore
     network: base
     source:
-      address: "0xF719bfBB8CdBb7bcC22Df99554d4ef6c0965e362"
+      address: "0x56EeA24F447A1609784566c84f40554B5742f7B6"
       abi: MineCore
-      startBlock: 41643772
+      startBlock: 41656994
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -41,9 +41,9 @@ dataSources:
     name: SpinCore
     network: base
     source:
-      address: "0x2444eaA70e3669Fc5a01bD05DBA716f94305466c"
+      address: "0x3CD87981596590E08dfad6Bf294406f05A6f5481"
       abi: SpinCore
-      startBlock: 41643772
+      startBlock: 41656994
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -60,7 +60,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: SpinCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: SpinCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleSpinCoreLaunched
       file: ./src/cores/spinCore.ts
 
@@ -71,9 +71,9 @@ dataSources:
     name: FundCore
     network: base
     source:
-      address: "0xbc40b29417f823b2Ae8cBE393c309F2d8A3BA6BE"
+      address: "0x9517B14d24DD4644347c80985473627866a6Eb40"
       abi: FundCore
-      startBlock: 41643772
+      startBlock: 41656994
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -90,7 +90,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleFundCoreLaunched
       file: ./src/cores/fundCore.ts
 

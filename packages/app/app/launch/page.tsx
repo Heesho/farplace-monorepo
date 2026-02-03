@@ -2,7 +2,21 @@
 
 import { useState } from "react";
 import { Upload, ChevronDown, ChevronUp, ChevronLeft, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
+import { parseUnits } from "viem";
 import { useFarcaster } from "@/hooks/useFarcaster";
+import {
+  useBatchedTransaction,
+  encodeApproveCall,
+  encodeContractCall,
+  type Call,
+} from "@/hooks/useBatchedTransaction";
+import {
+  CONTRACT_ADDRESSES,
+  MULTICALL_ABI,
+  SPIN_MULTICALL_ABI,
+  FUND_MULTICALL_ABI,
+  QUOTE_TOKEN_DECIMALS,
+} from "@/lib/contracts";
 
 // USDC token icon - blue circle with $ sign
 function UsdcIcon({ size = 20 }: { size?: number }) {
@@ -31,6 +45,11 @@ const BOUNDS = {
   epochPeriod: { min: 600, max: 31536000 }, // 10 min - 365 days (in seconds)
   priceMultiplier: { min: 1.1, max: 3 }, // 1.1x - 3x
   minInitPrice: { min: 0.000001, max: 1e12 }, // Contract uses 1e6 wei min
+  // Auction-specific bounds (LP token units, 18 decimals)
+  auctionEpochPeriod: { min: 3600, max: 31536000 }, // 1 hour - 365 days
+  auctionPriceMultiplier: { min: 1.1, max: 3 },
+  auctionMinInitPrice: { min: 0.000001, max: 1e12 },
+  auctionInitPrice: { min: 0.000001, max: 1e12 },
 
   // MineRig/SpinRig: Emission (per second)
   initialUps: { min: 0.000001, max: 1000000 }, // Contract max is 1e24 wei/sec
@@ -59,6 +78,10 @@ const DEFAULTS = {
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
     rigMinInitPrice: 1, // $1
+    auctionInitPrice: 1, // 1 LP
+    auctionEpochPeriod: 3600, // 1 hour
+    auctionPriceMultiplier: 2, // 2x
+    auctionMinInitPrice: 1, // 1 LP
     upsMultipliers: [] as number[], // empty = no multipliers
     upsMultiplierDuration: 86400, // 24h
   },
@@ -71,6 +94,10 @@ const DEFAULTS = {
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
     rigMinInitPrice: 1, // $1
+    auctionInitPrice: 1,
+    auctionEpochPeriod: 3600,
+    auctionPriceMultiplier: 2,
+    auctionMinInitPrice: 1,
     odds: [10] as number[], // 0.1% single entry
   },
   fund: {
@@ -79,6 +106,10 @@ const DEFAULTS = {
     initialUps: 50000, // 50,000 tokens/day (expressed as daily)
     tailUps: 5000, // 5,000 tokens/day floor
     halvingPeriod: 30 * 24 * 3600, // 30 days
+    auctionInitPrice: 1,
+    auctionEpochPeriod: 3600,
+    auctionPriceMultiplier: 2,
+    auctionMinInitPrice: 1,
   },
 };
 
@@ -383,6 +414,7 @@ function Slider({
 
 export default function LaunchPage() {
   const { address: account, isConnected, isInFrame, isConnecting, connect } = useFarcaster();
+  const { execute, status: txStatus, txHash, error: txError } = useBatchedTransaction();
 
   // Rig type selection
   const [rigType, setRigType] = useState<RigType>(null);
@@ -393,6 +425,7 @@ export default function LaunchPage() {
   const [tokenDescription, setTokenDescription] = useState("");
   const [miningMessage, setMiningMessage] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   // FundRig-specific fields
   const [recipientName, setRecipientName] = useState("");
@@ -415,6 +448,10 @@ export default function LaunchPage() {
   const [rigEpochPeriod, setRigEpochPeriod] = useState(DEFAULTS.mine.rigEpochPeriod);
   const [rigPriceMultiplier, setRigPriceMultiplier] = useState(DEFAULTS.mine.rigPriceMultiplier);
   const [rigMinInitPrice, setRigMinInitPrice] = useState(DEFAULTS.mine.rigMinInitPrice);
+  const [auctionInitPrice, setAuctionInitPrice] = useState(DEFAULTS.mine.auctionInitPrice);
+  const [auctionEpochPeriod, setAuctionEpochPeriod] = useState(DEFAULTS.mine.auctionEpochPeriod);
+  const [auctionPriceMultiplier, setAuctionPriceMultiplier] = useState(DEFAULTS.mine.auctionPriceMultiplier);
+  const [auctionMinInitPrice, setAuctionMinInitPrice] = useState(DEFAULTS.mine.auctionMinInitPrice);
 
   // Spin odds (basis points)
   const [odds, setOdds] = useState<number[]>(DEFAULTS.spin.odds);
@@ -422,11 +459,14 @@ export default function LaunchPage() {
   // Mine multipliers
   const [upsMultipliers, setUpsMultipliers] = useState<number[]>(DEFAULTS.mine.upsMultipliers);
   const [upsMultiplierDuration, setUpsMultiplierDuration] = useState(DEFAULTS.mine.upsMultiplierDuration);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setLogoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoPreview(reader.result as string);
@@ -448,6 +488,10 @@ export default function LaunchPage() {
       setRigEpochPeriod(defaults.rigEpochPeriod);
       setRigPriceMultiplier(defaults.rigPriceMultiplier);
       setRigMinInitPrice(defaults.rigMinInitPrice);
+      setAuctionInitPrice(defaults.auctionInitPrice);
+      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
+      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
+      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
       setUpsMultipliers([...defaults.upsMultipliers]);
       setUpsMultiplierDuration(defaults.upsMultiplierDuration);
     } else if (type === "spin") {
@@ -460,6 +504,10 @@ export default function LaunchPage() {
       setRigEpochPeriod(defaults.rigEpochPeriod);
       setRigPriceMultiplier(defaults.rigPriceMultiplier);
       setRigMinInitPrice(defaults.rigMinInitPrice);
+      setAuctionInitPrice(defaults.auctionInitPrice);
+      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
+      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
+      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
       setOdds([...defaults.odds]);
     } else if (type === "fund") {
       const defaults = DEFAULTS.fund;
@@ -468,6 +516,10 @@ export default function LaunchPage() {
       setInitialUps(defaults.initialUps);
       setTailUps(defaults.tailUps);
       setHalvingPeriod(defaults.halvingPeriod);
+      setAuctionInitPrice(defaults.auctionInitPrice);
+      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
+      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
+      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
     }
   };
 
@@ -487,8 +539,191 @@ export default function LaunchPage() {
       if (!recipientName.length) return false;
       if (!isValidAddress(recipientAddress)) return false;
     }
+    if (auctionInitPrice < auctionMinInitPrice) return false;
     return true;
   })();
+
+  const isLaunching = txStatus === "pending" || txStatus === "confirming";
+
+  const uploadLogoToPinata = async (): Promise<string> => {
+    if (!logoFile) return "";
+    const formData = new FormData();
+    formData.append("file", logoFile);
+    formData.append("tokenSymbol", tokenSymbol);
+
+    const res = await fetch("/api/pinata/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ipfsUrl) {
+      throw new Error(data?.error || "Logo upload failed");
+    }
+    return data.ipfsUrl as string;
+  };
+
+  const uploadMetadataToPinata = async (imageUrl: string): Promise<string> => {
+    const res = await fetch("/api/pinata/metadata", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: tokenName,
+        symbol: tokenSymbol,
+        image: imageUrl,
+        description: tokenDescription,
+        defaultMessage: miningMessage || "gm",
+        links: [],
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ipfsUrl) {
+      throw new Error(data?.error || "Metadata upload failed");
+    }
+    return data.ipfsUrl as string;
+  };
+
+  const handleLaunch = async () => {
+    if (!rigType) return;
+    if (!isFormValid || isLaunching) return;
+
+    setLaunchError(null);
+
+    let launcher = account;
+    if (!launcher) {
+      try {
+        launcher = await connect();
+      } catch (err) {
+        setLaunchError("Wallet connection failed.");
+        return;
+      }
+    }
+
+    if (!launcher) {
+      setLaunchError("Wallet not connected.");
+      return;
+    }
+
+    try {
+      // Upload metadata (required for Mine/Spin/Fund rigs at launch)
+      let uri = "";
+      if (rigType === "mine" || rigType === "spin" || rigType === "fund") {
+        setIsUploading(true);
+        const logoIpfsUrl = await uploadLogoToPinata();
+        uri = await uploadMetadataToPinata(logoIpfsUrl);
+        setIsUploading(false);
+      }
+
+      const usdcAmountWei = parseUnits(usdcAmount.toString(), QUOTE_TOKEN_DECIMALS);
+      const unitAmountWei = parseUnits(unitAmount.toString(), 18);
+
+      const rigEpochPeriodWei = BigInt(rigEpochPeriod);
+      const rigPriceMultiplierWei = parseUnits(rigPriceMultiplier.toString(), 18);
+      const rigMinInitPriceWei = parseUnits(rigMinInitPrice.toString(), QUOTE_TOKEN_DECIMALS);
+
+      // Auction params use LP token decimals (18)
+      const auctionInitPriceWei = parseUnits(auctionInitPrice.toString(), 18);
+      const auctionMinInitPriceWei = parseUnits(auctionMinInitPrice.toString(), 18);
+      const auctionEpochPeriodWei = BigInt(auctionEpochPeriod);
+      const auctionPriceMultiplierWei = parseUnits(auctionPriceMultiplier.toString(), 18);
+
+      const quoteToken = CONTRACT_ADDRESSES.usdc as `0x${string}`;
+
+      let multicallAddress: `0x${string}`;
+      let multicallAbi: readonly unknown[];
+      let launchParams: Record<string, unknown>;
+
+      if (rigType === "mine") {
+        const initialUpsWei = parseUnits(initialUps.toString(), 18);
+        const tailUpsWei = parseUnits(tailUps.toString(), 18);
+        const halvingAmountWei = parseUnits(halvingAmount.toString(), 18);
+        const upsMultipliersWei = upsMultipliers.map((m) => parseUnits(m.toString(), 18));
+
+        multicallAddress = CONTRACT_ADDRESSES.mineMulticall as `0x${string}`;
+        multicallAbi = MULTICALL_ABI;
+        launchParams = {
+          launcher,
+          quoteToken,
+          tokenName,
+          tokenSymbol,
+          uri,
+          usdcAmount: usdcAmountWei,
+          unitAmount: unitAmountWei,
+          initialUps: initialUpsWei,
+          tailUps: tailUpsWei,
+          halvingAmount: halvingAmountWei,
+          rigEpochPeriod: rigEpochPeriodWei,
+          rigPriceMultiplier: rigPriceMultiplierWei,
+          rigMinInitPrice: rigMinInitPriceWei,
+          upsMultipliers: upsMultipliersWei,
+          upsMultiplierDuration: BigInt(upsMultiplierDuration),
+          auctionInitPrice: auctionInitPriceWei,
+          auctionEpochPeriod: auctionEpochPeriodWei,
+          auctionPriceMultiplier: auctionPriceMultiplierWei,
+          auctionMinInitPrice: auctionMinInitPriceWei,
+        };
+      } else if (rigType === "spin") {
+        const initialUpsWei = parseUnits(initialUps.toString(), 18);
+        const tailUpsWei = parseUnits(tailUps.toString(), 18);
+
+        multicallAddress = CONTRACT_ADDRESSES.spinMulticall as `0x${string}`;
+        multicallAbi = SPIN_MULTICALL_ABI;
+        launchParams = {
+          launcher,
+          quoteToken,
+          tokenName,
+          tokenSymbol,
+          uri,
+          usdcAmount: usdcAmountWei,
+          unitAmount: unitAmountWei,
+          initialUps: initialUpsWei,
+          tailUps: tailUpsWei,
+          halvingPeriod: BigInt(halvingPeriod),
+          rigEpochPeriod: rigEpochPeriodWei,
+          rigPriceMultiplier: rigPriceMultiplierWei,
+          rigMinInitPrice: rigMinInitPriceWei,
+          odds: odds.map((o) => BigInt(o)),
+          auctionInitPrice: auctionInitPriceWei,
+          auctionEpochPeriod: auctionEpochPeriodWei,
+          auctionPriceMultiplier: auctionPriceMultiplierWei,
+          auctionMinInitPrice: auctionMinInitPriceWei,
+        };
+      } else {
+        const initialEmissionWei = parseUnits(initialUps.toString(), 18);
+        const minEmissionWei = parseUnits(tailUps.toString(), 18);
+        const halvingPeriodDays = Math.max(1, Math.round(halvingPeriod / 86400));
+
+        multicallAddress = CONTRACT_ADDRESSES.fundMulticall as `0x${string}`;
+        multicallAbi = FUND_MULTICALL_ABI;
+        launchParams = {
+          launcher,
+          quoteToken,
+          recipient: recipientAddress as `0x${string}`,
+          tokenName,
+          tokenSymbol,
+          uri,
+          usdcAmount: usdcAmountWei,
+          unitAmount: unitAmountWei,
+          initialEmission: initialEmissionWei,
+          minEmission: minEmissionWei,
+          halvingPeriod: BigInt(halvingPeriodDays),
+          auctionInitPrice: auctionInitPriceWei,
+          auctionEpochPeriod: auctionEpochPeriodWei,
+          auctionPriceMultiplier: auctionPriceMultiplierWei,
+          auctionMinInitPrice: auctionMinInitPriceWei,
+        };
+      }
+
+      const calls: Call[] = [
+        encodeApproveCall(quoteToken, multicallAddress, usdcAmountWei),
+        encodeContractCall(multicallAddress, multicallAbi, "launch", [launchParams]),
+      ];
+
+      await execute(calls);
+    } catch (err) {
+      setIsUploading(false);
+      setLaunchError(err instanceof Error ? err.message : "Launch failed.");
+    }
+  };
 
   // Format helpers
   const formatDuration = (seconds: number) => {
@@ -506,6 +741,8 @@ export default function LaunchPage() {
   const formatMultiplier = (n: number) => `${n.toFixed(1)}x`;
 
   const formatPrice = (n: number) => `$${n.toFixed(2)}`;
+
+  const formatLp = (n: number) => `${n.toFixed(4)} LP`;
 
   const formatRate = (n: number) => `${n}/s`;
 
@@ -925,6 +1162,59 @@ export default function LaunchPage() {
                     </div>
                   )}
 
+                  {/* Treasury Auction settings */}
+                  <div>
+                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Treasury Auction</h3>
+                    <p className="text-muted-foreground text-[11px] mb-3">
+                      Prices are in LP tokens. Auctions sell accumulated treasury assets.
+                    </p>
+                    <Slider
+                      label="Auction Epoch Duration"
+                      value={auctionEpochPeriod}
+                      onChange={setAuctionEpochPeriod}
+                      min={BOUNDS.auctionEpochPeriod.min}
+                      max={BOUNDS.auctionEpochPeriod.max}
+                      step={3600}
+                      formatValue={formatDuration}
+                      description="How long each treasury auction lasts (1h - 365d)"
+                    />
+                    <Slider
+                      label="Auction Price Multiplier"
+                      value={auctionPriceMultiplier}
+                      onChange={setAuctionPriceMultiplier}
+                      min={BOUNDS.auctionPriceMultiplier.min}
+                      max={BOUNDS.auctionPriceMultiplier.max}
+                      step={0.1}
+                      formatValue={formatMultiplier}
+                      description="Price reset multiplier after a buy (1.1x - 3x)"
+                    />
+                    <Slider
+                      label="Auction Min Start Price"
+                      value={auctionMinInitPrice}
+                      onChange={setAuctionMinInitPrice}
+                      min={BOUNDS.auctionMinInitPrice.min}
+                      max={BOUNDS.auctionMinInitPrice.max}
+                      step={0.01}
+                      formatValue={formatLp}
+                      description="Minimum auction start price (LP tokens)"
+                    />
+                    <Slider
+                      label="Auction Init Price"
+                      value={auctionInitPrice}
+                      onChange={setAuctionInitPrice}
+                      min={BOUNDS.auctionInitPrice.min}
+                      max={BOUNDS.auctionInitPrice.max}
+                      step={0.01}
+                      formatValue={formatLp}
+                      description="First auction start price (must be >= min)"
+                    />
+                    {auctionInitPrice < auctionMinInitPrice && (
+                      <p className="text-[11px] text-red-400">
+                        Auction init price must be greater than or equal to min price.
+                      </p>
+                    )}
+                  </div>
+
                   {/* Spin Odds (immutable at launch) */}
                   {rigType === "spin" && (() => {
                     const oddsPresets = [
@@ -1165,16 +1455,40 @@ export default function LaunchPage() {
                   </div>
                 </div>
               </div>
-              <button
-                disabled={!isFormValid}
-                className={`w-32 h-10 text-[14px] font-semibold rounded-xl transition-all ${
-                  isFormValid
-                    ? "bg-white text-black hover:bg-zinc-200"
-                    : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                }`}
-              >
-                Launch
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                <button
+                  onClick={handleLaunch}
+                  disabled={!isFormValid || isLaunching || isUploading}
+                  className={`w-32 h-10 text-[14px] font-semibold rounded-xl transition-all ${
+                    !isFormValid || isLaunching || isUploading
+                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                      : "bg-white text-black hover:bg-zinc-200"
+                  }`}
+                >
+                  {isUploading
+                    ? "Uploading..."
+                    : isLaunching
+                    ? "Launching..."
+                    : !isConnected
+                    ? "Connect"
+                    : "Launch"}
+                </button>
+                {(launchError || txError) && (
+                  <div className="text-[11px] text-red-400 max-w-[240px] text-right">
+                    {launchError || txError?.message}
+                  </div>
+                )}
+                {txStatus === "success" && txHash && (
+                  <a
+                    href={`https://basescan.org/tx/${txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-zinc-400 hover:text-white transition-colors"
+                  >
+                    View transaction
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}

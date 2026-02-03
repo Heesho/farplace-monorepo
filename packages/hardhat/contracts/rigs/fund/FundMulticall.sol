@@ -196,6 +196,7 @@ contract FundMulticall {
             recipient: params.recipient,
             tokenName: params.tokenName,
             tokenSymbol: params.tokenSymbol,
+            uri: params.uri,
             usdcAmount: params.usdcAmount,
             unitAmount: params.unitAmount,
             initialEmission: params.initialEmission,

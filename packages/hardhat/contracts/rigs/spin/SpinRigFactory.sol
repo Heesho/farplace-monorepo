@@ -15,6 +15,7 @@ contract SpinRigFactory {
      * @param _unit Unit token address (deployed separately by Core)
      * @param _quote Payment token address (e.g., USDC)
      * @param _entropy Pyth Entropy contract address
+     * @param _core Core contract address (source of protocol fee recipient)
      * @param _treasury Treasury address for fee collection
      * @param _epochPeriod Duration of each Dutch auction epoch
      * @param _priceMultiplier Price multiplier for next epoch
@@ -28,6 +29,7 @@ contract SpinRigFactory {
         address _unit,
         address _quote,
         address _entropy,
+        address _core,
         address _treasury,
         uint256 _epochPeriod,
         uint256 _priceMultiplier,
@@ -52,7 +54,7 @@ contract SpinRigFactory {
             _quote,
             _entropy,
             _treasury,
-            msg.sender, // core
+            _core,
             config
         );
         rig.transferOwnership(msg.sender);

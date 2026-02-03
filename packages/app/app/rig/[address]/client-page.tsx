@@ -287,7 +287,7 @@ export default function RigDetailPage() {
     account,
     0n,
     multicallAddress,
-    rigType === "mine" || !rigType  // enabled: run for mine rigs and while rigType is loading
+    rigType === "mine"
   );
 
   // Fetch spin rig state — only for spin rigs
@@ -307,7 +307,8 @@ export default function RigDetailPage() {
   // Fetch rig info (unit/auction/LP addresses, token name/symbol, launcher)
   const { rigInfo, isLoading: isRigInfoLoading } = useRigInfo(
     rigAddress,
-    coreAddress
+    coreAddress,
+    rigType
   );
 
   // Normalize fields across rig types
@@ -345,6 +346,7 @@ export default function RigDetailPage() {
   const { pairData } = useDexScreener(
     rigAddress,
     rigInfo?.unitAddress,
+    coreAddress,
   );
 
   // Derived values

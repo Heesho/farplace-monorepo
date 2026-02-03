@@ -101,8 +101,8 @@ contract SpinMulticall {
     ) external payable {
         if (!ISpinCore(core).rigToIsRig(rig)) revert SpinMulticall__InvalidRig();
 
-        // Calculate entropy fee
-        uint256 entropyFee = ISpinRig(rig).getEntropyFee();
+        // Calculate entropy fee (only required when entropy is enabled)
+        uint256 entropyFee = ISpinRig(rig).entropyEnabled() ? ISpinRig(rig).getEntropyFee() : 0;
         if (msg.value < entropyFee) revert SpinMulticall__InsufficientETH();
         if (msg.value > entropyFee) revert SpinMulticall__ExcessETH();
 
@@ -171,6 +171,7 @@ contract SpinMulticall {
             quoteToken: params.quoteToken,
             tokenName: params.tokenName,
             tokenSymbol: params.tokenSymbol,
+            uri: params.uri,
             usdcAmount: params.usdcAmount,
             unitAmount: params.unitAmount,
             initialUps: params.initialUps,

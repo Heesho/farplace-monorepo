@@ -11,6 +11,7 @@ interface ISpinRigFactory {
         address _unit,
         address _quote,
         address _entropy,
+        address _core,
         address _treasury,
         uint256 _epochPeriod,
         uint256 _priceMultiplier,

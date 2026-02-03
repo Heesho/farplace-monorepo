@@ -69,6 +69,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         address recipient; // address to receive 50% of donations (required)
         string tokenName; // Unit token name
         string tokenSymbol; // Unit token symbol
+        string uri; // metadata URI for the rig
         uint256 usdcAmount; // USDC to provide for LP
         uint256 unitAmount; // Unit tokens minted for initial LP
         uint256 initialEmission; // starting Unit emission per day
@@ -88,6 +89,7 @@ contract FundCore is Ownable, ReentrancyGuard {
     error FundCore__ZeroRecipient();
     error FundCore__EmptyTokenName();
     error FundCore__EmptyTokenSymbol();
+    error FundCore__EmptyUri();
     error FundCore__ZeroUnitAmount();
     error FundCore__ZeroAddress();
 
@@ -103,6 +105,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         address quoteToken,
         string tokenName,
         string tokenSymbol,
+        string uri,
         uint256 usdcAmount,
         uint256 unitAmount,
         uint256 initialEmission,
@@ -238,6 +241,9 @@ contract FundCore is Ownable, ReentrancyGuard {
         // Transfer Unit minting rights to FundRig (permanently locked)
         IUnit(unit).setRig(rig);
 
+        // Set initial URI for the rig (required)
+        IFundRig(rig).setUri(params.uri);
+
         // Transfer FundRig ownership to launcher
         IFundRig(rig).transferOwnership(params.launcher);
 
@@ -261,6 +267,7 @@ contract FundCore is Ownable, ReentrancyGuard {
             params.quoteToken,
             params.tokenName,
             params.tokenSymbol,
+            params.uri,
             params.usdcAmount,
             params.unitAmount,
             params.initialEmission,
@@ -320,6 +327,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         if (params.usdcAmount < minUsdcForLaunch) revert FundCore__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert FundCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert FundCore__EmptyTokenSymbol();
+        if (bytes(params.uri).length == 0) revert FundCore__EmptyUri();
         if (params.unitAmount == 0) revert FundCore__ZeroUnitAmount();
     }
 

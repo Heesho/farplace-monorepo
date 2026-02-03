@@ -7,6 +7,7 @@ import {
   CORE_ABI,
   RIG_ABI,
   ERC20_ABI,
+  type RigType,
   type RigState,
 } from "@/lib/contracts";
 
@@ -54,8 +55,10 @@ export function useRigState(
 export function useRigInfo(
   rigAddress: `0x${string}` | undefined,
   coreAddress?: `0x${string}`,
+  rigType?: RigType,
 ) {
   const resolvedCore = coreAddress ?? CONTRACT_ADDRESSES.core as `0x${string}`;
+  const hasRigType = !!rigType;
 
   // Get unit token address from rig contract
   const { data: unitAddress } = useReadContract({
@@ -75,7 +78,26 @@ export function useRigInfo(
     functionName: "quote",
     chainId: base.id,
     query: {
-      enabled: !!rigAddress,
+      enabled: !!rigAddress && hasRigType && rigType !== "fund",
+    },
+  });
+
+  // Fund rigs use paymentToken instead of quote
+  const { data: paymentTokenAddress } = useReadContract({
+    address: rigAddress,
+    abi: [
+      {
+        inputs: [],
+        name: "paymentToken",
+        outputs: [{ internalType: "address", name: "", type: "address" }],
+        stateMutability: "view",
+        type: "function",
+      },
+    ] as const,
+    functionName: "paymentToken",
+    chainId: base.id,
+    query: {
+      enabled: !!rigAddress && hasRigType && rigType === "fund",
     },
   });
 
@@ -151,7 +173,7 @@ export function useRigInfo(
           unitAddress: unitAddress as `0x${string}`,
           auctionAddress: auctionAddress as `0x${string}`,
           lpAddress: lpAddress as `0x${string}`,
-          quoteAddress: (quoteAddress as `0x${string}`) ?? CONTRACT_ADDRESSES.usdc,
+          quoteAddress: (paymentTokenAddress as `0x${string}`) ?? (quoteAddress as `0x${string}`) ?? CONTRACT_ADDRESSES.usdc,
           launcher: launcher as `0x${string}`,
           tokenName: (tokenName as string) ?? "",
           tokenSymbol: (tokenSymbol as string) ?? "",

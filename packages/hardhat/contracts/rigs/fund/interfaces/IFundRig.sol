@@ -8,12 +8,16 @@ pragma solidity 0.8.19;
  */
 interface IFundRig {
     // Constants
-    function HALVING_PERIOD() external view returns (uint256);
     function DAY_DURATION() external view returns (uint256);
+    function MIN_HALVING_PERIOD() external view returns (uint256);
+    function MAX_HALVING_PERIOD() external view returns (uint256);
+    function MIN_INITIAL_EMISSION() external view returns (uint256);
+    function MAX_INITIAL_EMISSION() external view returns (uint256);
     function RECIPIENT_BPS() external view returns (uint256);
     function TEAM_BPS() external view returns (uint256);
     function PROTOCOL_BPS() external view returns (uint256);
     function DIVISOR() external view returns (uint256);
+    function MIN_DONATION() external view returns (uint256);
 
     // Immutables
     function paymentToken() external view returns (address);
@@ -22,7 +26,7 @@ interface IFundRig {
     function startTime() external view returns (uint256);
     function initialEmission() external view returns (uint256);
     function minEmission() external view returns (uint256);
-    function minDonation() external view returns (uint256);
+    function halvingPeriod() external view returns (uint256);
 
     // State
     function recipient() external view returns (address);

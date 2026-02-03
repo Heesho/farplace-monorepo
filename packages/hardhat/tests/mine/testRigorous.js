@@ -33,7 +33,7 @@ async function launchFreshRig(launcher, params = {}) {
     quoteToken: weth.address,
     tokenName: "Test Unit",
     tokenSymbol: "TUNIT",
-    uri: "",
+    uri: "https://example.com/rig",
     usdcAmount: convert("10", 6),
     unitAmount: convert("1000000", 18),
     initialUps: convert("4", 18),
@@ -42,7 +42,7 @@ async function launchFreshRig(launcher, params = {}) {
     rigEpochPeriod: 3600,
     rigPriceMultiplier: convert("2", 18),
     rigMinInitPrice: convert("0.0001", 18),
-    upsMultipliers: [],
+    upsMultipliers: [convert("1", 18)],
     upsMultiplierDuration: 86400,
     auctionInitPrice: convert("1", 18),
     auctionEpochPeriod: 86400,
@@ -55,6 +55,11 @@ async function launchFreshRig(launcher, params = {}) {
   const tx = await core.connect(launcher).launch(launchParams);
   const receipt = await tx.wait();
   const launchEvent = receipt.events.find((e) => e.event === "MineCore__Launched");
+
+  const rigContract = await ethers.getContractAt("MineRig", launchEvent.args.rig);
+
+  // Disable entropy for tests that don't send ETH for VRF fees
+  await rigContract.connect(launcher).setEntropyEnabled(false);
 
   return {
     rig: launchEvent.args.rig,
