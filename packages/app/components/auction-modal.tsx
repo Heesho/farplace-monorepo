@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { X, Loader2, ExternalLink, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { NavBar } from "@/components/nav-bar";
 import { formatEther, formatUnits } from "viem";
 import { useAuctionState } from "@/hooks/useAuctionState";
 import {
@@ -119,161 +120,155 @@ export function AuctionModal({
 
   if (!isOpen) return null;
 
-  // Button state/label based on transaction status
-  const getButtonContent = () => {
-    if (status === "pending") {
-      return (
-        <>
-          <Loader2 className="w-4 h-4 animate-spin" />
-          <span>Confirming...</span>
-        </>
-      );
-    }
-    if (status === "success") {
-      return (
-        <>
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Purchased!</span>
-        </>
-      );
-    }
-    if (!account) return <span>Connect wallet</span>;
-    if (isLoading) return <span>Loading...</span>;
-    if (!isAuctionActive) return <span>No active auction</span>;
-    if (!hasEnoughLp) return <span>Insufficient LP balance</span>;
-    return <span>Buy 1 {tokenSymbol}</span>;
-  };
-
-  const isButtonDisabled =
-    !account ||
-    isLoading ||
-    !isAuctionActive ||
-    !hasEnoughLp ||
-    status === "pending" ||
-    status === "success";
+  const isPending = status === "pending";
+  const isSuccess = status === "success";
+  const isError = status === "error";
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
-        className="absolute inset-0 bg-black/60"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-[520px] bg-background rounded-t-2xl p-5 pb-8 animate-in slide-in-from-bottom duration-300">
+        className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-[18px] font-semibold">
-            Auction &middot; {tokenSymbol}
-          </h2>
+        <div className="flex items-center justify-between px-4 pb-2">
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+            className="p-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
+          <span className="text-base font-semibold">Auction</span>
+          <div className="w-9" />
         </div>
 
-        {/* Loading state */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-10">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        )}
+        {/* Content */}
+        <div className="flex-1 flex flex-col px-4">
+          {/* Loading state */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
 
-        {/* Auction data */}
-        {!isLoading && (
-          <>
-            {/* Auction info card */}
-            <div className="bg-secondary/50 rounded-xl p-4 mb-4">
-              <div className="text-muted-foreground text-[12px] mb-1">
-                Current price for 1 {tokenSymbol}
+          {!isLoading && (
+            <>
+              {/* Title */}
+              <div className="mt-4 mb-6">
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  Buy USDC
+                </h1>
+                <p className="text-[13px] text-muted-foreground mt-1">
+                  {Number(userLpBalance).toFixed(3)} {tokenSymbol}-USDC LP available
+                </p>
               </div>
-              <div className="text-[22px] font-semibold tabular-nums">
-                {isAuctionActive
-                  ? `${Number(lpPriceFormatted).toFixed(6)} LP`
-                  : "No active auction"}
+
+              {/* You Pay */}
+              <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] text-muted-foreground">You pay</span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {isAuctionActive ? `${Number(lpPriceFormatted).toFixed(3)} LP` : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[11px] text-muted-foreground">{tokenSymbol}-USDC LP</span>
+                  {isAuctionActive && auctionState && (
+                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                      ~${(Number(lpPriceFormatted) * Number(formatUnits(auctionState.paymentTokenPrice, 18))).toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {/* You Receive */}
+              <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] text-muted-foreground">You receive</span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {isAuctionActive ? `$${Number(treasuryUsdc).toFixed(2)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[11px] text-muted-foreground">USDC</span>
+                </div>
+              </div>
+
+              {/* Profit indicator */}
               {isAuctionActive && auctionState && (
-                <div className="text-muted-foreground text-[12px] mt-1">
-                  Epoch #{auctionState.epochId.toString()}
+                <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums">
+                    {(() => {
+                      const lpCost = Number(lpPriceFormatted) * Number(formatUnits(auctionState.paymentTokenPrice, 18));
+                      const usdcReceive = Number(treasuryUsdc);
+                      const profit = usdcReceive - lpCost;
+                      return `${profit >= 0 ? "+" : ""}${profit.toFixed(2)} ${profit >= 0 ? "profit" : "loss"}`;
+                    })()}
+                  </span>
                 </div>
               )}
-            </div>
 
-            {/* User balance + treasury info */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-secondary/50 rounded-xl p-3">
-                <div className="text-muted-foreground text-[12px] mb-0.5">
-                  Your LP balance
+              {/* Insufficient balance warning */}
+              {account && isAuctionActive && !hasEnoughLp && !isError && !isSuccess && (
+                <div className="flex items-center gap-2 text-[13px] text-zinc-400 bg-secondary/30 rounded-lg px-3 py-2 mb-4">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    You need {Number(lpPriceFormatted).toFixed(3)} LP tokens. You have{" "}
+                    {Number(userLpBalance).toFixed(3)}.
+                  </span>
                 </div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  {Number(userLpBalance).toFixed(6)}
-                </div>
-              </div>
-              <div className="bg-secondary/50 rounded-xl p-3">
-                <div className="text-muted-foreground text-[12px] mb-0.5">
-                  Treasury (USDC)
-                </div>
-                <div className="font-semibold text-[15px] tabular-nums">
-                  ${Number(treasuryUsdc).toFixed(2)}
-                </div>
-              </div>
-            </div>
+              )}
 
-            {/* Insufficient balance warning */}
-            {account && isAuctionActive && !hasEnoughLp && (
-              <div className="flex items-center gap-2 text-[13px] text-zinc-400 bg-secondary/30 rounded-lg px-3 py-2 mb-4">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>
-                  You need{" "}
-                  {Number(lpPriceFormatted).toFixed(6)} LP tokens to buy.
-                  You have {Number(userLpBalance).toFixed(6)}.
-                </span>
-              </div>
-            )}
+              {/* Spacer */}
+              <div className="flex-1" />
 
-            {/* Error message */}
-            {status === "error" && error && (
-              <div className="flex items-center gap-2 text-[13px] text-red-400 bg-red-500/10 rounded-lg px-3 py-2 mb-4">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>{error.message ?? "Transaction failed"}</span>
-              </div>
-            )}
+              {/* Info text */}
+              <p className="text-[11px] text-muted-foreground text-center mb-4">
+                Auction price decays over time. Buy when profitable.
+              </p>
 
-            {/* Success message with tx link */}
-            {status === "success" && txHash && (
-              <div className="flex items-center gap-2 text-[13px] text-zinc-300 bg-zinc-700/50 rounded-lg px-3 py-2 mb-4">
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-white" />
-                <span>Transaction confirmed</span>
-                <a
-                  href={`https://basescan.org/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-auto flex items-center gap-1 text-zinc-400 hover:text-white transition-colors"
+              {/* Action button */}
+              <div
+                className="pb-4"
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)" }}
+              >
+                <button
+                  onClick={handleBuy}
+                  disabled={!account || !isAuctionActive || !hasEnoughLp || isPending || isSuccess}
+                  className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all flex items-center justify-center gap-2 ${
+                    isSuccess
+                      ? "bg-green-600 text-white"
+                      : isError
+                      ? "bg-red-600 text-white"
+                      : !account || !isAuctionActive || !hasEnoughLp || isPending
+                      ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                      : "bg-white text-black hover:bg-zinc-200"
+                  }`}
                 >
-                  View
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                  {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSuccess && <CheckCircle className="w-4 h-4" />}
+                  {isPending
+                    ? "Selling..."
+                    : isSuccess
+                    ? "Sold!"
+                    : isError
+                    ? "Failed"
+                    : !account
+                    ? "Connect wallet"
+                    : !isAuctionActive
+                    ? "No active auction"
+                    : !hasEnoughLp
+                    ? "Insufficient LP"
+                    : "Sell LP"}
+                </button>
               </div>
-            )}
-
-            {/* Buy button */}
-            <button
-              onClick={handleBuy}
-              disabled={isButtonDisabled}
-              className={`w-full py-3 rounded-xl font-semibold text-[15px] flex items-center justify-center gap-2 transition-all ${
-                isButtonDisabled
-                  ? "bg-secondary text-muted-foreground cursor-not-allowed"
-                  : "bg-white text-black hover:bg-zinc-200 active:scale-[0.98]"
-              }`}
-            >
-              {getButtonContent()}
-            </button>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
+      <NavBar />
     </div>
   );
 }

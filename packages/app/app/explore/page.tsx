@@ -6,12 +6,14 @@ import { Search, Zap, Clock, Star, X } from "lucide-react";
 import { NavBar } from "@/components/nav-bar";
 import { useExploreRigs, type RigListItem, type SortOption } from "@/hooks/useAllRigs";
 import { useBatchMetadata } from "@/hooks/useMetadata";
+import { useSparklineData } from "@/hooks/useSparklineData";
 import { useFarcaster } from "@/hooks/useFarcaster";
 
 function formatMarketCap(mcap: number): string {
   if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(2)}M`;
-  if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(0)}K`;
-  return `$${mcap}`;
+  if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(1)}K`;
+  if (mcap >= 1) return `$${mcap.toFixed(2)}`;
+  return `$${mcap.toFixed(4)}`;
 }
 
 /** Gradient color for the letter avatar fallback, based on rig type */
@@ -27,29 +29,37 @@ function rigTypeGradient(rigType: string): string {
   }
 }
 
-/** Small colored pill showing the rig type */
-function RigTypeBadge({ rigType }: { rigType: string }) {
-  let bg: string;
-  let label: string;
-  switch (rigType) {
-    case "spin":
-      bg = "bg-purple-500/20 text-purple-300";
-      label = "Spin";
-      break;
-    case "fund":
-      bg = "bg-sky-500/20 text-sky-300";
-      label = "Fund";
-      break;
-    case "mine":
-    default:
-      bg = "bg-zinc-500/20 text-zinc-400";
-      label = "Mine";
-      break;
-  }
+
+/** Mini sparkline chart */
+function Sparkline({ data, isPositive }: { data: number[]; isPositive: boolean }) {
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min;
+
+  const points = data
+    .map((value, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      // If flat line (range=0), draw in the middle (y=50)
+      const y = range === 0 ? 50 : 100 - ((value - min) / range) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${bg}`}>
-      {label}
-    </span>
+    <svg
+      viewBox="0 0 100 100"
+      className="w-16 h-8"
+      preserveAspectRatio="none"
+    >
+      <polyline
+        fill="none"
+        stroke={isPositive ? "#a1a1aa" : "#52525b"}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
   );
 }
 
@@ -92,17 +102,22 @@ function TokenLogo({
 function SkeletonRow() {
   return (
     <div
-      className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4"
+      className="grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4"
       style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
     >
-      <div className="w-10 h-10 rounded-full bg-secondary animate-pulse" />
-      <div className="space-y-2">
-        <div className="w-16 h-4 rounded bg-secondary animate-pulse" />
-        <div className="w-24 h-3 rounded bg-secondary animate-pulse" />
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-secondary animate-pulse" />
+        <div className="space-y-2">
+          <div className="w-16 h-4 rounded bg-secondary animate-pulse" />
+          <div className="w-24 h-3 rounded bg-secondary animate-pulse" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <div className="w-14 h-4 rounded bg-secondary animate-pulse" />
-        <div className="w-10 h-3 rounded bg-secondary animate-pulse" />
+      <div className="flex justify-center">
+        <div className="w-16 h-8 rounded bg-secondary animate-pulse" />
+      </div>
+      <div className="text-right space-y-2">
+        <div className="w-14 h-4 rounded bg-secondary animate-pulse ml-auto" />
+        <div className="w-10 h-3 rounded bg-secondary animate-pulse ml-auto" />
       </div>
     </div>
   );
@@ -118,6 +133,10 @@ export default function ExplorePage() {
   // Batch fetch metadata for logos
   const rigUris = rigs.map((r) => r.rigUri).filter(Boolean);
   const { getLogoUrl } = useBatchMetadata(rigUris);
+
+  // Batch fetch sparkline data for all units
+  const unitAddresses = rigs.map((r) => r.unitAddress).filter(Boolean);
+  const { getSparkline } = useSparklineData(unitAddresses);
 
   const isSearching = searchQuery.length > 0;
   const showEmpty = !isLoading && rigs.length === 0;
@@ -213,7 +232,7 @@ export default function ExplorePage() {
                 <Link
                   key={rig.address}
                   href={`/rig/${rig.address}`}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-4 transition-all duration-200 hover:bg-white/[0.02]"
+                  className="grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4 transition-all duration-200 hover:bg-white/[0.02]"
                   style={{
                     borderBottom:
                       index < rigs.length - 1
@@ -243,9 +262,12 @@ export default function ExplorePage() {
                     </div>
                   </div>
 
-                  {/* Middle - Rig type badge */}
+                  {/* Middle - Sparkline */}
                   <div className="flex justify-center">
-                    <RigTypeBadge rigType={rig.rigType} />
+                    <Sparkline
+                      data={getSparkline(rig.unitAddress, rig.priceUsd)}
+                      isPositive={rig.change24h >= 0}
+                    />
                   </div>
 
                   {/* Right side - Market cap and 24h change */}

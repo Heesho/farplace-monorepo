@@ -132,8 +132,14 @@ export function LiquidityModal({
 
           {/* Token Input */}
           <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">You provide</span>
+              <span className="text-lg font-semibold tabular-nums">
+                {tokenAmount} {tokenSymbol}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-[11px] text-muted-foreground">{tokenSymbol}</span>
               <button
                 onClick={() => setTokenAmount(tokenBalance.toString())}
                 className="text-[11px] text-muted-foreground hover:text-zinc-300 transition-colors"
@@ -141,23 +147,18 @@ export function LiquidityModal({
                 Balance: {tokenBalance.toLocaleString()}
               </button>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-semibold tabular-nums">
-                {tokenAmount}
-              </span>
-              <div className="flex items-center gap-2 bg-zinc-800 rounded-full px-3 py-1.5">
-                <div className="w-5 h-5 rounded-full bg-zinc-600 flex items-center justify-center text-[10px] font-semibold">
-                  {tokenSymbol.charAt(0)}
-                </div>
-                <span className="text-sm font-medium">{tokenSymbol}</span>
-              </div>
-            </div>
           </div>
 
           {/* Required USDC */}
           <div className="py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">Required USDC</span>
+              <span className="text-lg font-semibold tabular-nums">
+                {requiredUsdc.toFixed(2)} USDC
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-[11px] text-muted-foreground">USDC</span>
               <button
                 onClick={() => {
                   // Calculate max token amount based on USDC balance
@@ -168,17 +169,6 @@ export function LiquidityModal({
               >
                 Balance: {usdcBalance.toLocaleString()}
               </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-semibold tabular-nums">
-                {requiredUsdc.toFixed(2)}
-              </span>
-              <div className="flex items-center gap-2 bg-zinc-800 rounded-full px-3 py-1.5">
-                <div className="w-5 h-5 rounded-full bg-[#2775CA] flex items-center justify-center text-[10px] font-bold text-white">
-                  $
-                </div>
-                <span className="text-sm font-medium">USDC</span>
-              </div>
             </div>
           </div>
 

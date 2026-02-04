@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Share2, Copy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useReadContract } from "wagmi";
+import { base } from "wagmi/chains";
 import { formatEther, formatUnits } from "viem";
 import { NavBar } from "@/components/nav-bar";
 import { MineModal } from "@/components/mine-modal";
@@ -26,6 +28,7 @@ import {
   CONTRACT_ADDRESSES,
   QUOTE_TOKEN_DECIMALS,
   getMulticallAddress,
+  RIG_ABI,
   type RigType,
 } from "@/lib/contracts";
 import { getRig } from "@/lib/subgraph-launchpad";
@@ -54,6 +57,7 @@ function AddressLink({ address }: { address: string | null }) {
 }
 
 function formatPrice(price: number): string {
+  if (price === 0) return "$0.00";
   if (price >= 1) return `$${price.toFixed(2)}`;
   if (price >= 0.01) return `$${price.toFixed(4)}`;
   if (price >= 0.0001) return `$${price.toFixed(6)}`;
@@ -70,6 +74,64 @@ function formatMarketCap(mcap: number): string {
   if (mcap >= 1_000_000) return `$${(mcap / 1_000_000).toFixed(2)}M`;
   if (mcap >= 1_000) return `$${(mcap / 1_000).toFixed(0)}K`;
   return `$${mcap.toFixed(2)}`;
+}
+
+// Format UPS (units per second) - BigInt string with 18 decimals
+function formatUps(ups: string | undefined): string {
+  if (!ups) return "0";
+  const value = parseFloat(ups) / 1e18;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M/s`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K/s`;
+  if (value >= 1) return `${value.toFixed(2)}/s`;
+  if (value >= 0.001) return `${value.toFixed(4)}/s`;
+  return `${value.toExponential(2)}/s`;
+}
+
+// Format emission (per day) - BigInt string with 18 decimals
+function formatEmission(emission: string | undefined): string {
+  if (!emission) return "0";
+  const value = parseFloat(emission) / 1e18;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M/day`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K/day`;
+  return `${value.toFixed(2)}/day`;
+}
+
+// Format time period (seconds to human readable)
+function formatPeriod(seconds: string | undefined): string {
+  if (!seconds) return "0";
+  const secs = parseInt(seconds);
+  if (secs >= 86400 * 365) return `${(secs / (86400 * 365)).toFixed(1)} years`;
+  if (secs >= 86400 * 30) return `${Math.round(secs / (86400 * 30))} months`;
+  if (secs >= 86400 * 7) return `${Math.round(secs / (86400 * 7))} weeks`;
+  if (secs >= 86400) return `${Math.round(secs / 86400)} days`;
+  if (secs >= 3600) return `${Math.round(secs / 3600)} hours`;
+  if (secs >= 60) return `${Math.round(secs / 60)} min`;
+  return `${secs}s`;
+}
+
+// Format halving amount - BigInt string with 18 decimals
+function formatHalvingAmount(amount: string | undefined): string {
+  if (!amount) return "0";
+  const value = parseFloat(amount) / 1e18;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  return value.toFixed(0);
+}
+
+// Format price multiplier (18 decimals, display as X.Xx)
+function formatMultiplier(multiplier: string | undefined): string {
+  if (!multiplier) return "1.0x";
+  const value = parseFloat(multiplier) / 1e18;
+  return `${value.toFixed(2)}x`;
+}
+
+// Format min price (6 decimals for USDC)
+function formatMinPrice(price: string | undefined): string {
+  if (!price) return "$0";
+  const value = parseFloat(price) / 1e6;
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  if (value >= 0.01) return `$${value.toFixed(4)}`;
+  return `$${value.toFixed(6)}`;
 }
 
 function TokenLogo({
@@ -304,6 +366,50 @@ export default function RigDetailPage() {
     rigType === "fund"
   );
 
+  // Fetch treasury address directly from rig contract (for mine/spin rigs)
+  const { data: treasuryAddress } = useReadContract({
+    address: rigAddress,
+    abi: RIG_ABI,
+    functionName: "treasury",
+    chainId: base.id,
+    query: {
+      enabled: !!rigAddress && (rigType === "mine" || rigType === "spin"),
+    },
+  });
+
+  // Fetch team address directly from rig contract (for mine/spin rigs)
+  const { data: teamAddress } = useReadContract({
+    address: rigAddress,
+    abi: RIG_ABI,
+    functionName: "team",
+    chainId: base.id,
+    query: {
+      enabled: !!rigAddress && (rigType === "mine" || rigType === "spin"),
+    },
+  });
+
+  // Fetch upsMultipliers array from rig contract (mine rigs only)
+  const { data: upsMultipliers } = useReadContract({
+    address: rigAddress,
+    abi: RIG_ABI,
+    functionName: "getUpsMultipliers",
+    chainId: base.id,
+    query: {
+      enabled: !!rigAddress && rigType === "mine",
+    },
+  });
+
+  // Fetch upsMultiplierDuration from rig contract (mine rigs only)
+  const { data: upsMultiplierDuration } = useReadContract({
+    address: rigAddress,
+    abi: RIG_ABI,
+    functionName: "upsMultiplierDuration",
+    chainId: base.id,
+    query: {
+      enabled: !!rigAddress && rigType === "mine",
+    },
+  });
+
   // Fetch rig info (unit/auction/LP addresses, token name/symbol, launcher)
   const { rigInfo, isLoading: isRigInfoLoading } = useRigInfo(
     rigAddress,
@@ -358,17 +464,17 @@ export default function RigDetailPage() {
     ? Number(formatEther(unitPrice))
     : 0;
 
-  // Market cap = totalMinted * unitPrice (USDC ~= $1)
-  // subgraphRig.totalMinted is a BigDecimal string
-  const totalMintedRaw = subgraphRig?.totalMinted ? BigInt(Math.floor(parseFloat(subgraphRig.totalMinted) * 1e18)) : 0n;
-  const marketCapUsd =
-    unitPrice && totalMintedRaw > 0n
-      ? Number(formatEther(totalMintedRaw)) *
-        Number(formatEther(unitPrice))
-      : 0;
+  // Total supply from subgraph (unit.totalSupply includes initial LP tokens)
+  const totalSupplyRaw = subgraphRig?.unit?.totalSupply
+    ? parseFloat(subgraphRig.unit.totalSupply)
+    : 0;
+  const totalSupply = totalSupplyRaw;
 
-  // Total supply from subgraph
-  const totalSupply = totalMintedRaw > 0n ? Number(formatEther(totalMintedRaw)) : 0;
+  // Market cap = totalSupply * unitPrice (USDC ~= $1)
+  const marketCapUsd =
+    unitPrice && totalSupplyRaw > 0
+      ? totalSupplyRaw * Number(formatEther(unitPrice))
+      : 0;
 
   // 24h change from DexScreener
   const change24h = pairData?.priceChange?.h24 ?? null;
@@ -391,8 +497,11 @@ export default function RigDetailPage() {
     ? Number(formatUnits(accountUsdcBalance, QUOTE_TOKEN_DECIMALS))
     : 0;
 
-  // Stats from DexScreener + subgraph
-  const liquidityUsd = pairData?.liquidity?.usd ?? 0;
+  // Stats from subgraph (primary) + DexScreener (fallback)
+  // Multiply by 2 since subgraph liquidity is just USDC side of the pool
+  const liquidityUsd = subgraphRig?.unit?.liquidity
+    ? parseFloat(subgraphRig.unit.liquidity) * 2
+    : (pairData?.liquidity?.usd ?? 0);
   const volume24h = pairData?.volume?.h24 ?? 0;
 
   // Revenue from subgraph (BigDecimal strings already in quote token units)
@@ -421,15 +530,24 @@ export default function RigDetailPage() {
     account.toLowerCase() === launcherAddress.toLowerCase()
   );
 
-  // Chart data from subgraph price history
-  const [timeframe, setTimeframe] = useState<Timeframe>("1D");
-  const { data: chartData } = usePriceHistory(rigAddress, timeframe, rigInfo?.unitAddress);
-
-  // Created date from subgraph
-  const createdAt = subgraphRig?.createdAt
-    ? new Date(Number(subgraphRig.createdAt) * 1000)
+  // Created date from subgraph (needed for chart)
+  const createdAtTimestamp = subgraphRig?.createdAt
+    ? Number(subgraphRig.createdAt)
+    : undefined;
+  const createdAt = createdAtTimestamp
+    ? new Date(createdAtTimestamp * 1000)
     : null;
   const launchDateStr = createdAt ? getRelativeTime(createdAt) : "--";
+
+  // Chart data from subgraph price history
+  const [timeframe, setTimeframe] = useState<Timeframe>("1D");
+  const { data: chartData } = usePriceHistory(
+    rigAddress,
+    timeframe,
+    rigInfo?.unitAddress,
+    priceUsd,
+    createdAtTimestamp,
+  );
 
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showHeaderPrice, setShowHeaderPrice] = useState(false);
@@ -444,8 +562,8 @@ export default function RigDetailPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const tokenInfoRef = useRef<HTMLDivElement>(null);
 
-  // Primary action - label based on rig type
-  const primaryAction = rigType === "spin" ? "Spin" : rigType === "fund" ? "Fund" : "Mine";
+  // Primary action - always "Mine" regardless of rig type
+  const primaryAction = "Mine";
   const showPrimaryModal = () => {
     if (rigType === "spin") setShowSpinModal(true);
     else if (rigType === "fund") setShowFundModal(true);
@@ -499,7 +617,7 @@ export default function RigDetailPage() {
           </Link>
           {/* Center - Price appears on scroll */}
           <div className={`text-center transition-opacity duration-200 ${showHeaderPrice ? "opacity-100" : "opacity-0"}`}>
-            <div className="text-[15px] font-semibold">{priceUsd > 0 ? formatPrice(priceUsd) : "--"}</div>
+            <div className="text-[15px] font-semibold">{formatPrice(priceUsd)}</div>
             <div className="text-[11px] text-muted-foreground">{tokenSymbol}</div>
           </div>
           <button className="p-2 -mr-2 rounded-xl hover:bg-secondary transition-colors">
@@ -519,15 +637,13 @@ export default function RigDetailPage() {
               </div>
             </div>
             <div className="text-right">
-              <div className="price-large">{priceUsd > 0 ? formatPrice(priceUsd) : "--"}</div>
+              <div className="price-large">{formatPrice(priceUsd)}</div>
               <div
                 className={`text-[13px] font-medium ${
                   isPositive ? "text-zinc-300" : "text-zinc-500"
                 }`}
               >
-                {change24h !== null
-                  ? `${change24h >= 0 ? "+" : ""}${change24h.toFixed(2)}%`
-                  : "--"}
+                {`${(change24h ?? 0) >= 0 ? "+" : ""}${(change24h ?? 0).toFixed(2)}%`}
               </div>
             </div>
           </div>
@@ -569,7 +685,7 @@ export default function RigDetailPage() {
                 <div>
                   <div className="text-muted-foreground text-[12px] mb-1">Value</div>
                   <div className="font-semibold text-[15px] tabular-nums text-white">
-                    {positionBalanceUsd > 0 ? `$${positionBalanceUsd.toFixed(2)}` : "--"}
+                    ${positionBalanceUsd.toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -583,37 +699,37 @@ export default function RigDetailPage() {
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">Market cap</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {marketCapUsd > 0 ? formatMarketCap(marketCapUsd) : "--"}
+                  {formatMarketCap(marketCapUsd)}
                 </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">Total supply</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {totalSupply > 0 ? formatNumber(totalSupply) : "--"}
+                  {formatNumber(totalSupply)}
                 </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">Liquidity</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {liquidityUsd > 0 ? `$${formatNumber(liquidityUsd)}` : "--"}
+                  ${formatNumber(liquidityUsd)}
                 </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">24h volume</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {volume24h > 0 ? `$${formatNumber(volume24h)}` : "--"}
+                  ${formatNumber(volume24h)}
                 </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {treasuryRevenue > 0 ? `$${treasuryRevenue.toFixed(2)}` : "--"}
+                  ${treasuryRevenue.toFixed(2)}
                 </div>
               </div>
               <div>
                 <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
                 <div className="font-semibold text-[15px] tabular-nums">
-                  {teamRevenue > 0 ? `$${teamRevenue.toFixed(2)}` : "--"}
+                  ${teamRevenue.toFixed(2)}
                 </div>
               </div>
             </div>
@@ -675,86 +791,185 @@ export default function RigDetailPage() {
               </button>
             </div>
 
-            {/* Parameters - shows capacity + placeholders for detailed config */}
+            {/* Parameters - rig configuration from subgraph */}
             <div className="grid grid-cols-2 gap-y-3 gap-x-8">
-              {rigType === "mine" && (
+              {rigType === "mine" && subgraphRig?.mineRig && (
                 <>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Slots</div>
-                    <div className="font-medium text-[13px]">{capacity > 0 ? capacity : "--"}</div>
+                    <div className="font-medium text-[13px]">{subgraphRig.mineRig.capacity}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Initial rate</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatUps(subgraphRig.mineRig.initialUps)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Floor rate</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatUps(subgraphRig.mineRig.tailUps)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Halving at</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatHalvingAmount(subgraphRig.mineRig.halvingAmount)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Epoch</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatPeriod(subgraphRig.mineRig.epochPeriod)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Price multiplier</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatMultiplier(subgraphRig.mineRig.priceMultiplier)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Min price</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatMinPrice(subgraphRig.mineRig.minInitPrice)}</div>
                   </div>
+                  {upsMultiplierDuration && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Multiplier duration</div>
+                      <div className="font-medium text-[13px]">{formatPeriod(upsMultiplierDuration.toString())}</div>
+                    </div>
+                  )}
+                  {treasuryAddress && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={treasuryAddress} />
+                      </div>
+                    </div>
+                  )}
+                  {teamAddress && teamAddress !== "0x0000000000000000000000000000000000000000" && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={teamAddress} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {/* Multipliers badges (outside the grid) */}
+              {rigType === "mine" && upsMultipliers && (upsMultipliers as bigint[]).length > 0 && (
+                <div className="col-span-2 mt-2">
+                  <div className="text-muted-foreground text-[12px] mb-2">Multipliers</div>
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const multipliers = upsMultipliers as bigint[];
+                      // Count occurrences of each multiplier
+                      const counts = new Map<string, number>();
+                      multipliers.forEach((m) => {
+                        const key = (Number(m) / 1e18).toString();
+                        counts.set(key, (counts.get(key) || 0) + 1);
+                      });
+                      // Convert to array and calculate percentages
+                      return Array.from(counts.entries()).map(([multiplier, count]) => {
+                        const pct = Math.round((count / multipliers.length) * 100);
+                        return (
+                          <span
+                            key={multiplier}
+                            className="px-2.5 py-1 rounded-full bg-secondary text-[12px] text-muted-foreground"
+                          >
+                            {multiplier}x <span className="text-zinc-500">{pct}%</span>
+                          </span>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+              )}
+              {rigType === "mine" && !subgraphRig?.mineRig && (
+                <>
                   <div>
-                    <div className="text-muted-foreground text-[12px] mb-0.5">Multiplier duration</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="text-muted-foreground text-[12px] mb-0.5">Slots</div>
+                    <div className="font-medium text-[13px]">{capacity}</div>
                   </div>
                 </>
               )}
-              {rigType === "spin" && (
+              {rigType === "spin" && subgraphRig?.spinRig && (
                 <>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Initial rate</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatUps(subgraphRig.spinRig.initialUps)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Floor rate</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatUps(subgraphRig.spinRig.tailUps)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Halving</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatPeriod(subgraphRig.spinRig.halvingPeriod)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Epoch</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatPeriod(subgraphRig.spinRig.epochPeriod)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Price multiplier</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatMultiplier(subgraphRig.spinRig.priceMultiplier)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Min price</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatMinPrice(subgraphRig.spinRig.minInitPrice)}</div>
                   </div>
+                  <div>
+                    <div className="text-muted-foreground text-[12px] mb-0.5">Odds</div>
+                    <div className="font-medium text-[13px]">
+                      {subgraphRig.spinRig.currentOdds?.map(o => `${(parseInt(o) / 100).toFixed(1)}%`).join(", ") || "N/A"}
+                    </div>
+                  </div>
+                  {treasuryAddress && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={treasuryAddress} />
+                      </div>
+                    </div>
+                  )}
+                  {teamAddress && teamAddress !== "0x0000000000000000000000000000000000000000" && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={teamAddress} />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
-              {rigType === "fund" && (
+              {rigType === "fund" && subgraphRig?.fundRig && (
                 <>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Initial emission</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatEmission(subgraphRig.fundRig.initialEmission)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Min emission</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatEmission(subgraphRig.fundRig.minEmission)}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Halving</div>
-                    <div className="font-medium text-[13px]">--</div>
+                    <div className="font-medium text-[13px]">{formatPeriod(String(parseInt(subgraphRig.fundRig.halvingPeriod) * 86400))}</div>
                   </div>
+                  <div>
+                    <div className="text-muted-foreground text-[12px] mb-0.5">Recipient</div>
+                    <div className="font-medium text-[13px] font-mono">
+                      <AddressLink address={subgraphRig.fundRig.recipient} />
+                    </div>
+                  </div>
+                  {fundState?.treasury && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Treasury</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={fundState.treasury} />
+                      </div>
+                    </div>
+                  )}
+                  {fundState?.team && fundState.team !== "0x0000000000000000000000000000000000000000" && (
+                    <div>
+                      <div className="text-muted-foreground text-[12px] mb-0.5">Team</div>
+                      <div className="font-medium text-[13px] font-mono">
+                        <AddressLink address={fundState.team} />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -779,7 +994,7 @@ export default function RigDetailPage() {
             <div>
               <div className="text-muted-foreground text-[12px]">Market Cap</div>
               <div className="font-semibold text-[17px] tabular-nums">
-                {marketCapUsd > 0 ? formatMarketCap(marketCapUsd) : "--"}
+                {formatMarketCap(marketCapUsd)}
               </div>
             </div>
             <div className="relative">
@@ -881,6 +1096,7 @@ export default function RigDetailPage() {
         rigAddress={rigAddress}
         tokenSymbol={tokenSymbol}
         tokenName={tokenName}
+        tokenLogoUrl={logoUrl}
         multicallAddress={multicallAddress}
       />
 
@@ -891,6 +1107,7 @@ export default function RigDetailPage() {
         rigAddress={rigAddress}
         tokenSymbol={tokenSymbol}
         tokenName={tokenName}
+        tokenLogoUrl={logoUrl}
       />
 
       {/* Fund Modal */}
@@ -900,6 +1117,7 @@ export default function RigDetailPage() {
         rigAddress={rigAddress}
         tokenSymbol={tokenSymbol}
         tokenName={tokenName}
+        tokenLogoUrl={logoUrl}
       />
 
       {/* Trade Modal (Buy/Sell) */}

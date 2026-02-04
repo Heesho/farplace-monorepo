@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { X, Loader2, AlertCircle } from "lucide-react";
+import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther, parseUnits } from "viem";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useFundRigState } from "@/hooks/useFundRigState";
@@ -20,9 +20,10 @@ import {
 } from "@/lib/contracts";
 import { NavBar } from "@/components/nav-bar";
 import { Leaderboard } from "@/components/leaderboard";
+import { DonationHistoryItem } from "@/components/donation-history-item";
 
 // Preset funding amounts
-const PRESET_AMOUNTS = [5, 10, 25, 50];
+const PRESET_AMOUNTS = [1, 10, 100];
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,7 +35,45 @@ type FundModalProps = {
   rigAddress: `0x${string}`;
   tokenSymbol?: string;
   tokenName?: string;
+  tokenLogoUrl?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// Token Logo
+// ---------------------------------------------------------------------------
+
+function TokenLogo({
+  symbol,
+  logoUrl,
+  size = "sm",
+}: {
+  symbol: string;
+  logoUrl?: string | null;
+  size?: "xs" | "sm";
+}) {
+  const sizeClasses = {
+    xs: "w-4 h-4 text-[8px]",
+    sm: "w-5 h-5 text-[10px]",
+  };
+
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={symbol}
+        className={`${sizeClasses[size].split(" ").slice(0, 2).join(" ")} rounded-full object-cover`}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-semibold`}
+    >
+      {symbol.charAt(0)}
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,10 +116,11 @@ export function FundModal({
   rigAddress,
   tokenSymbol = "TOKEN",
   tokenName = "Token",
+  tokenLogoUrl,
 }: FundModalProps) {
   // ---------- Local UI state ----------
-  const [fundAmount, setFundAmount] = useState("5");
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(5);
+  const [fundAmount, setFundAmount] = useState("1");
+  const [selectedPreset, setSelectedPreset] = useState<number | null>(1);
   const [isCustom, setIsCustom] = useState(false);
   const [message, setMessage] = useState("");
   const defaultMessage = "for the cause";
@@ -280,7 +320,7 @@ export function FundModal({
           >
             <X className="w-5 h-5" />
           </button>
-          <span className="text-base font-semibold">Fund</span>
+          <span className="text-base font-semibold">Mine</span>
           <div className="w-9" />
         </div>
 
@@ -325,9 +365,7 @@ export function FundModal({
                 <div>
                   <div className="text-muted-foreground text-[10px]">Emission</div>
                   <div className="font-semibold text-[13px] tabular-nums flex items-center gap-1">
-                    <span className="w-4 h-4 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[8px] text-white font-semibold">
-                      {tokenSymbol.charAt(0)}
-                    </span>
+                    <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="xs" />
                     {todayEmission >= 1_000_000 ? `${(todayEmission / 1_000_000).toFixed(2)}M`
                       : todayEmission >= 1_000 ? `${(todayEmission / 1_000).toFixed(0)}K`
                       : todayEmission.toFixed(0)}
@@ -378,8 +416,8 @@ export function FundModal({
                     <button
                       onClick={() => {
                         setIsCustom(false);
-                        setFundAmount("5");
-                        setSelectedPreset(5);
+                        setFundAmount("1");
+                        setSelectedPreset(1);
                       }}
                       className="px-3 py-2 rounded-lg text-[13px] font-semibold bg-zinc-800 text-white hover:bg-zinc-700 transition-all"
                     >
@@ -409,19 +447,6 @@ export function FundModal({
             {/* Scrollable Content */}
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
 
-              {/* Transaction Status */}
-              {txStatus === "error" && txError && (
-                <div className="flex items-center gap-2 text-[13px] text-red-400 bg-red-500/10 rounded-lg px-3 py-2 mb-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{txError.message ?? "Transaction failed"}</span>
-                </div>
-              )}
-              {txStatus === "success" && (
-                <div className="flex items-center gap-2 text-[13px] text-zinc-300 bg-zinc-700/50 rounded-lg px-3 py-2 mb-2">
-                  <span>Transaction confirmed!</span>
-                </div>
-              )}
-
               {/* Your Position */}
               <div className="mb-6">
                 <div className="font-semibold text-[18px] mb-3">Your position</div>
@@ -432,48 +457,58 @@ export function FundModal({
                     <div>
                       <div className="text-muted-foreground text-[12px] mb-1">Pending</div>
                       <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
-                          {tokenSymbol.charAt(0)}
-                        </span>
+                        <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
                         {pendingTokens >= 1000
                           ? `${(pendingTokens / 1000).toFixed(1)}K`
                           : pendingTokens.toFixed(0)}
                         <span className="text-[12px] text-muted-foreground font-normal">
-                          · {unclaimedDayCount}d
+                          ${(pendingTokens * currentPricePerToken).toFixed(2)} · {unclaimedDayCount}d
                         </span>
                       </div>
                     </div>
                     <button
                       onClick={handleClaim}
-                      disabled={txStatus === "pending"}
-                      className={`px-5 py-2 text-[13px] font-semibold rounded-xl transition-all ${
-                        txStatus === "pending"
+                      disabled={txStatus === "pending" || txStatus === "success"}
+                      className={`px-5 py-2 text-[13px] font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
+                        txStatus === "success"
+                          ? "bg-green-600 text-white"
+                          : txStatus === "error"
+                          ? "bg-red-600 text-white"
+                          : txStatus === "pending"
                           ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                           : "bg-white text-black hover:bg-zinc-200"
                       }`}
                     >
-                      {txStatus === "pending" ? "Claiming..." : "Claim"}
+                      {txStatus === "pending" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {txStatus === "success" && <CheckCircle className="w-3.5 h-3.5" />}
+                      {txStatus === "pending"
+                        ? "Claiming..."
+                        : txStatus === "success"
+                        ? "Claimed!"
+                        : txStatus === "error"
+                        ? "Failed"
+                        : "Claim"}
                     </button>
                   </div>
                 )}
 
-                {/* Today + Est. */}
+                {/* Estimated + Today */}
                 <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-4">
                   <div>
-                    <div className="text-muted-foreground text-[12px] mb-1">Today</div>
-                    <div className="font-semibold text-[15px] tabular-nums">
-                      ${userTodayDonation.toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground text-[12px] mb-1">Est.</div>
+                    <div className="text-muted-foreground text-[12px] mb-1">Estimated</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
                         {tokenSymbol.charAt(0)}
                       </span>
-                      ~{todayTotalDonated > 0
+                      {todayTotalDonated > 0
                         ? ((userTodayDonation / todayTotalDonated) * todayEmission / 1000).toFixed(1)
                         : "0"}K
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-[12px] mb-1">Today</div>
+                    <div className="font-semibold text-[15px] tabular-nums">
+                      ${userTodayDonation.toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -481,7 +516,24 @@ export function FundModal({
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-y-4 gap-x-8">
                   <div>
-                    <div className="text-muted-foreground text-[12px] mb-1">Earned</div>
+                    <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
+                    <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
+                        {tokenSymbol.charAt(0)}
+                      </span>
+                      {(userUnitBalance + pendingTokens) >= 1000
+                        ? `${((userUnitBalance + pendingTokens) / 1000).toFixed(1)}K`
+                        : (userUnitBalance + pendingTokens).toFixed(0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-[12px] mb-1">Value</div>
+                    <div className="font-semibold text-[15px] tabular-nums">
+                      ${((userUnitBalance + pendingTokens) * currentPricePerToken).toFixed(2)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground text-[12px] mb-1">Claimed</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
                         {tokenSymbol.charAt(0)}
@@ -500,43 +552,36 @@ export function FundModal({
                 </div>
               </div>
 
-              {/* Recent Donations */}
+              {/* Recent Mines */}
               <div className="mt-6">
-                <h2 className="text-[18px] font-semibold mb-3">Recent Donations</h2>
+                <h2 className="text-[18px] font-semibold mb-3">Recent Mines</h2>
                 {isHistoryLoading ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : donations.length === 0 ? (
                   <div className="text-center py-4 text-muted-foreground text-[13px]">
-                    No donation history yet
+                    No mines yet
                   </div>
                 ) : (
                   <div>
-                    {/* Header */}
-                    <div className="grid grid-cols-[1fr_4.5rem_4rem] gap-2 px-2 pb-2 text-[11px] text-muted-foreground">
-                      <span>Donor</span>
-                      <span className="text-right">Amount</span>
-                      <span className="text-right">Time</span>
-                    </div>
-
-                    {/* Entries */}
-                    <div className="space-y-1">
-                      {donations.map((donation, index) => {
-                        const isUser = account && donation.donor.toLowerCase() === account.toLowerCase();
-                        return (
-                          <div key={`${donation.donor}-${donation.timestamp}-${index}`}
-                            className={`grid grid-cols-[1fr_4.5rem_4rem] gap-2 px-2 py-2 rounded-lg text-[12px] ${isUser ? "bg-white/5" : ""}`}>
-                            <span className="font-mono truncate">
-                              {truncateAddress(donation.donor)}
-                              {isUser && <span className="ml-1 text-[10px] text-muted-foreground">(you)</span>}
-                            </span>
-                            <span className="text-right tabular-nums">${formatUSDC(donation.amount)}</span>
-                            <span className="text-right text-muted-foreground">{timeAgo(Number(donation.timestamp))}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {donations.map((donation, index) => (
+                      <DonationHistoryItem
+                        key={`${donation.donor}-${donation.timestamp}-${index}`}
+                        donation={{
+                          id: `${donation.donor}-${donation.timestamp}-${index}`,
+                          donor: donation.donor,
+                          uri: "",
+                          amount: donation.amount,
+                          estimatedTokens: todayEmission > 0
+                            ? BigInt(Math.floor((Number(formatUnits(donation.amount, QUOTE_TOKEN_DECIMALS)) / (todayTotalDonated || 1)) * todayEmission * 1e18))
+                            : 0n,
+                          timestamp: Number(donation.timestamp),
+                        }}
+                        timeAgo={timeAgo}
+                        tokenSymbol={tokenSymbol}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -587,10 +632,14 @@ export function FundModal({
               </div>
               <button
                 onClick={handleFund}
-                disabled={txStatus === "pending" || parsedAmount <= 0 || parsedAmount > userBalance}
+                disabled={txStatus === "pending" || txStatus === "success" || parsedAmount <= 0 || parsedAmount > userBalance}
                 className={`
-                  w-32 h-10 text-[14px] font-semibold rounded-xl transition-all
-                  ${txStatus === "pending"
+                  w-32 h-10 text-[14px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2
+                  ${txStatus === "success"
+                    ? "bg-green-600 text-white"
+                    : txStatus === "error"
+                    ? "bg-red-600 text-white"
+                    : txStatus === "pending"
                     ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                     : parsedAmount > 0 && parsedAmount <= userBalance
                       ? "bg-white text-black hover:bg-zinc-200"
@@ -598,7 +647,15 @@ export function FundModal({
                   }
                 `}
               >
-                {txStatus === "pending" ? "Funding..." : "Fund"}
+                {txStatus === "pending" && <Loader2 className="w-4 h-4 animate-spin" />}
+                {txStatus === "success" && <CheckCircle className="w-4 h-4" />}
+                {txStatus === "pending"
+                  ? "Mining..."
+                  : txStatus === "success"
+                  ? "Success"
+                  : txStatus === "error"
+                  ? "Failed"
+                  : "Mine"}
               </button>
             </div>
           </div>
