@@ -49,9 +49,34 @@ export type SubgraphRig = {
   lastActivityAt: string; // BigInt
   createdAt: string;
   createdAtBlock: string;
-  mineRig: { id: string; capacity: string } | null;
-  spinRig: { id: string } | null;
-  fundRig: { id: string } | null;
+  mineRig: {
+    id: string;
+    capacity: string;
+    initialUps: string;
+    tailUps: string;
+    halvingAmount: string;
+    epochPeriod: string;
+    priceMultiplier: string;
+    minInitPrice: string;
+  } | null;
+  spinRig: {
+    id: string;
+    initialUps: string;
+    tailUps: string;
+    halvingPeriod: string;
+    epochPeriod: string;
+    priceMultiplier: string;
+    minInitPrice: string;
+    currentOdds: string[];
+  } | null;
+  fundRig: {
+    id: string;
+    initialEmission: string;
+    minEmission: string;
+    halvingPeriod: string;
+    minDonation: string;
+    recipient: string;
+  } | null;
 };
 
 export type SubgraphUnitListItem = {
@@ -67,6 +92,7 @@ export type SubgraphUnitListItem = {
   liquidityUSD: string;
   volume24h: string;
   priceChange24h: string;
+  totalSupply: string;
   totalMinted: string;
   lastActivityAt: string;
   createdAt: string;
@@ -170,9 +196,34 @@ const RIG_FIELDS = `
   lastActivityAt
   createdAt
   createdAtBlock
-  mineRig { id capacity }
-  spinRig { id }
-  fundRig { id }
+  mineRig {
+    id
+    capacity
+    initialUps
+    tailUps
+    halvingAmount
+    epochPeriod
+    priceMultiplier
+    minInitPrice
+  }
+  spinRig {
+    id
+    initialUps
+    tailUps
+    halvingPeriod
+    epochPeriod
+    priceMultiplier
+    minInitPrice
+    currentOdds
+  }
+  fundRig {
+    id
+    initialEmission
+    minEmission
+    halvingPeriod
+    minDonation
+    recipient
+  }
 `;
 
 const UNIT_LIST_FIELDS = `
@@ -188,6 +239,7 @@ const UNIT_LIST_FIELDS = `
   liquidityUSD
   volume24h
   priceChange24h
+  totalSupply
   totalMinted
   lastActivityAt
   createdAt
@@ -265,6 +317,7 @@ export const SEARCH_RIGS_QUERY = gql`
       liquidityUSD
       volume24h
       priceChange24h
+      totalSupply
       totalMinted
       lastActivityAt
       createdAt
@@ -459,6 +512,25 @@ export const GET_UNIT_DAY_DATA_QUERY = gql`
       volumeUnit
       volumeUsdc
       txCount
+    }
+  }
+`;
+
+// Get hourly candle data for multiple units (for sparklines)
+export const GET_BATCH_UNIT_HOUR_DATA_QUERY = gql`
+  query GetBatchUnitHourData($unitAddresses: [String!]!, $since: BigInt!) {
+    unitHourDatas(
+      where: { unit_in: $unitAddresses, timestamp_gte: $since }
+      orderBy: timestamp
+      orderDirection: asc
+      first: 1000
+    ) {
+      id
+      unit {
+        id
+      }
+      timestamp
+      close
     }
   }
 `;
@@ -775,5 +847,48 @@ export async function getUnitDayData(
   } catch (error) {
     console.error("[getUnitDayData] Error:", error);
     return [];
+  }
+}
+
+// Batch fetch sparkline data for multiple units (last 24h hourly)
+export type SparklineDataPoint = { timestamp: number; price: number };
+export type SparklineMap = Map<string, SparklineDataPoint[]>;
+
+export async function getBatchSparklineData(
+  unitAddresses: string[]
+): Promise<SparklineMap> {
+  if (unitAddresses.length === 0) return new Map();
+
+  const since = Math.floor(Date.now() / 1000) - 86400; // Last 24 hours
+
+  try {
+    const data = await client.request<{
+      unitHourDatas: Array<{
+        unit: { id: string };
+        timestamp: string;
+        close: string;
+      }>;
+    }>(GET_BATCH_UNIT_HOUR_DATA_QUERY, {
+      unitAddresses: unitAddresses.map((a) => a.toLowerCase()),
+      since: since.toString(),
+    });
+
+    // Group by unit address
+    const result: SparklineMap = new Map();
+    for (const candle of data.unitHourDatas ?? []) {
+      const unitId = candle.unit.id.toLowerCase();
+      if (!result.has(unitId)) {
+        result.set(unitId, []);
+      }
+      result.get(unitId)!.push({
+        timestamp: parseInt(candle.timestamp),
+        price: parseFloat(candle.close),
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[getBatchSparklineData] Error:", error);
+    return new Map();
   }
 }

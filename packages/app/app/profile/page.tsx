@@ -427,6 +427,32 @@ export default function ProfilePage() {
               {totalValueUsd > 0 ? formatUsd(totalValueUsd) : "$0.00"}
             </div>
           </div>
+
+          {/* Cash Balance */}
+          <div className="pb-3">
+            <div className="text-[12px] text-muted-foreground mb-1">
+              Cash Balance
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-[18px] font-semibold tabular-nums">
+                ${formattedUsdc}
+              </div>
+              <button
+                onClick={() =>
+                  mintUsdc({
+                    address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
+                    abi: MOCK_MINT_ABI,
+                    functionName: "mint",
+                    args: [address!, parseUnits("1000", QUOTE_TOKEN_DECIMALS)],
+                  })
+                }
+                disabled={isUsdcMinting}
+                className="text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {isUsdcMinting ? "Minting..." : "Mint 1000"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -467,39 +493,6 @@ export default function ProfilePage() {
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
           {activeTab === "holdings" && (
             <div className="py-1">
-              {/* USDC balance row */}
-              <div className="flex items-center justify-between py-3 -mx-4 px-4 rounded-lg">
-                <div className="flex items-center gap-3 min-w-0">
-                  <UsdcIcon size={40} />
-                  <div className="min-w-0">
-                    <div className="text-[15px] font-medium truncate">USDC</div>
-                    <div className="text-[12px] text-muted-foreground">USD Coin</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() =>
-                    mintUsdc({
-                      address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
-                      abi: MOCK_MINT_ABI,
-                      functionName: "mint",
-                      args: [address!, parseUnits("1000", QUOTE_TOKEN_DECIMALS)],
-                    })
-                  }
-                  disabled={isUsdcMinting}
-                  className="text-[12px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 shrink-0"
-                >
-                  {isUsdcMinting ? "Minting..." : "Mint 1000"}
-                </button>
-                <div className="text-right shrink-0 ml-3">
-                  <div className="text-[15px] font-semibold tabular-nums">
-                    {formatUsd(usdcValueUsd)}
-                  </div>
-                  <div className="text-[12px] text-muted-foreground tabular-nums">
-                    {formattedUsdc} USDC
-                  </div>
-                </div>
-              </div>
-
               {/* Mined token rows */}
               {minedRigs.map((rig) => (
                 <HoldingRow

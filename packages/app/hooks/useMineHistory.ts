@@ -10,6 +10,8 @@ export type MineEvent = {
   price: bigint;
   minted: bigint;
   timestamp: bigint;
+  uri: string;
+  multiplier: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -37,6 +39,8 @@ export function useMineHistory(
     price: BigInt(Math.floor(parseFloat(m.price) * 1e6)), // USDC 6 decimals
     minted: BigInt(Math.floor(parseFloat(m.minted) * 1e18)), // Unit 18 decimals
     timestamp: BigInt(m.timestamp),
+    uri: m.uri || "",
+    multiplier: 1, // Not stored in subgraph, default to 1
   }));
 
   return {

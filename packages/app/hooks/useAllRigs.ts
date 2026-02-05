@@ -66,6 +66,17 @@ export function useSearchUnits(searchQuery: string) {
 
 // Convert SubgraphUnitListItem to RigListItem
 function unitToRigListItem(u: SubgraphUnitListItem): RigListItem {
+  // Price: prefer priceUSD, fallback to price (which is in USDC ≈ USD)
+  const priceUsd = parseFloat(u.priceUSD) || parseFloat(u.price) || 0;
+  const totalSupply = parseFloat(u.totalSupply || "0");
+  const totalMinted = parseFloat(u.totalMinted || "0");
+
+  // Calculate market cap: prefer subgraph value, fallback to price × totalSupply
+  let marketCapUsd = parseFloat(u.marketCapUSD) || 0;
+  if (marketCapUsd === 0 && priceUsd > 0 && totalSupply > 0) {
+    marketCapUsd = priceUsd * totalSupply;
+  }
+
   return {
     address: u.rig.id.toLowerCase() as `0x${string}`,
     unitAddress: u.id.toLowerCase() as `0x${string}`,
@@ -75,12 +86,12 @@ function unitToRigListItem(u: SubgraphUnitListItem): RigListItem {
     rigType: u.rig.rigType,
     rigUri: u.rig.uri,
     launcher: u.rig.launcher.id.toLowerCase() as `0x${string}`,
-    priceUsd: parseFloat(u.priceUSD) || 0,
+    priceUsd,
     change24h: parseFloat(u.priceChange24h) || 0,
-    marketCapUsd: parseFloat(u.marketCapUSD) || 0,
+    marketCapUsd,
     volume24h: parseFloat(u.volume24h) || 0,
-    liquidityUsd: parseFloat(u.liquidityUSD) || 0,
-    totalMinted: BigInt(Math.floor(parseFloat(u.totalMinted || "0") * 1e18)),
+    liquidityUsd: parseFloat(u.liquidityUSD) || parseFloat(u.liquidity) || 0,
+    totalMinted: BigInt(Math.floor(totalMinted * 1e18)),
     lastActivityAt: parseInt(u.lastActivityAt) || 0,
     createdAt: parseInt(u.createdAt) || 0,
   };

@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Upload, ChevronDown, ChevronUp, ChevronLeft, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
-import { parseUnits } from "viem";
+import { parseUnits, formatUnits } from "viem";
+import { useReadContract } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   useBatchedTransaction,
@@ -16,6 +18,7 @@ import {
   SPIN_MULTICALL_ABI,
   FUND_MULTICALL_ABI,
   QUOTE_TOKEN_DECIMALS,
+  ERC20_ABI,
 } from "@/lib/contracts";
 
 // USDC token icon - blue circle with $ sign
@@ -67,14 +70,14 @@ const BOUNDS = {
 
 };
 
-// Default values per rig type (all based on 21M total supply)
+// Default values per rig type
 const DEFAULTS = {
   mine: {
-    usdcAmount: 1000,
-    unitAmount: 1000000,
-    initialUps: 10, // 10 tokens/sec
-    tailUps: 0.1, // 0.1 token/sec floor
-    halvingAmount: 1000000, // 1M tokens (supply-based)
+    usdcAmount: 1,
+    unitAmount: 1000,
+    initialUps: 4, // 4 tokens/sec
+    tailUps: 0.01, // 0.01 token/sec floor
+    halvingAmount: 10000000, // 10M tokens (supply-based) → ~20M at floor
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
     rigMinInitPrice: 1, // $1
@@ -86,10 +89,10 @@ const DEFAULTS = {
     upsMultiplierDuration: 86400, // 24h
   },
   spin: {
-    usdcAmount: 1000,
-    unitAmount: 1000000,
-    initialUps: 10, // 10 tokens/sec
-    tailUps: 0.1, // 0.1 token/sec floor
+    usdcAmount: 1,
+    unitAmount: 1000,
+    initialUps: 4, // 4 tokens/sec
+    tailUps: 0.01, // 0.01 token/sec floor
     halvingPeriod: 30 * 24 * 3600, // 30 days (time-based)
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
@@ -101,8 +104,8 @@ const DEFAULTS = {
     odds: [100, 100, 100, 100, 200, 200, 200, 500, 500, 1000] as number[], // ~3% average payout
   },
   fund: {
-    usdcAmount: 1000,
-    unitAmount: 1000000,
+    usdcAmount: 1,
+    unitAmount: 1000,
     initialUps: 50000, // 50,000 tokens/day (expressed as daily)
     tailUps: 5000, // 5,000 tokens/day floor
     halvingPeriod: 30 * 24 * 3600, // 30 days
@@ -169,12 +172,14 @@ function EmissionPreview({
   tailUps,
   halvingPeriod,
   halvingAmount,
+  compact = false,
 }: {
   rigType: "mine" | "spin" | "fund";
   initialUps: number;
   tailUps: number;
   halvingPeriod: number;
   halvingAmount: number;
+  compact?: boolean;
 }) {
   const formatSupply = (n: number) => {
     if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
@@ -297,20 +302,14 @@ function EmissionPreview({
     afterFloorPerYear = tailPerSec * 86400 * 365;
   }
 
-  return (
-    <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
+  const content = (
+    <>
       <div className="text-[13px] font-medium text-zinc-300">Emission Schedule</div>
       <div className="space-y-1.5 text-[12px]">
         <div className="flex justify-between items-center">
           <span className="text-zinc-500">First halving</span>
           <span className="text-zinc-300 font-medium tabular-nums">
             {formatTime(firstHalvingDays)} · {formatSupply(firstHalvingSupply)} tokens
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-zinc-500">50% to floor</span>
-          <span className="text-zinc-300 font-medium tabular-nums">
-            {formatTime(halfwayDays)} · {formatSupply(halfwaySupply)} tokens
           </span>
         </div>
         <div className="flex justify-between items-center">
@@ -326,44 +325,169 @@ function EmissionPreview({
           </span>
         </div>
       </div>
-      <div className="text-[11px] text-zinc-500 pt-1 border-t border-zinc-700/50">
-        {totalHalvings} halvings{rigType === "mine" ? " · Time estimates assume continuous mining" : ""}
+      <div className="text-[11px] text-zinc-500 pt-1">
+        {totalHalvings} halvings
       </div>
+    </>
+  );
+
+  if (compact) {
+    return <div className="space-y-2">{content}</div>;
+  }
+
+  return (
+    <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
+      {content}
     </div>
   );
 }
 
-// Simple mode summary component
-function SimpleModeSummary({ rigType }: { rigType: "mine" | "spin" | "fund" }) {
-  const summaries = {
-    mine: [
-      "21M total supply",
-      "1,000 USDC liquidity",
-      "Halving every 1M tokens mined",
-      "1 hour epochs, 2x price multiplier",
-    ],
-    spin: [
-      "21M total supply",
-      "1,000 USDC liquidity",
-      "Halving every 30 days",
-      "95% of spins go to prize pool",
-    ],
-    fund: [
-      "21M total supply",
-      "1,000 USDC liquidity",
-      "Configurable halving period (7-365 days)",
-      "50% of funds go to recipient",
-    ],
+// Combined settings summary component
+function SettingsSummary({
+  rigType,
+  usdcAmount,
+  unitAmount,
+  initialUps,
+  tailUps,
+  halvingAmount,
+  halvingPeriod,
+  rigEpochPeriod,
+  rigPriceMultiplier,
+  rigMinInitPrice,
+  upsMultipliers,
+  odds,
+}: {
+  rigType: "mine" | "spin" | "fund";
+  usdcAmount: number;
+  unitAmount: number;
+  initialUps: number;
+  tailUps: number;
+  halvingAmount: number;
+  halvingPeriod: number;
+  rigEpochPeriod: number;
+  rigPriceMultiplier: number;
+  rigMinInitPrice: number;
+  upsMultipliers: number[];
+  odds: number[];
+}) {
+  const formatNum = (n: number) => {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+    if (n >= 1) return n.toFixed(0);
+    return n.toFixed(2);
+  };
+
+  const formatDur = (seconds: number) => {
+    if (seconds >= 86400) return `${Math.round(seconds / 86400)}d`;
+    if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
+    return `${Math.round(seconds / 60)}m`;
+  };
+
+  // Calculate multiplier probabilities for display
+  const getMultiplierSummary = () => {
+    if (upsMultipliers.length === 0) return "No multipliers (1x only)";
+    const counts: Record<number, number> = {};
+    upsMultipliers.forEach(m => { counts[m] = (counts[m] || 0) + 1; });
+    const parts = Object.entries(counts)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([mult, count]) => `${mult}x: ${Math.round((count / upsMultipliers.length) * 100)}%`);
+    return parts.join(", ");
+  };
+
+  // Calculate odds summary for SpinRig
+  const getOddsSummary = () => {
+    const counts: Record<number, number> = {};
+    odds.forEach(o => { counts[o] = (counts[o] || 0) + 1; });
+    const parts = Object.entries(counts)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([bps, count]) => `${(Number(bps) / 100).toFixed(1)}%: ${Math.round((count / odds.length) * 100)}%`);
+    return parts.join(", ");
   };
 
   return (
-    <div className="bg-zinc-800/50 rounded-lg p-3 space-y-1">
-      {summaries[rigType].map((item, i) => (
-        <div key={i} className="text-[13px] text-zinc-400 flex items-center gap-2">
+    <div className="bg-zinc-800/50 rounded-lg p-3 space-y-3">
+      <div className="text-[13px] font-medium text-zinc-300">Default Settings</div>
+
+      {/* All settings as bullet points */}
+      <div className="space-y-1">
+        <div className="text-[12px] text-zinc-400 flex items-center gap-2">
           <span className="text-zinc-500">•</span>
-          {item}
+          Initial LP: ${formatNum(usdcAmount)} + {formatNum(unitAmount)} tokens
         </div>
-      ))}
+        <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+          <span className="text-zinc-500">•</span>
+          Starting price: ${(usdcAmount / unitAmount).toFixed(6)}
+        </div>
+        {rigType === "mine" && (
+          <>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Emission: {formatNum(initialUps)}/sec initial → {formatNum(tailUps)}/sec floor
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Halving every {formatNum(halvingAmount)} tokens mined
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Mining: {formatDur(rigEpochPeriod)} epochs, ${rigMinInitPrice} min price, {rigPriceMultiplier}x multiplier
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              UPS multipliers: {getMultiplierSummary()}
+            </div>
+          </>
+        )}
+        {rigType === "spin" && (
+          <>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Emission: {formatNum(initialUps)}/sec initial → {formatNum(tailUps)}/sec floor
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Halving every {formatDur(halvingPeriod)}
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Spinning: {formatDur(rigEpochPeriod)} epochs, ${rigMinInitPrice} min price, {rigPriceMultiplier}x multiplier
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Payout odds: {getOddsSummary()}
+            </div>
+          </>
+        )}
+        {rigType === "fund" && (
+          <>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Emission: {formatNum(initialUps)}/day initial → {formatNum(tailUps)}/day floor
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              Halving every {formatDur(halvingPeriod)}
+            </div>
+            <div className="text-[12px] text-zinc-400 flex items-center gap-2">
+              <span className="text-zinc-500">•</span>
+              50% of donations go to recipient
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Emission Schedule - use the existing EmissionPreview component */}
+      <div className="pt-3">
+        <EmissionPreview
+          rigType={rigType}
+          initialUps={initialUps}
+          tailUps={tailUps}
+          halvingPeriod={halvingPeriod}
+          halvingAmount={halvingAmount}
+          compact
+        />
+      </div>
     </div>
   );
 }
@@ -415,6 +539,15 @@ function Slider({
 export default function LaunchPage() {
   const { address: account, isConnected, isInFrame, isConnecting, connect } = useFarcaster();
   const { execute, status: txStatus, txHash, error: txError } = useBatchedTransaction();
+
+  // Read user's USDC balance
+  const { data: usdcBalance } = useReadContract({
+    address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: account ? [account] : undefined,
+    query: { enabled: !!account },
+  });
 
   // Rig type selection
   const [rigType, setRigType] = useState<RigType>(null);
@@ -922,18 +1055,22 @@ export default function LaunchPage() {
                 )}
               </button>
 
-              {/* Simple Mode Summary (only when Advanced collapsed) */}
+              {/* Settings Summary (only when Advanced collapsed) */}
               {!showAdvanced && (
-                <>
-                  <SimpleModeSummary rigType={rigType} />
-                  <EmissionPreview
-                    rigType={rigType}
-                    initialUps={initialUps}
-                    tailUps={tailUps}
-                    halvingPeriod={halvingPeriod}
-                    halvingAmount={halvingAmount}
-                  />
-                </>
+                <SettingsSummary
+                  rigType={rigType}
+                  usdcAmount={usdcAmount}
+                  unitAmount={unitAmount}
+                  initialUps={initialUps}
+                  tailUps={tailUps}
+                  halvingAmount={halvingAmount}
+                  halvingPeriod={halvingPeriod}
+                  rigEpochPeriod={rigEpochPeriod}
+                  rigPriceMultiplier={rigPriceMultiplier}
+                  rigMinInitPrice={rigMinInitPrice}
+                  upsMultipliers={upsMultipliers}
+                  odds={odds}
+                />
               )}
 
               {/* Advanced Settings */}
@@ -946,9 +1083,9 @@ export default function LaunchPage() {
                       label="USDC for LP"
                       value={usdcAmount}
                       onChange={setUsdcAmount}
-                      min={1000}
-                      max={100000}
-                      step={1000}
+                      min={1}
+                      max={1000}
+                      step={1}
                       formatValue={formatNumber}
                       description="USDC provided for initial liquidity"
                     />
@@ -956,9 +1093,9 @@ export default function LaunchPage() {
                       label="Initial Token Supply"
                       value={unitAmount}
                       onChange={setUnitAmount}
-                      min={100000}
+                      min={100}
                       max={100000000}
-                      step={100000}
+                      step={100}
                       formatValue={formatNumber}
                       description="Tokens minted for initial LP"
                     />
@@ -983,25 +1120,18 @@ export default function LaunchPage() {
                           <div className="flex items-center justify-between">
                             <span className="text-[12px] text-zinc-500">Initial Price</span>
                             <div className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <UsdcIcon size={12} />
-                                <span className="text-[12px] font-medium tabular-nums">
-                                  {initialPriceUsdc.toFixed(6)}
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-zinc-500">{formatUsd(initialPriceUsd)}</span>
+                              <span className="text-[12px] font-medium tabular-nums">
+                                ${initialPriceUsdc.toFixed(6)}
+                              </span>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[12px] text-zinc-500">Initial Liquidity</span>
                             <div className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <UsdcIcon size={12} />
-                                <span className="text-[12px] font-medium tabular-nums">
-                                  {formatNumber(usdcAmount)} + {formatNumber(unitAmount)} tokens
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-zinc-500">{formatUsd(liquidityUsd)} TVL</span>
+                              <span className="text-[12px] font-medium tabular-nums">
+                                ${formatNumber(usdcAmount)} + {formatNumber(unitAmount)} tokens
+                              </span>
+                              <div className="text-[11px] text-zinc-500">{formatUsd(liquidityUsd)} TVL</div>
                             </div>
                           </div>
                           <div className="flex items-center justify-between">
@@ -1442,16 +1572,14 @@ export default function LaunchPage() {
               <div className="flex items-center gap-5">
                 <div>
                   <div className="text-muted-foreground text-[11px]">Amount</div>
-                  <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1">
-                    <UsdcIcon size={16} />
-                    {formatNumber(usdcAmount)}
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    ${formatNumber(usdcAmount)}
                   </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground text-[11px]">Balance</div>
-                  <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1">
-                    <UsdcIcon size={16} />
-                    {formatNumber(10000)} {/* TODO: Replace with actual user balance */}
+                  <div className="font-semibold text-[15px] tabular-nums">
+                    ${formatNumber(usdcBalance ? Number(formatUnits(usdcBalance, QUOTE_TOKEN_DECIMALS)) : 0)}
                   </div>
                 </div>
               </div>
@@ -1478,21 +1606,68 @@ export default function LaunchPage() {
                     {launchError || txError?.message}
                   </div>
                 )}
-                {txStatus === "success" && txHash && (
-                  <a
-                    href={`https://basescan.org/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-zinc-400 hover:text-white transition-colors"
-                  >
-                    View transaction
-                  </a>
-                )}
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Success Modal - contained within phone screen */}
+      {txStatus === "success" && txHash && (
+        <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
+          <div
+            className="relative flex h-full w-full max-w-[520px] flex-col bg-background items-center justify-center px-6"
+            style={{
+              paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+              paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)",
+            }}
+          >
+            <div className="text-center space-y-6 max-w-xs">
+              {/* Token preview first for visual hierarchy */}
+              {logoPreview && (
+                <div className="flex justify-center">
+                  <img src={logoPreview} alt={tokenName} className="w-24 h-24 rounded-full object-cover ring-2 ring-zinc-700" />
+                </div>
+              )}
+
+              {/* Success icon */}
+              <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+
+              {/* Message */}
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">Token Launched!</h2>
+                <p className="text-zinc-400 text-[15px]">
+                  <span className="font-semibold text-white">{tokenName}</span>
+                  {" "}({tokenSymbol}) is now live
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3 pt-2 w-full">
+                <Link
+                  href="/explore"
+                  className="block w-full py-3.5 px-4 bg-white text-black font-semibold text-[15px] rounded-xl hover:bg-zinc-200 transition-colors"
+                >
+                  View on Explore
+                </Link>
+                <a
+                  href={`https://basescan.org/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full py-3.5 px-4 bg-zinc-800 text-white font-semibold text-[15px] rounded-xl hover:bg-zinc-700 transition-colors"
+                >
+                  View Transaction
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <NavBar />
     </main>
   );

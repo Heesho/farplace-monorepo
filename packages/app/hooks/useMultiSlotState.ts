@@ -16,6 +16,7 @@ export type SlotDisplayState = {
   glazed: bigint;
   price: bigint;
   ups: bigint;
+  upsMultiplier: bigint;
   nextUps: bigint;
   miner: `0x${string}`;
   slotUri: string;
@@ -66,6 +67,7 @@ export function useMultiSlotState(
           glazed: 0n,
           price: 0n,
           ups: 0n,
+          upsMultiplier: 1n,
           nextUps: 0n,
           miner: zeroAddress,
           slotUri: "",
@@ -84,6 +86,7 @@ export function useMultiSlotState(
         glazed: state.glazed,
         price: state.price,
         ups: state.ups,
+        upsMultiplier: state.upsMultiplier,
         nextUps: state.nextUps,
         miner: state.miner,
         slotUri: state.slotUri,
