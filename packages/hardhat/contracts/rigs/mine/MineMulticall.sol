@@ -11,7 +11,7 @@ import {IMineCore} from "./interfaces/IMineCore.sol";
  * @title MineMulticall
  * @author heesho
  * @notice Helper contract for batched operations and aggregated view functions for MineRig.
- * @dev Provides multi-slot mining with entropy fee handling,
+ * @dev Provides single-slot mining with entropy fee handling,
  *      and comprehensive state queries for Rigs and Auctions.
  *      Quote token is read from each rig - users must approve this contract for the rig's quote token.
  *      ETH is only needed for entropy fees when randomness is enabled.
@@ -23,7 +23,6 @@ contract MineMulticall {
 
     error MineMulticall__ZeroAddress();
     error MineMulticall__InvalidRig();
-    error MineMulticall__ArrayLengthMismatch();
     error MineMulticall__InsufficientETH();
     error MineMulticall__ExcessETH();
 
@@ -77,16 +76,6 @@ contract MineMulticall {
         // User balances
         uint256 accountQuoteBalance;        // user's quote token balance
         uint256 accountPaymentTokenBalance; // user's LP balance
-    }
-
-    /**
-     * @notice Parameters for a single slot mining operation.
-     */
-    struct MineParams {
-        uint256 index;      // Slot index to mine
-        uint256 epochId;    // Expected epoch ID
-        uint256 maxPrice;   // Maximum price willing to pay
-        string slotUri;     // Metadata URI for this mining action
     }
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
@@ -152,77 +141,6 @@ contract MineMulticall {
         }
 
         // Refund any unused quote tokens (in case price changed)
-        uint256 quoteBalance = IERC20(quoteToken).balanceOf(address(this));
-        if (quoteBalance > 0) {
-            IERC20(quoteToken).safeTransfer(msg.sender, quoteBalance);
-        }
-    }
-
-    /**
-     * @notice Mine multiple rig slots in a single transaction.
-     * @dev All slots must be on the same rig. User must approve total quote token needed.
-     *      ETH only needed for entropy fees on slots that need randomness update.
-     *      Auto-claims for previous miners (best effort - won't revert if claims fail).
-     * @param rig Rig contract address
-     * @param params Array of mining parameters for each slot
-     * @param deadline Transaction deadline (applies to all)
-     */
-    function mineMultiple(
-        address rig,
-        MineParams[] calldata params,
-        uint256 deadline
-    ) external payable {
-        if (!IMineCore(core).rigToIsRig(rig)) revert MineMulticall__InvalidRig();
-        uint256 length = params.length;
-        if (length == 0) revert MineMulticall__ArrayLengthMismatch();
-
-        // Get quote token from rig
-        address quoteToken = IMineRig(rig).quote();
-
-        // Collect previous miners and calculate totals
-        address[] memory prevMiners = new address[](length);
-        uint256 totalEntropyFee = 0;
-        uint256 totalQuoteNeeded = 0;
-        for (uint256 i = 0; i < length;) {
-            prevMiners[i] = IMineRig(rig).getSlot(params[i].index).miner;
-            totalEntropyFee += _calculateEntropyFee(rig, params[i].index);
-            totalQuoteNeeded += IMineRig(rig).getPrice(params[i].index);
-            unchecked { ++i; }
-        }
-
-        if (msg.value < totalEntropyFee) revert MineMulticall__InsufficientETH();
-        if (msg.value > totalEntropyFee) revert MineMulticall__ExcessETH();
-
-        // Transfer total quote tokens from user upfront
-        if (totalQuoteNeeded > 0) {
-            IERC20(quoteToken).safeTransferFrom(msg.sender, address(this), totalQuoteNeeded);
-            IERC20(quoteToken).safeApprove(rig, 0);
-            IERC20(quoteToken).safeApprove(rig, totalQuoteNeeded);
-        }
-
-        // Mine each slot
-        for (uint256 i = 0; i < length;) {
-            uint256 slotEntropyFee = _calculateEntropyFee(rig, params[i].index);
-            IMineRig(rig).mine{value: slotEntropyFee}(
-                msg.sender,
-                params[i].index,
-                params[i].epochId,
-                deadline,
-                params[i].maxPrice,
-                params[i].slotUri
-            );
-            unchecked { ++i; }
-        }
-
-        // Auto-claim for previous miners (best effort - won't block mining if claims fail)
-        for (uint256 i = 0; i < length;) {
-            if (prevMiners[i] != address(0) && IMineRig(rig).accountToClaimable(prevMiners[i]) > 0) {
-                try IMineRig(rig).claim(prevMiners[i]) {} catch {}
-            }
-            unchecked { ++i; }
-        }
-
-        // Refund any unused quote tokens (in case prices changed)
         uint256 quoteBalance = IERC20(quoteToken).balanceOf(address(this));
         if (quoteBalance > 0) {
             IERC20(quoteToken).safeTransfer(msg.sender, quoteBalance);
@@ -422,24 +340,4 @@ contract MineMulticall {
         return state;
     }
 
-    /**
-     * @notice Calculate total costs to mine multiple slots.
-     * @dev Includes entropy fees for slots that need randomness update.
-     * @param rig Rig contract address
-     * @param indices Array of slot indices
-     * @return totalEntropyFee Total ETH needed for entropy fees
-     * @return totalQuoteNeeded Total quote token needed for slot prices
-     */
-    function estimateMineMultipleCost(
-        address rig,
-        uint256[] calldata indices
-    ) external view returns (uint256 totalEntropyFee, uint256 totalQuoteNeeded) {
-        uint256 length = indices.length;
-        for (uint256 i = 0; i < length;) {
-            totalEntropyFee += _calculateEntropyFee(rig, indices[i]);
-            totalQuoteNeeded += IMineRig(rig).getPrice(indices[i]);
-            unchecked { ++i; }
-        }
-        return (totalEntropyFee, totalQuoteNeeded);
-    }
 }
