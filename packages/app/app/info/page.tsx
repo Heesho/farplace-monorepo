@@ -6,66 +6,62 @@ const INFO_SECTIONS = [
   {
     title: "What is Farplace?",
     content:
-      "A launchpad where anyone can create and distribute tokens through gamified mechanisms. No presales, no VCs, no insider allocations.",
+      "A fair-launch token platform on Base. No presales, no insiders, no rugs. Tokens are earned through games — not bought from a team.",
     bullets: [
-      "Launch in minutes with full customization",
-      "Liquidity is locked forever - no rug pulls possible",
-      "All tokens paired with USDC for deep liquidity",
-      "Three distribution models: Mine, Spin, and Fund",
+      "Liquidity is locked forever — LP tokens are burned on launch",
+      "All contracts are immutable — nobody can change the rules",
+      "Three ways to earn: Mine, Spin, and Fund",
     ],
   },
   {
-    title: "Mine Rigs",
+    title: "How Mining Works",
     content:
-      "Compete for mining slots via Dutch auction pricing. Hold a slot to earn token emissions over time.",
+      "Claim a mining slot and earn token emissions for as long as you hold it. If someone takes your slot, you walk away with 80% of what they paid.",
     bullets: [
-      "Pay the current decaying price to claim a mining slot",
-      "Price resets higher after each claim, then decays over time",
-      "When your slot is taken, you earn 80% of the payment",
-      "Emissions halve over time like Bitcoin",
+      "Slot prices decay over time — wait longer, pay less",
+      "Each purchase resets the price higher, then it decays again",
+      "Emissions halve over time (like Bitcoin) with a guaranteed floor",
+      "Random VRF multipliers (up to 10x) can boost your earnings",
     ],
   },
   {
-    title: "Spin Rigs",
+    title: "How Spinning Works",
     content:
-      "Pay a Dutch auction price to spin for a chance to win tokens from a prize pool that grows with emissions.",
+      "The prize pool fills up with token emissions over time — whether or not anyone is playing. Pay to spin and win a random percentage of the pool.",
     bullets: [
-      "Prize pool grows continuously from token emissions",
-      "VRF randomness determines your payout percentage",
-      "Higher risk, higher reward - payouts range from 0.1% to 80% of the pool",
-      "Every spin has a chance at a big win",
+      "Payouts are determined by on-chain VRF — fully random, fully verifiable",
+      "The pool never fully drains — it keeps compounding between spins",
+      "Spin price decays over time, so patience pays off here too",
     ],
   },
   {
-    title: "Fund Rigs",
+    title: "How Funding Works",
     content:
-      "Donate to a daily pool and claim your proportional share of that day's token emission.",
+      "Donate to a creator or cause and earn tokens in return. Each day's token emission is split among donors based on how much they contributed.",
     bullets: [
-      "50% of donations go directly to the recipient",
-      "Daily emission is split proportionally among all donors",
-      "Claim your tokens after each day ends",
-      "Support creators while earning tokens",
+      "50% of every donation goes straight to the recipient",
+      "Your share of that day's emission matches your share of donations",
+      "Emissions halve on a schedule but never drop below a set floor",
     ],
   },
   {
     title: "Why It's Fair",
     content:
-      "Dutch auctions flip the script on snipers and bots.",
+      "Prices start high and drop over time (Dutch auction). Being first costs the most — not the least. Bots and snipers have no edge.",
     bullets: [
-      "Price starts HIGH and drops - being first costs the most",
-      "Patience beats speed - no advantage to bots",
-      "Everyone sees the same price decay in real-time",
+      "Everyone sees the same decaying price in real-time",
+      "No hidden allocations or team tokens",
+      "Treasury fees are auctioned off for LP tokens, which get burned — permanently deepening liquidity",
     ],
   },
   {
-    title: "For Creators",
+    title: "For Launchers",
     content:
-      "Full control over your token's economics:",
+      "Launch a token with your own emission schedule, pricing curves, and game mechanics. Everything is configured at launch and locked forever.",
     bullets: [
-      "Set emission rates and halving schedules",
-      "Configure auction timing and price curves",
-      "Earn 4% of all payments forever",
-      "Treasury collects fees for your project's growth",
+      "Set your own halvings, emission rates, and epoch durations",
+      "Earn 4% of all activity on your rig as the team fee",
+      "Treasury accumulates fees that get auctioned to grow your liquidity",
     ],
   },
 ];
