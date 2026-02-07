@@ -16,13 +16,14 @@ export type ChartDataPoint = { time: number; value: number };
 
 function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
   const now = Math.floor(Date.now() / 1000);
+  const tokenAge = createdAt ? now - createdAt : Infinity;
 
   switch (timeframe) {
     case "1H":
       return {
-        sinceTimestamp: now - 3600,
+        sinceTimestamp: now - 6 * 3600, // Fetch 6 hours of hourly candles
         refetchInterval: 30_000,
-        intervalSeconds: 180, // 3 min intervals for 1H (20 points)
+        intervalSeconds: 3600, // Match hourly candle granularity
         timeframeSeconds: 3600,
         useHourly: true,
       };
@@ -30,7 +31,7 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
       return {
         sinceTimestamp: now - 86400,
         refetchInterval: 30_000,
-        intervalSeconds: 3600, // 1 hour intervals for 1D (24 points)
+        intervalSeconds: 3600,
         timeframeSeconds: 86400,
         useHourly: true,
       };
@@ -38,37 +39,38 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
       return {
         sinceTimestamp: now - 7 * 86400,
         refetchInterval: 60_000,
-        intervalSeconds: 21600, // 6 hour intervals for 1W (28 points)
+        // Finer intervals for new tokens so trading data isn't collapsed
+        intervalSeconds: tokenAge < 86400 ? 3600 : 21600,
         timeframeSeconds: 7 * 86400,
-        useHourly: false,
+        useHourly: true,
       };
     case "1M":
       return {
         sinceTimestamp: now - 30 * 86400,
         refetchInterval: 60_000,
-        intervalSeconds: 86400, // 1 day intervals for 1M (30 points)
+        // Finer intervals for new tokens so trading data isn't collapsed
+        intervalSeconds: tokenAge < 86400 ? 3600 : tokenAge < 7 * 86400 ? 21600 : 86400,
         timeframeSeconds: 30 * 86400,
-        useHourly: false,
+        useHourly: tokenAge < 7 * 86400,
       };
     case "ALL": {
-      // Dynamic interval based on token age for ALL timeframe
-      const tokenAge = createdAt ? now - createdAt : 365 * 86400;
+      // Dynamic interval based on token age
       let intervalSeconds: number;
       let useHourly: boolean;
       if (tokenAge < 3600) {
-        intervalSeconds = 180; // < 1h old → 3min intervals
+        intervalSeconds = 180;
         useHourly = true;
       } else if (tokenAge < 86400) {
-        intervalSeconds = 900; // < 1d old → 15min intervals
+        intervalSeconds = 900;
         useHourly = true;
       } else if (tokenAge < 7 * 86400) {
-        intervalSeconds = 3600; // < 1w old → 1h intervals
+        intervalSeconds = 3600;
         useHourly = true;
       } else if (tokenAge < 30 * 86400) {
-        intervalSeconds = 21600; // < 1m old → 6h intervals
+        intervalSeconds = 21600;
         useHourly = false;
       } else {
-        intervalSeconds = 86400; // > 1m old → 1d intervals
+        intervalSeconds = 86400;
         useHourly = false;
       }
       return {
@@ -95,19 +97,13 @@ function fillChartData(
 ): ChartDataPoint[] {
   const config = getTimeframeConfig(timeframe, createdAt);
   const rawNow = Math.floor(Date.now() / 1000);
-  // Round "now" to the interval to prevent constant small shifts
   const now = Math.floor(rawNow / config.intervalSeconds) * config.intervalSeconds;
 
-  // For "ALL" timeframe, start before createdAt to show baseline
+  // ALL starts at createdAt (no pre-creation data, no baseline)
+  // Other timeframes start at their sinceTimestamp (shows baseline for pre-creation period)
   let startTimestamp: number;
   if (timeframe === "ALL" && createdAt) {
-    // Include 30% of token age before creation (min 1 interval) for baseline
-    const tokenAge = rawNow - createdAt;
-    const preBuffer = Math.max(Math.floor(tokenAge * 0.3), config.intervalSeconds * 3);
-    startTimestamp = Math.max(
-      Math.floor((createdAt - preBuffer) / config.intervalSeconds) * config.intervalSeconds,
-      rawNow - 365 * 86400,
-    );
+    startTimestamp = Math.floor(createdAt / config.intervalSeconds) * config.intervalSeconds;
   } else {
     startTimestamp = Math.floor(config.sinceTimestamp / config.intervalSeconds) * config.intervalSeconds;
   }
@@ -141,7 +137,7 @@ function fillChartData(
   }
 
   // Always add a final point at rawNow with currentPrice to ensure
-  // there's a post-creation data point (fixes 1M/ALL when token is very new
+  // there's a post-creation data point (fixes 1M/1W when token is very new
   // and `now` rounds down to before `createdAt`)
   if (currentPrice > 0) {
     const lastTime = result.length > 0 ? result[result.length - 1].time : 0;
@@ -216,9 +212,6 @@ export function usePriceHistory(
     placeholderData: (previousData) => previousData,
   });
 
-  // Fill in missing data points with last known price
-  // Memoize to prevent recalculating on every render
-  // Round currentPrice to prevent tiny floating point changes from causing recalcs
   const roundedPrice = Math.round(currentPrice * 1e6) / 1e6;
   const filledData = useMemo(
     () => fillChartData(rawData ?? [], timeframe, roundedPrice, createdAt, initialPrice),

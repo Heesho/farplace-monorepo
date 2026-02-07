@@ -172,7 +172,7 @@ export default function ExplorePage() {
                   >
                     <Link
                       href={`/rig/${rig.address}`}
-                      className={`grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4 transition-colors duration-200 hover:bg-white/[0.02]${index < rigs.length - 1 ? " border-b border-border" : ""}`}
+                      className="grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4 transition-colors duration-200 hover:bg-white/[0.02]"
                     >
                       {/* Left side - Logo, Symbol, Name */}
                       <div className="flex items-center gap-3">
