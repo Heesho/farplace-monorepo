@@ -350,7 +350,7 @@ describe("Core Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "Core__InsufficientUsdc()"
+      "MineCore__InsufficientUsdc()"
     );
     console.log("Launch correctly reverted with insufficient USDC");
   });
@@ -384,7 +384,7 @@ describe("Core Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "Core__EmptyTokenName()"
+      "MineCore__EmptyTokenName()"
     );
 
     console.log("Launch correctly reverted with invalid parameters");

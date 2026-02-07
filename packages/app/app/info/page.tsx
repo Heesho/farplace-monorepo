@@ -1,38 +1,50 @@
 "use client";
 
 import { NavBar } from "@/components/nav-bar";
-import { useFarcaster } from "@/hooks/useFarcaster";
 
 const INFO_SECTIONS = [
   {
-    title: "Why Mining?",
-    content:
-      "Mining is the fairest way to distribute tokens. No presales, no VCs, no insider allocations. Just time, commitment, and fair competition.",
-    bullets: [
-      "Everyone starts equal - no special access",
-      "Tokens are earned, not bought in bulk",
-      "Distribution happens over time, not all at once",
-    ],
-  },
-  {
     title: "What is Farplace?",
     content:
-      "A launchpad where anyone can create their own mineable token. You set the rules - emission rate, halving schedule, auction timing - and let the community mine.",
+      "A launchpad where anyone can create and distribute tokens through gamified mechanisms. No presales, no VCs, no insider allocations.",
     bullets: [
       "Launch in minutes with full customization",
       "Liquidity is locked forever - no rug pulls possible",
       "All tokens paired with USDC for deep liquidity",
+      "Three distribution models: Mine, Spin, and Fund",
     ],
   },
   {
-    title: "How It Works",
+    title: "Mine Rigs",
     content:
-      "Each token has a mining rig. One slot, many competitors. Hold the slot to earn emissions.",
+      "Compete for mining slots via Dutch auction pricing. Hold a slot to earn token emissions over time.",
     bullets: [
-      "Pay to claim the mining slot and start earning tokens",
-      "Price resets high after each claim, then decays over time",
-      "When someone takes your slot, you get 80% of what they paid",
+      "Pay the current decaying price to claim a mining slot",
+      "Price resets higher after each claim, then decays over time",
+      "When your slot is taken, you earn 80% of the payment",
       "Emissions halve over time like Bitcoin",
+    ],
+  },
+  {
+    title: "Spin Rigs",
+    content:
+      "Pay a Dutch auction price to spin for a chance to win tokens from a prize pool that grows with emissions.",
+    bullets: [
+      "Prize pool grows continuously from token emissions",
+      "VRF randomness determines your payout percentage",
+      "Higher risk, higher reward - payouts range from 0.1% to 80% of the pool",
+      "Every spin has a chance at a big win",
+    ],
+  },
+  {
+    title: "Fund Rigs",
+    content:
+      "Donate to a daily pool and claim your proportional share of that day's token emission.",
+    bullets: [
+      "50% of donations go directly to the recipient",
+      "Daily emission is split proportionally among all donors",
+      "Claim your tokens after each day ends",
+      "Support creators while earning tokens",
     ],
   },
   {
@@ -52,15 +64,13 @@ const INFO_SECTIONS = [
     bullets: [
       "Set emission rates and halving schedules",
       "Configure auction timing and price curves",
-      "Earn 4% of all mining payments forever",
-      "Treasury collects 15% for your project's growth",
+      "Earn 4% of all payments forever",
+      "Treasury collects fees for your project's growth",
     ],
   },
 ];
 
 export default function InfoPage() {
-  const { address } = useFarcaster();
-
   return (
     <main className="flex h-screen w-screen justify-center bg-zinc-800">
       <div
@@ -72,14 +82,7 @@ export default function InfoPage() {
       >
         {/* Header */}
         <div className="px-4 pb-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold tracking-tight">About</h1>
-            {address && (
-              <div className="px-3 py-1.5 rounded-full bg-secondary text-[13px] text-muted-foreground font-mono">
-                {address.slice(0, 6)}...{address.slice(-4)}
-              </div>
-            )}
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">About</h1>
         </div>
 
         {/* Content */}
@@ -88,7 +91,7 @@ export default function InfoPage() {
             {INFO_SECTIONS.map((section, index) => (
               <div
                 key={index}
-                className={index < INFO_SECTIONS.length - 1 ? "pb-6 border-b border-white/10" : ""}
+                className=""
               >
                 <h2 className="font-semibold text-foreground mb-2">
                   {section.title}

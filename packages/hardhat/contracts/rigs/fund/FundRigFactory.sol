@@ -12,38 +12,42 @@ import {FundRig} from "./FundRig.sol";
 contract FundRigFactory {
     /**
      * @notice Deploy a new FundRig contract.
-     * @param _paymentToken The ERC-20 token accepted for donations
      * @param _unit Unit token address (deployed separately by Core)
-     * @param _recipient Address to receive 50% of donations (required)
+     * @param _quote Payment token address (e.g., USDC)
+     * @param _core Core contract address
      * @param _treasury Treasury address for fee collection
      * @param _team Team address for fee collection
-     * @param _core Core contract address
+     * @param _recipient Address to receive 50% of donations (required)
      * @param _initialEmission Initial Unit emission per day
      * @param _minEmission Minimum Unit emission per day (floor)
      * @param _halvingPeriod Number of days between emission halvings
      * @return Address of the newly deployed FundRig
      */
     function deploy(
-        address _paymentToken,
         address _unit,
-        address _recipient,
+        address _quote,
+        address _core,
         address _treasury,
         address _team,
-        address _core,
+        address _recipient,
         uint256 _initialEmission,
         uint256 _minEmission,
         uint256 _halvingPeriod
     ) external returns (address) {
+        FundRig.Config memory config = FundRig.Config({
+            initialEmission: _initialEmission,
+            minEmission: _minEmission,
+            halvingPeriod: _halvingPeriod
+        });
+
         FundRig rig = new FundRig(
-            _paymentToken,
             _unit,
-            _recipient,
+            _quote,
+            _core,
             _treasury,
             _team,
-            _core,
-            _initialEmission,
-            _minEmission,
-            _halvingPeriod
+            _recipient,
+            config
         );
         rig.transferOwnership(msg.sender);
         return address(rig);

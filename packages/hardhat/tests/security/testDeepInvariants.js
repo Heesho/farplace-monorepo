@@ -1001,9 +1001,10 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
     rig = await SpinRig.deploy(
       unitToken.address,
       paymentToken.address,
-      mockEntropy.address,
-      treasury.address,
       mockCore.address,
+      treasury.address,
+      AddressZero, // team (set later via setTeam)
+      mockEntropy.address,
       config
     );
 
@@ -1030,7 +1031,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       // Wait for emissions to accumulate
       await increaseTime(ONE_HOUR);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -1039,6 +1040,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
         epochId,
         await getFutureDeadline(),
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -1052,7 +1054,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       // Do another spin to get a sequence number
       await increaseTime(ONE_HOUR);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
@@ -1061,6 +1063,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
         epochId,
         await getFutureDeadline(),
         convert("1000", 6),
+        "",
         { value: fee }
       );
       const receipt = await tx.wait();
@@ -1086,7 +1089,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       const poolBefore = await rig.getPrizePool();
       const pendingEmissions = await rig.getPendingEmissions();
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -1095,6 +1098,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
         epochId,
         await getFutureDeadline(),
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -1121,7 +1125,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       // Accumulate emissions
       await increaseTime(ONE_HOUR * 3);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user2).approve(rig.address, convert("1000", 6));
@@ -1130,6 +1134,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
         epochId,
         await getFutureDeadline(),
         convert("1000", 6),
+        "",
         { value: fee }
       );
       const receipt = await tx.wait();
@@ -1173,7 +1178,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       for (const seed of seeds) {
         await increaseTime(ONE_HOUR + 1);
 
-        const epochId = await rig.getEpochId();
+        const epochId = await rig.epochId();
         const fee = await rig.getEntropyFee();
 
         await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -1182,6 +1187,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
           epochId,
           await getFutureDeadline(),
           convert("1000", 6),
+          "",
           { value: fee }
         );
         const receipt = await tx.wait();
@@ -1214,7 +1220,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       const poolSnapshots = [];
 
       for (let i = 0; i < 3; i++) {
-        const epochId = await rig.getEpochId();
+        const epochId = await rig.epochId();
         const fee = await rig.getEntropyFee();
         const poolBefore = await rig.getPrizePool();
 
@@ -1225,6 +1231,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
           epochId,
           await getFutureDeadline(),
           convert("1000", 6),
+          "",
           { value: fee }
         );
         const receipt = await tx.wait();
@@ -1284,7 +1291,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
 
       // Spin twice
       for (let i = 0; i < 2; i++) {
-        const epochId = await rig.getEpochId();
+        const epochId = await rig.epochId();
         const fee = await rig.getEntropyFee();
 
         const user = [user0, user1][i];
@@ -1294,6 +1301,7 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
           epochId,
           await getFutureDeadline(),
           convert("1000", 6),
+          "",
           { value: fee }
         );
         const receipt = await tx.wait();

@@ -45,14 +45,11 @@ export const MineHistoryItem = memo(function MineHistoryItem({
   };
 
   const spent = Number(formatUnits(mine.spent, 6));
-  const earned = mine.earned ? Number(formatUnits(mine.earned, 6)) : null;
-  const mined = mine.mined ? Number(formatUnits(mine.mined, 18)) : null;
+  const earned = Number(formatUnits(mine.earned ?? 0n, 6));
+  const mined = Number(formatUnits(mine.mined ?? 0n, 18));
 
   return (
-    <div
-      className="flex items-center gap-3 py-3"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-    >
+    <div className="flex items-center gap-3 py-3">
       <button
         onClick={handleProfileClick}
         disabled={!fid}
@@ -92,18 +89,14 @@ export const MineHistoryItem = memo(function MineHistoryItem({
           <div className="text-[12px] text-muted-foreground">Spent</div>
           <div className="text-[13px] font-medium">${spent.toFixed(2)}</div>
         </div>
-        {earned !== null && (
-          <div>
-            <div className="text-[12px] text-muted-foreground">Earned</div>
-            <div className="text-[13px] font-medium">${earned.toFixed(2)}</div>
-          </div>
-        )}
-        {mined !== null && (
-          <div>
-            <div className="text-[12px] text-muted-foreground">Mined</div>
-            <div className="text-[13px] font-medium">{formatNumber(mined)}</div>
-          </div>
-        )}
+        <div>
+          <div className="text-[12px] text-muted-foreground">Earned</div>
+          <div className="text-[13px] font-medium">${earned.toFixed(2)}</div>
+        </div>
+        <div>
+          <div className="text-[12px] text-muted-foreground">Mined</div>
+          <div className="text-[13px] font-medium">{formatNumber(mined)}</div>
+        </div>
       </div>
     </div>
   );

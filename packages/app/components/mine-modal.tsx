@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, CheckCircle, User } from "lucide-react";
 import { formatUnits, formatEther, zeroAddress } from "viem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +11,7 @@ import { useRigState } from "@/hooks/useRigState";
 import { useMultiSlotState } from "@/hooks/useMultiSlotState";
 import { useRigLeaderboard } from "@/hooks/useRigLeaderboard";
 import { useMineHistory } from "@/hooks/useMineHistory";
+import { useTokenMetadata } from "@/hooks/useMetadata";
 import {
   useBatchedTransaction,
   encodeApproveCall,
@@ -69,7 +71,7 @@ function TokenLogo({
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-semibold`}
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-white font-semibold`}
     >
       {symbol.charAt(0)}
     </div>
@@ -240,6 +242,7 @@ export function MineModal({
   const [message, setMessage] = useState("");
 
   // ---------- Hooks ----------
+  const queryClient = useQueryClient();
   const { address: account } = useFarcaster();
 
   // Fetch slot 0 to get capacity
@@ -276,6 +279,10 @@ export function MineModal({
     isLoading: isHistoryLoading,
   } = useMineHistory(rigAddress, 10);
 
+  // Rig metadata (for default message from IPFS)
+  const { metadata } = useTokenMetadata(rigState?.rigUri);
+  const defaultMessage = metadata?.defaultMessage || "gm";
+
   // Batched transaction for mine / claim
   const {
     execute,
@@ -295,6 +302,68 @@ export function MineModal({
   const hasClaimable = claimable > 0n;
   const userQuoteBalance = rigState?.accountQuoteBalance ?? 0n;
   const selectedSlot = slots[selectedSlotIndex];
+
+  // ---------- Real-time emission ticker ----------
+  const [tickElapsed, setTickElapsed] = useState(0);
+  const tickBaseTime = useRef(Date.now());
+
+  // Reset tick base whenever slot data refreshes
+  useEffect(() => {
+    tickBaseTime.current = Date.now();
+    setTickElapsed(0);
+  }, [selectedSlot?.glazed, rigState?.accountUnitBalance]);
+
+  // Tick every second
+  useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setTickElapsed(Math.floor((Date.now() - tickBaseTime.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
+  // Compute real-time values
+  const slotUps = selectedSlot?.ups || 0n;
+  const slotMultiplier = selectedSlot?.upsMultiplier || BigInt(1e18);
+  const emissionPerSec = (slotUps * slotMultiplier) / BigInt(1e18);
+  const tickedGlazed = (selectedSlot?.glazed || 0n) + emissionPerSec * BigInt(tickElapsed);
+  const isUserOnSelectedSlot = account && selectedSlot && selectedSlot.miner.toLowerCase() === account.toLowerCase();
+  const tickedBalance = (rigState?.accountUnitBalance || 0n) + (isUserOnSelectedSlot ? emissionPerSec * BigInt(tickElapsed) : 0n);
+
+  // Client-side price decay: price decays linearly from initPrice to 0 over epochPeriod
+  // Compute decay rate from known data: decayPerSec = initPrice / epochPeriod
+  // We derive epochPeriod from: elapsed = now - epochStartTime, price = initPrice - decayPerSec * elapsed
+  // So decayPerSec = (initPrice - price) / elapsed
+  const computeTickedPrice = (slot: typeof selectedSlot) => {
+    if (!slot || slot.initPrice === 0n) return slot?.price || 0n;
+    const elapsed = BigInt(Math.floor(Date.now() / 1000)) - slot.epochStartTime;
+    if (elapsed <= 0n) return slot.initPrice;
+    const decayPerSec = (slot.initPrice - slot.price) / elapsed;
+    if (decayPerSec <= 0n) return slot.price;
+    const tickDecay = decayPerSec * BigInt(tickElapsed);
+    const result = slot.price - tickDecay;
+    return result > 0n ? result : 0n;
+  };
+  const tickedPrice = computeTickedPrice(selectedSlot);
+
+  // Compute PnL for the selected slot's current miner
+  // Find what the current miner paid (spent) from mine history
+  const currentMinerSpent = (() => {
+    if (!mineHistory || !selectedSlot) return 0n;
+    const entry = mineHistory.find(
+      m => m.slotIndex === selectedSlotIndex &&
+           m.miner.toLowerCase() === selectedSlot.miner.toLowerCase()
+    );
+    return entry?.price ?? 0n;
+  })();
+  // Earned = ticked price * 80% (what they'd get if displaced now)
+  const currentMinerEarned = (tickedPrice * 80n) / 100n;
+  // Mined USD value in USDC 6-decimal format: tokens_18 * unitPrice / 10^30
+  const minedUsdValue = rigState ? (tickedGlazed * rigState.unitPrice) / (10n ** 30n) : 0n;
+  // PnL = earned - spent (all in USDC 6 decimals)
+  const slotPnl = currentMinerEarned - currentMinerSpent;
+  // Total = mined USD + PnL
+  const slotTotal = minedUsdValue + slotPnl;
 
   // Rig URL for sharing
   const rigUrl = typeof window !== "undefined" ? `${window.location.origin}/rig/${rigAddress}` : "";
@@ -324,20 +393,43 @@ export function MineModal({
     }
   }, [isOpen, resetTx]);
 
+  // ---------- Auto-select cheapest slot on load ----------
+  useEffect(() => {
+    if (isOpen && slots.length > 0) {
+      let cheapestIdx = 0;
+      let cheapestPrice = slots[0].price;
+      for (let i = 1; i < slots.length; i++) {
+        if (slots[i].price < cheapestPrice) {
+          cheapestPrice = slots[i].price;
+          cheapestIdx = i;
+        }
+      }
+      setSelectedSlotIndex(cheapestIdx);
+    }
+  // Only run once when slots first load after modal opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, slots.length > 0]);
+
   useEffect(() => {
     resetTx();
   }, [selectedSlotIndex, resetTx]);
 
-  // Auto-refetch after successful tx
+  // Auto-refetch after successful tx — invalidate all related queries
   useEffect(() => {
     if (txStatus === "success") {
       const timer = setTimeout(() => {
         refetchRigState();
+        queryClient.invalidateQueries({ queryKey: ["mineHistory", rigAddress] });
+        queryClient.invalidateQueries({ queryKey: ["rigLeaderboard", rigAddress] });
         resetTx();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [txStatus, refetchRigState, resetTx]);
+    if (txStatus === "error") {
+      const timer = setTimeout(() => resetTx(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [txStatus, refetchRigState, resetTx, queryClient, rigAddress]);
 
   // ---------- Handlers ----------
   const handleMine = useCallback(async () => {
@@ -346,7 +438,7 @@ export function MineModal({
     const slotState = rigState;
     const maxPrice = slotState.price + (slotState.price * 5n / 100n); // 5% slippage
     const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS);
-    const slotUri = message || "";
+    const slotUri = message || defaultMessage;
 
     const calls: Call[] = [];
 
@@ -448,7 +540,7 @@ export function MineModal({
                   {selectedSlot.miner === zeroAddress ? "Available to mine" : truncateAddress(selectedSlot.miner)}
                 </div>
                 <div className="text-xs text-zinc-400 mt-1 truncate italic">
-                  "{selectedSlot.slotUri || "No message"}"
+                  &quot;{selectedSlot.slotUri || "No message"}&quot;
                 </div>
               </div>
             </div>
@@ -458,9 +550,7 @@ export function MineModal({
               <div>
                 <div className="text-[12px] text-muted-foreground">Rate</div>
                 <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
-                  <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
-                    {tokenSymbol.charAt(0)}
-                  </span>
+                  <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="xs" />
                   {Number(formatEther(selectedSlot.ups || 0n)).toFixed(0)}/s
                 </div>
               </div>
@@ -468,20 +558,16 @@ export function MineModal({
                 <div className="text-[12px] text-muted-foreground">Mined</div>
                 <div className="text-[13px] font-medium tabular-nums mt-0.5 flex items-center gap-1">
                   +
-                  <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px]">
-                    {tokenSymbol.charAt(0)}
-                  </span>
-                  {formatCompactToken(selectedSlot.glazed || 0n)}
+                  <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="xs" />
+                  {Number(formatEther(tickedGlazed)).toFixed(0)}
                 </div>
               </div>
               <div>
-                <div className="text-[12px] text-muted-foreground">PnL</div>
+                <div className="text-[12px] text-muted-foreground">Return</div>
                 <div className="text-[13px] font-medium tabular-nums mt-0.5">
                   {(() => {
-                    const userEntry = formattedLeaderboard.find(e => e.isCurrentUser);
-                    if (!userEntry) return "+$0.00";
-                    const pnl = Number(formatUnits(userEntry.earned - userEntry.spent, QUOTE_TOKEN_DECIMALS));
-                    return `${pnl >= 0 ? "+" : ""}$${Math.abs(pnl).toFixed(2)}`;
+                    const pnl = Number(formatUnits(slotPnl, QUOTE_TOKEN_DECIMALS));
+                    return `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toFixed(2)}`;
                   })()}
                 </div>
               </div>
@@ -489,8 +575,8 @@ export function MineModal({
                 <div className="text-[12px] text-muted-foreground">Total</div>
                 <div className="text-[13px] font-medium tabular-nums mt-0.5">
                   {(() => {
-                    const unitValue = rigState ? Number(formatUnits(((rigState.accountUnitBalance || 0n) * rigState.unitPrice) / BigInt(1e18), QUOTE_TOKEN_DECIMALS)) : 0;
-                    return `+$${unitValue.toFixed(2)}`;
+                    const total = Number(formatUnits(slotTotal, QUOTE_TOKEN_DECIMALS));
+                    return `${total >= 0 ? "+" : "-"}$${Math.abs(total).toFixed(2)}`;
                   })()}
                 </div>
               </div>
@@ -512,12 +598,13 @@ export function MineModal({
             <div className={`grid ${getGridCols(slots.length)} gap-2 mx-auto`}>
               {slots.map((slot, index) => {
                 const isUser = account && slot.miner.toLowerCase() === account.toLowerCase();
+                const slotTickedPrice = computeTickedPrice(slot);
                 return (
                   <SlotCard
                     key={index}
                     slotIndex={index}
                     miner={slot.miner}
-                    price={slot.price}
+                    price={slotTickedPrice}
                     multiplier={Number((slot.upsMultiplier || BigInt(1e18)) / BigInt(1e18))}
                     isSelected={selectedSlotIndex === index}
                     onSelect={() => setSelectedSlotIndex(index)}
@@ -561,13 +648,13 @@ export function MineModal({
                   <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
                   <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
                     <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
-                    <span>{formatCompactToken(rigState.accountUnitBalance || 0n)}</span>
+                    <span>{Number(formatEther(rigState.accountUnitBalance)).toFixed(0)}</span>
                   </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground text-[12px] mb-1">Value</div>
                   <div className="font-semibold text-[15px] tabular-nums text-white">
-                    ${formatUSDC(((rigState.accountUnitBalance || 0n) * rigState.unitPrice) / BigInt(1e18))}
+                    ${Number(formatEther((rigState.accountUnitBalance * rigState.unitPrice) / BigInt(1e18))).toFixed(2)}
                   </div>
                 </div>
                 <div>
@@ -599,24 +686,46 @@ export function MineModal({
               </div>
             ) : (
               <div>
-                {mineHistory.map((mine, index) => (
-                  <MineHistoryItem
-                    key={`${mine.miner}-${mine.timestamp}-${index}`}
-                    mine={{
-                      id: index.toString(),
-                      miner: mine.miner,
-                      uri: mine.uri,
-                      price: mine.price,
-                      spent: mine.price,
-                      earned: 0n,
-                      mined: mine.minted,
-                      multiplier: mine.multiplier,
-                      timestamp: Number(mine.timestamp),
-                    }}
-                    timeAgo={timeAgo}
-                    tokenSymbol={tokenSymbol}
-                  />
-                ))}
+                {(() => {
+                  // Track which slots already have their live (current) entry rendered
+                  const liveSlotsClaimed = new Set<number>();
+                  return mineHistory.map((mine, index) => {
+                  // Only the most recent mine per slot gets live values
+                  const slot = slots[mine.slotIndex];
+                  const isCurrentMiner = slot
+                    && slot.miner.toLowerCase() === mine.miner.toLowerCase()
+                    && !liveSlotsClaimed.has(mine.slotIndex);
+
+                  let earned = mine.earned;
+                  let minted = mine.minted;
+                  if (isCurrentMiner) {
+                    liveSlotsClaimed.add(mine.slotIndex);
+                    const slotLivePrice = computeTickedPrice(slot);
+                    earned = (slotLivePrice * 80n) / 100n;
+                    const slotEmission = (slot.ups * (slot.upsMultiplier || BigInt(1e18))) / BigInt(1e18);
+                    minted = slot.glazed + slotEmission * BigInt(tickElapsed);
+                  }
+
+                  return (
+                    <MineHistoryItem
+                      key={`${mine.miner}-${mine.timestamp}-${index}`}
+                      mine={{
+                        id: index.toString(),
+                        miner: mine.miner,
+                        uri: mine.uri,
+                        price: mine.price,
+                        spent: mine.price,
+                        earned,
+                        mined: minted,
+                        multiplier: mine.multiplier,
+                        timestamp: Number(mine.timestamp),
+                      }}
+                      timeAgo={timeAgo}
+                      tokenSymbol={tokenSymbol}
+                    />
+                  );
+                });
+                })()}
               </div>
             )}
           </div>
@@ -638,26 +747,26 @@ export function MineModal({
         {/* Bottom Action Bar */}
         <div
           className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 56px)" }}
         >
-          <div className="w-full max-w-[520px] px-4 pt-3 pb-3 bg-background">
+          <div className="w-full max-w-[520px] px-4 pt-2 pb-2 bg-background">
             {/* Message Input */}
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="gm"
+              placeholder={defaultMessage}
               maxLength={100}
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-[15px] outline-none placeholder:text-zinc-500 mb-3"
+              className="w-full bg-zinc-800 rounded-xl px-4 py-2 text-[15px] outline-none placeholder:text-zinc-500 mb-2"
             />
 
             {/* Price, Balance, Mine Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div>
-                  <div className="text-muted-foreground text-[12px]">Price</div>
+                  <div className="text-muted-foreground text-[12px]">Pay</div>
                   <div className="font-semibold text-[17px] tabular-nums">
-                    ${rigState ? formatUSDC4(rigState.price) : "—"}
+                    ${rigState ? formatUSDC4(tickedPrice) : "—"}
                   </div>
                 </div>
                 <div>
@@ -673,9 +782,9 @@ export function MineModal({
                 className={`
                   w-32 h-10 text-[14px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2
                   ${isSuccess
-                    ? "bg-green-600 text-white"
+                    ? "bg-zinc-300 text-black"
                     : isError
-                    ? "bg-red-600 text-white"
+                    ? "bg-zinc-600 text-white"
                     : account && rigState
                     ? "bg-white text-black hover:bg-zinc-200"
                     : "bg-zinc-700 text-zinc-500 cursor-not-allowed"
@@ -693,7 +802,7 @@ export function MineModal({
                     Success
                   </>
                 ) : isError ? (
-                  "Failed"
+                  txError?.message?.includes("cancelled") ? "Rejected" : "Failed"
                 ) : (
                   "Mine"
                 )}

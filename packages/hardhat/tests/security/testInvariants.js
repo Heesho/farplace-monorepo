@@ -557,9 +557,10 @@ describe("SpinRig Invariants", function () {
     rig = await SpinRig.deploy(
       unitToken.address,
       paymentToken.address,
-      mockEntropy.address,
-      owner.address, // treasury
       mockCore.address,
+      owner.address, // treasury
+      AddressZero, // team (set later via setTeam)
+      mockEntropy.address,
       config
     );
 
@@ -582,11 +583,11 @@ describe("SpinRig Invariants", function () {
       // Wait for emissions to accumulate
       await increaseTime(ONE_HOUR);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+      await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
 
       const poolAfter = await rig.getPrizePool();
       // Pool should increase because emissions were minted
@@ -597,11 +598,11 @@ describe("SpinRig Invariants", function () {
       // Accumulate more emissions
       await increaseTime(ONE_HOUR * 2);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
-      const tx = await rig.connect(user1).spin(user1.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+      const tx = await rig.connect(user1).spin(user1.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
       const receipt = await tx.wait();
       const entropyEvent = receipt.events.find(e => e.event === "SpinRig__EntropyRequested");
       const sequenceNumber = entropyEvent.args.sequenceNumber;
@@ -636,11 +637,11 @@ describe("SpinRig Invariants", function () {
         // Accumulate emissions
         await increaseTime(ONE_HOUR + 1);
 
-        const epochId = await rig.getEpochId();
+        const epochId = await rig.epochId();
         const fee = await rig.getEntropyFee();
 
         await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-        const tx = await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+        const tx = await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
         const receipt = await tx.wait();
         const entropyEvent = receipt.events.find(e => e.event === "SpinRig__EntropyRequested");
         const sequenceNumber = entropyEvent.args.sequenceNumber;
@@ -663,11 +664,11 @@ describe("SpinRig Invariants", function () {
       // Accumulate significant emissions
       await increaseTime(ONE_HOUR * 3);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user2).approve(rig.address, convert("1000", 6));
-      const tx = await rig.connect(user2).spin(user2.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+      const tx = await rig.connect(user2).spin(user2.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
       const receipt = await tx.wait();
       const entropyEvent = receipt.events.find(e => e.event === "SpinRig__EntropyRequested");
       const sequenceNumber = entropyEvent.args.sequenceNumber;
@@ -693,11 +694,11 @@ describe("SpinRig Invariants", function () {
       await increaseTime(ONE_HOUR + 1);
 
       // Spin to get a fresh epoch with known price
-      let epochId = await rig.getEpochId();
+      let epochId = await rig.epochId();
       let fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+      await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
 
       // Now spin again immediately to get a non-zero price
       const price = await rig.getPrice();
@@ -710,11 +711,11 @@ describe("SpinRig Invariants", function () {
       const teamBefore = await paymentToken.balanceOf(team.address);
       const protocolBefore = await paymentToken.balanceOf(protocol.address);
 
-      epochId = await rig.getEpochId();
+      epochId = await rig.epochId();
       fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, price.add(convert("100", 6)));
-      const tx = await rig.connect(user1).spin(user1.address, epochId, await getFutureDeadline(), price.add(convert("100", 6)), { value: fee });
+      const tx = await rig.connect(user1).spin(user1.address, epochId, await getFutureDeadline(), price.add(convert("100", 6)), "", { value: fee });
       const receipt = await tx.wait();
       const spinEvent = receipt.events.find(e => e.event === "SpinRig__Spin");
       const actualPrice = spinEvent.args.price;
@@ -739,11 +740,11 @@ describe("SpinRig Invariants", function () {
       for (let i = 0; i < 3; i++) {
         await increaseTime(ONE_HOUR + 1);
 
-        const epochId = await rig.getEpochId();
+        const epochId = await rig.epochId();
         const fee = await rig.getEntropyFee();
 
         await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-        await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), { value: fee });
+        await rig.connect(user0).spin(user0.address, epochId, await getFutureDeadline(), convert("1000", 6), "", { value: fee });
 
         const currentEmissionTime = await rig.lastEmissionTime();
         expect(currentEmissionTime).to.be.gte(prevEmissionTime);
@@ -781,15 +782,13 @@ describe("FundRig Invariants", function () {
     // Deploy FundRig
     const FundRig = await ethers.getContractFactory("FundRig");
     rig = await FundRig.deploy(
-      paymentToken.address,
       unitToken.address,
-      recipient.address,
+      paymentToken.address,
+      mockCore.address,
       treasury.address,
       team.address,
-      mockCore.address,
-      convert("1000", 18),  // initialEmission: 1000 tokens per day
-      convert("10", 18),    // minEmission: 10 tokens per day floor
-      30                    // halvingPeriod: 30 days
+      recipient.address,
+      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
     );
 
     // Grant minting rights
@@ -810,7 +809,7 @@ describe("FundRig Invariants", function () {
 
       for (let i = 0; i < users.length; i++) {
         await paymentToken.connect(users[i]).approve(rig.address, amounts[i]);
-        await rig.connect(users[i]).fund(users[i].address, amounts[i]);
+        await rig.connect(users[i]).fund(users[i].address, amounts[i], "");
       }
 
       const dayTotal = await rig.dayToTotalDonated(currentDay);
@@ -831,8 +830,8 @@ describe("FundRig Invariants", function () {
       const amount2 = convert("125", 18);
 
       await paymentToken.connect(user0).approve(rig.address, amount1.add(amount2));
-      await rig.connect(user0).fund(user0.address, amount1);
-      await rig.connect(user0).fund(user0.address, amount2);
+      await rig.connect(user0).fund(user0.address, amount1, "");
+      await rig.connect(user0).fund(user0.address, amount2, "");
 
       const dayTotal = await rig.dayToTotalDonated(currentDay);
       const user0Donation = await rig.dayAccountToDonation(currentDay, user0.address);
@@ -853,7 +852,7 @@ describe("FundRig Invariants", function () {
 
       for (let i = 0; i < users.length; i++) {
         await paymentToken.connect(users[i]).approve(rig.address, amounts[i]);
-        await rig.connect(users[i]).fund(users[i].address, amounts[i]);
+        await rig.connect(users[i]).fund(users[i].address, amounts[i], "");
       }
 
       // Move to next day to allow claiming
@@ -882,7 +881,7 @@ describe("FundRig Invariants", function () {
       const testDay = await rig.currentDay();
 
       await paymentToken.connect(user0).approve(rig.address, convert("100", 18));
-      await rig.connect(user0).fund(user0.address, convert("100", 18));
+      await rig.connect(user0).fund(user0.address, convert("100", 18), "");
 
       await increaseTime(ONE_DAY);
 
@@ -928,7 +927,7 @@ describe("FundRig Invariants", function () {
 
       const amount = convert("500", 18);
       await paymentToken.connect(user0).approve(rig.address, amount);
-      await rig.connect(user0).fund(user0.address, amount);
+      await rig.connect(user0).fund(user0.address, amount, "");
 
       const rigBalance = await paymentToken.balanceOf(rig.address);
       expect(rigBalance).to.equal(0);
@@ -940,7 +939,7 @@ describe("FundRig Invariants", function () {
 
       for (let i = 0; i < users.length; i++) {
         await paymentToken.connect(users[i]).approve(rig.address, amounts[i]);
-        await rig.connect(users[i]).fund(users[i].address, amounts[i]);
+        await rig.connect(users[i]).fund(users[i].address, amounts[i], "");
 
         const rigBalance = await paymentToken.balanceOf(rig.address);
         expect(rigBalance).to.equal(0);
@@ -971,9 +970,9 @@ describe("Auction Invariants", function () {
     // Deploy Auction
     const Auction = await ethers.getContractFactory("Auction");
     auction = await Auction.deploy(
-      convert("100", 18),      // initPrice
       paymentToken.address,
       paymentReceiver.address,
+      convert("100", 18),      // initPrice
       ONE_DAY,                 // epochPeriod
       convert("2", 18),        // priceMultiplier (2x)
       convert("1", 18)         // minInitPrice

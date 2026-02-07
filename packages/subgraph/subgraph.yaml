@@ -11,9 +11,9 @@ dataSources:
     name: MineCore
     network: base
     source:
-      address: "0x56EeA24F447A1609784566c84f40554B5742f7B6"
+      address: "0x5d98C870276D270bD876b694444CC8647a331f31"
       abi: MineCore
-      startBlock: 41656994
+      startBlock: 41808484
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -41,9 +41,9 @@ dataSources:
     name: SpinCore
     network: base
     source:
-      address: "0x3CD87981596590E08dfad6Bf294406f05A6f5481"
+      address: "0x58e3777B0baea6D47F21689B5b70C092A09ae42b"
       abi: SpinCore
-      startBlock: 41656994
+      startBlock: 41808484
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -57,6 +57,8 @@ dataSources:
       abis:
         - name: SpinCore
           file: ./abis/SpinCore.json
+        - name: SpinRig
+          file: ./abis/SpinRig.json
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
@@ -71,9 +73,9 @@ dataSources:
     name: FundCore
     network: base
     source:
-      address: "0x9517B14d24DD4644347c80985473627866a6Eb40"
+      address: "0xb510499f2239103b9daC96b23657f20EF6F2a110"
       abi: FundCore
-      startBlock: 41656994
+      startBlock: 41808484
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -87,6 +89,8 @@ dataSources:
       abis:
         - name: FundCore
           file: ./abis/FundCore.json
+        - name: FundRig
+          file: ./abis/FundRig.json
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
@@ -148,20 +152,24 @@ templates:
         - name: MineRig
           file: ./abis/MineRig.json
       eventHandlers:
-        - event: Rig__Mine(address,indexed address,indexed uint256,indexed uint256,uint256,string)
+        - event: MineRig__Mine(address,indexed address,indexed uint256,indexed uint256,uint256,string)
           handler: handleMine
-        - event: Rig__MinerFee(indexed address,indexed uint256,indexed uint256,uint256)
+        - event: MineRig__MinerFee(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineMinerFee
-        - event: Rig__Mint(indexed address,indexed uint256,indexed uint256,uint256)
+        - event: MineRig__Mint(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineMint
-        - event: Rig__TreasuryFee(indexed address,indexed uint256,indexed uint256,uint256)
+        - event: MineRig__TreasuryFee(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineTreasuryFee
-        - event: Rig__TeamFee(indexed address,indexed uint256,indexed uint256,uint256)
+        - event: MineRig__TeamFee(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineTeamFee
-        - event: Rig__ProtocolFee(indexed address,indexed uint256,indexed uint256,uint256)
+        - event: MineRig__ProtocolFee(indexed address,indexed uint256,indexed uint256,uint256)
           handler: handleMineProtocolFee
-        - event: Rig__CapacitySet(uint256)
+        - event: MineRig__CapacitySet(uint256)
           handler: handleMineCapacitySet
+        - event: MineRig__UriSet(string)
+          handler: handleMineUriSet
+        - event: MineRig__Claimed(indexed address,uint256)
+          handler: handleMineClaimed
       file: ./src/rigs/mineRig.ts
 
   # ==========================================================================
@@ -186,7 +194,7 @@ templates:
         - name: SpinRig
           file: ./abis/SpinRig.json
       eventHandlers:
-        - event: SpinRig__Spin(indexed address,indexed address,indexed uint256,uint256)
+        - event: SpinRig__Spin(indexed address,indexed address,indexed uint256,uint256,string)
           handler: handleSpin
         - event: SpinRig__Win(indexed address,indexed uint256,uint256,uint256)
           handler: handleWin
@@ -196,6 +204,10 @@ templates:
           handler: handleSpinTeamFee
         - event: SpinRig__ProtocolFee(indexed address,indexed uint256,uint256)
           handler: handleSpinProtocolFee
+        - event: SpinRig__EmissionMinted(indexed uint256,uint256)
+          handler: handleSpinEmissionMinted
+        - event: SpinRig__UriSet(string)
+          handler: handleSpinUriSet
       file: ./src/rigs/spinRig.ts
 
   # ==========================================================================
@@ -219,13 +231,23 @@ templates:
       abis:
         - name: FundRig
           file: ./abis/FundRig.json
+        - name: FundCore
+          file: ./abis/FundCore.json
       eventHandlers:
-        - event: FundRig__Funded(indexed address,uint256,uint256)
+        - event: FundRig__Funded(indexed address,uint256,uint256,string)
           handler: handleFunded
         - event: FundRig__Claimed(indexed address,uint256,uint256)
           handler: handleFundClaimed
         - event: FundRig__ProtocolFee(indexed address,uint256,uint256)
           handler: handleFundProtocolFee
+        - event: FundRig__RecipientSet(indexed address)
+          handler: handleFundRecipientSet
+        - event: FundRig__UriSet(string)
+          handler: handleFundUriSet
+        - event: FundRig__TreasurySet(indexed address)
+          handler: handleFundTreasurySet
+        - event: FundRig__TeamSet(indexed address)
+          handler: handleFundTeamSet
       file: ./src/rigs/fundRig.ts
 
   # ==========================================================================

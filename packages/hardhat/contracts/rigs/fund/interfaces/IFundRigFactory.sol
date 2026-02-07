@@ -8,12 +8,12 @@ pragma solidity 0.8.19;
  */
 interface IFundRigFactory {
     function deploy(
-        address _paymentToken,
         address _unit,
-        address _recipient,
+        address _quote,
+        address _core,
         address _treasury,
         address _team,
-        address _core,
+        address _recipient,
         uint256 _initialEmission,
         uint256 _minEmission,
         uint256 _halvingPeriod

@@ -8,6 +8,7 @@ export type TokenMetadata = {
   image?: string;
   description?: string;
   defaultMessage?: string;
+  recipientName?: string;
   links?: string[];
   // Legacy format support
   website?: string;

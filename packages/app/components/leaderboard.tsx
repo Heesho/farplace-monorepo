@@ -31,10 +31,7 @@ function LeaderboardRow({ entry, tokenSymbol }: { entry: LeaderboardEntry; token
     ?? `https://api.dicebear.com/7.x/shapes/svg?seed=${entry.address.toLowerCase()}`;
 
   return (
-    <div
-      className="flex items-center gap-3 py-3"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
-    >
+    <div className="flex items-center gap-3 py-3">
       {/* Rank */}
       <div className="w-6 flex justify-center flex-shrink-0">
         {getRankIcon(entry.rank)}
@@ -123,15 +120,6 @@ export function Leaderboard({
     <div className="mt-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[18px] font-semibold">Leaderboard</h2>
-        {userRank && (
-          <button
-            onClick={handleShareChallenge}
-            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-300 transition-colors"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            Challenge friends
-          </button>
-        )}
       </div>
 
       {/* User rank summary if not in top entries */}

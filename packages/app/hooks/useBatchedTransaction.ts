@@ -5,11 +5,10 @@ import {
   useCapabilities,
 } from "wagmi/experimental";
 import {
-  useWriteContract,
   useWaitForTransactionReceipt,
   useSendTransaction,
 } from "wagmi";
-import type { Address } from "viem";
+import type { Abi, Address } from "viem";
 import { encodeFunctionData } from "viem";
 import { DEFAULT_CHAIN_ID } from "@/lib/constants";
 
@@ -21,6 +20,19 @@ export type Call = {
 
 type BatchedTransactionState = "idle" | "pending" | "confirming" | "success" | "error";
 
+/** Extract a short, user-friendly message from a viem/wagmi error. */
+function friendlyError(err: unknown): Error {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/User rejected|User denied|rejected the request/i.test(raw)) {
+    return new Error("Transaction cancelled.");
+  }
+  // Strip verbose "Request Arguments:" block that viem appends
+  const stripped = raw.replace(/Request Arguments:[\s\S]*/i, "").trim();
+  // Take only the first sentence / line for display
+  const first = stripped.split("\n")[0].trim();
+  return new Error(first || "Transaction failed.");
+}
+
 type UseBatchedTransactionReturn = {
   execute: (calls: Call[]) => Promise<void>;
   status: BatchedTransactionState;
@@ -28,6 +40,10 @@ type UseBatchedTransactionReturn = {
   error: Error | null;
   reset: () => void;
   reportsCapability: boolean;
+};
+
+type CallsStatusWithReceipts = {
+  receipts?: Array<{ transactionHash?: `0x${string}` }>;
 };
 
 /**
@@ -124,7 +140,7 @@ export function useBatchedTransaction(): UseBatchedTransactionReturn {
       });
     } else {
       // Other error - just report it
-      setError(batchError);
+      setError(friendlyError(batchError));
       setState("error");
       setPendingCalls(null);
     }
@@ -164,7 +180,7 @@ export function useBatchedTransaction(): UseBatchedTransactionReturn {
   // Handle sequential errors
   useEffect(() => {
     if (seqError || isSeqTxError) {
-      setError(seqError || new Error("Transaction failed"));
+      setError(friendlyError(seqError || new Error("Transaction failed")));
       setState("error");
       setPendingCalls(null);
       isSequentialMode.current = false;
@@ -181,8 +197,10 @@ export function useBatchedTransaction(): UseBatchedTransactionReturn {
   }, [isBatchPending, isSeqPending, isSeqConfirming]);
 
   // Derive txHash from sequential or batch mode
+  const batchTxHash =
+    (callsStatus as CallsStatusWithReceipts | undefined)?.receipts?.[0]?.transactionHash;
   const txHash: string | undefined =
-    seqTxHash ?? (callsStatus as any)?.receipts?.[0]?.transactionHash ?? undefined;
+    seqTxHash ?? batchTxHash ?? undefined;
 
   const execute = useCallback(
     async (calls: Call[]) => {
@@ -205,7 +223,7 @@ export function useBatchedTransaction(): UseBatchedTransactionReturn {
           })),
           chainId: DEFAULT_CHAIN_ID,
         });
-      } catch (err) {
+      } catch {
         // If batching fails synchronously, fall back to sequential
         isSequentialMode.current = true;
         const firstCall = calls[0];
@@ -280,13 +298,13 @@ export function encodeContractCall(
   contractAddress: Address,
   abi: readonly unknown[],
   functionName: string,
-  args: unknown[],
+  args: readonly unknown[],
   value?: bigint
 ): Call {
   const data = encodeFunctionData({
-    abi: abi as any,
-    functionName,
-    args,
+    abi: abi as Abi,
+    functionName: functionName as never,
+    args: args as never,
   });
 
   return {

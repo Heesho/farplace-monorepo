@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PINATA_API_KEY = process.env.PINATA_API_KEY;
 const PINATA_SECRET_KEY = process.env.PINATA_SECRET_KEY;
-const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://glazecorp.mypinata.cloud";
+const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud";
 const PINATA_GATEWAY_KEY = process.env.NEXT_PUBLIC_PINATA_GATEWAY_KEY || "";
 
 export async function POST(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, symbol, image, description, defaultMessage, links } = body;
+    const { name, symbol, image, description, defaultMessage, recipientName, links } = body;
 
     if (!name || !symbol) {
       return NextResponse.json(
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       image: image || "",
       description: description || "",
       defaultMessage: defaultMessage || "gm",
+      ...(recipientName ? { recipientName } : {}),
       links: Array.isArray(links) ? links.filter((l: string) => l.trim() !== "") : [],
     };
 
@@ -62,8 +63,6 @@ export async function POST(request: NextRequest) {
     };
     pinataFormData.append("pinataOptions", JSON.stringify(options));
 
-    console.log("Uploading metadata to Pinata:", fileName);
-
     // Upload using legacy pinning API
     const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
       method: "POST",
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
     });
 
     const responseText = await response.text();
-    console.log("Pinata response status:", response.status);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -98,8 +96,6 @@ export async function POST(request: NextRequest) {
     const baseGatewayUrl = `${PINATA_GATEWAY}/ipfs/${cid}`;
     const gatewayUrl = PINATA_GATEWAY_KEY ? `${baseGatewayUrl}?pinataGatewayToken=${PINATA_GATEWAY_KEY}` : baseGatewayUrl;
 
-    console.log("Metadata upload successful:", cid);
-
     return NextResponse.json({
       success: true,
       ipfsHash: cid,
@@ -109,7 +105,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Metadata upload error:", error);
     return NextResponse.json(
-      { error: `Failed to upload metadata: ${error}` },
+      { error: "Failed to upload metadata" },
       { status: 500 }
     );
   }

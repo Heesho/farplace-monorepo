@@ -11,12 +11,12 @@ import { useBatchMetadata } from "@/hooks/useMetadata";
 function rigTypeGradient(rigType: string): string {
   switch (rigType) {
     case "spin":
-      return "from-purple-500 to-violet-600";
+      return "from-purple-500 to-purple-700";
     case "fund":
-      return "from-sky-500 to-blue-600";
+      return "from-emerald-500 to-emerald-700";
     case "mine":
     default:
-      return "from-zinc-500 to-zinc-600";
+      return "from-blue-500 to-blue-700";
   }
 }
 

@@ -462,13 +462,17 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       // Mine repeatedly to cross halving
       for (let i = 0; i < 20; i++) {
         const slot = await result.rig.getSlot(0);
+        const price = await result.rig.getPrice(0);
 
-        await network.provider.send("evm_increaseTime", [601]); // epoch + 1
+        await network.provider.send("evm_increaseTime", [601]); // partial epoch decay
         await network.provider.send("evm_mine");
 
-        await weth.connect(user1).approve(result.rig.address, convert("1", 18));
+        const decayedPrice = await result.rig.getPrice(0);
+        const payAmount = decayedPrice.add(convert("1", 18));
+        await ensureWeth(user1, payAmount);
+        await weth.connect(user1).approve(result.rig.address, payAmount);
         await result.rig.connect(user1).mine(
-          user1.address, 0, slot.epochId, getFutureDeadline(), convert("1", 18), ""
+          user1.address, 0, slot.epochId, getFutureDeadline(), payAmount, ""
         );
       }
 
@@ -526,7 +530,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
 
       // Verify state is consistent
       const finalSlot = await result.rig.getSlot(0);
-      expect(finalSlot.epochId).to.equal(5);
+      expect(finalSlot.epochId).to.equal(6);
       expect(finalSlot.startTime).to.be.gt(0);
       expect(finalSlot.ups).to.be.gt(0);
     });
@@ -746,7 +750,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
 
       // Verify final state
       const finalSlot = await result.rig.getSlot(0);
-      expect(finalSlot.epochId).to.equal(100);
+      expect(finalSlot.epochId).to.equal(101);
     });
 
     it("STRESS: Mine all 256 slots (max capacity)", async function () {

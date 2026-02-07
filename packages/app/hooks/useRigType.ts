@@ -30,7 +30,7 @@ export function useRigType(rigAddress: `0x${string}` | undefined): {
         chainId: base.id,
       },
     ],
-    query: { enabled: !!rigAddress },
+    query: { enabled: !!rigAddress, staleTime: Infinity },
   });
 
   let rigType: RigType | undefined;

@@ -1,5 +1,5 @@
 import { BigDecimal, BigInt, Address } from '@graphprotocol/graph-ts'
-import { Transfer as TransferEvent } from '../generated/templates/Unit/ERC20'
+import { Transfer as TransferEvent, ERC20 } from '../generated/templates/Unit/ERC20'
 import { Unit, Account } from '../generated/schema'
 import {
   ZERO_BI,
@@ -24,40 +24,43 @@ export function handleUnitTransfer(event: TransferEvent): void {
 
   // Track mints (from zero address)
   if (from == ADDRESS_ZERO) {
-    // Mint - increase total supply
     unit.totalSupply = unit.totalSupply.plus(value)
-    // Update market cap
     unit.marketCap = unit.price.times(unit.totalSupply)
   }
 
   // Track burns (to zero address)
   if (to == ADDRESS_ZERO) {
-    // Burn - decrease total supply
     unit.totalSupply = unit.totalSupply.minus(value)
-    // Update market cap
     unit.marketCap = unit.price.times(unit.totalSupply)
   }
 
-  // Holder tracking (simplified)
-  // Note: For accurate holder count, you'd need to track balances per account
-  // This is a simplified version that doesn't maintain exact holder count
-  // A more accurate implementation would store UnitAccountBalance entities
+  // Holder tracking via balanceOf
+  let contract = ERC20.bind(event.address)
 
-  // For now, we just track the transfer happened
-  // The "from" account had tokens and might still have some
-  // The "to" account now has tokens
-
-  // Update accounts
-  if (from != ADDRESS_ZERO) {
-    let fromAccount = getOrCreateAccount(Address.fromString(from))
-    fromAccount.lastActivityAt = event.block.timestamp
-    fromAccount.save()
-  }
-
+  // Check if receiver is a new holder (balance == transfer amount means they had 0 before)
   if (to != ADDRESS_ZERO) {
     let toAccount = getOrCreateAccount(Address.fromString(to))
     toAccount.lastActivityAt = event.block.timestamp
     toAccount.save()
+
+    let toBalanceResult = contract.try_balanceOf(Address.fromString(to))
+    if (!toBalanceResult.reverted && toBalanceResult.value.equals(event.params.value)) {
+      unit.holderCount = unit.holderCount.plus(ONE_BI)
+    }
+  }
+
+  // Check if sender no longer holds any tokens
+  if (from != ADDRESS_ZERO) {
+    let fromAccount = getOrCreateAccount(Address.fromString(from))
+    fromAccount.lastActivityAt = event.block.timestamp
+    fromAccount.save()
+
+    let fromBalanceResult = contract.try_balanceOf(Address.fromString(from))
+    if (!fromBalanceResult.reverted && fromBalanceResult.value.isZero()) {
+      if (unit.holderCount.gt(ZERO_BI)) {
+        unit.holderCount = unit.holderCount.minus(ONE_BI)
+      }
+    }
   }
 
   unit.save()

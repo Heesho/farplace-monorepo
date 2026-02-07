@@ -46,7 +46,7 @@ export function useMultiSlotState(
     contracts,
     query: {
       enabled: contracts.length > 0,
-      refetchInterval: 15_000,
+      refetchInterval: 5_000,
       refetchOnWindowFocus: false,
     },
   });

@@ -66,9 +66,10 @@ describe("SpinRig Invariant Tests", function () {
     rig = await rigArtifact.deploy(
       unitToken.address,
       paymentToken.address,
-      mockEntropy.address,
-      treasury.address,
       mockCore.address,
+      treasury.address,
+      AddressZero, // team (set later via setTeam)
+      mockEntropy.address,
       config
     );
 
@@ -103,7 +104,7 @@ describe("SpinRig Invariant Tests", function () {
       await increaseTime(ONE_HOUR);
 
       // Slot to trigger emission minting
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -112,6 +113,7 @@ describe("SpinRig Invariant Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -132,7 +134,7 @@ describe("SpinRig Invariant Tests", function () {
     beforeEach(async function () {
       // Slot to start fresh epoch
       await increaseTime(ONE_HOUR + 1);
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -141,12 +143,13 @@ describe("SpinRig Invariant Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
     });
 
     it("Price should equal initPrice at epoch start", async function () {
-      const initPrice = await rig.getInitPrice();
+      const initPrice = await rig.initPrice();
       const price = await rig.getPrice();
 
       // Allow small tolerance for block time
@@ -155,7 +158,7 @@ describe("SpinRig Invariant Tests", function () {
     });
 
     it("Price should be ~50% at epoch midpoint", async function () {
-      const initPrice = await rig.getInitPrice();
+      const initPrice = await rig.initPrice();
       const epochPeriod = await rig.epochPeriod();
 
       await increaseTime(epochPeriod.toNumber() / 2);
@@ -192,7 +195,7 @@ describe("SpinRig Invariant Tests", function () {
     it("Fees should sum to price paid", async function () {
       // Start fresh epoch with known price
       await increaseTime(ONE_HOUR + 1);
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
@@ -201,6 +204,7 @@ describe("SpinRig Invariant Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -215,13 +219,14 @@ describe("SpinRig Invariant Tests", function () {
       const teamBefore = await paymentToken.balanceOf(team.address);
       const protocolBefore = await paymentToken.balanceOf(protocol.address);
 
-      const newEpochId = await rig.getEpochId();
+      const newEpochId = await rig.epochId();
       await paymentToken.connect(user2).approve(rig.address, price.add(convert("1000", 6)));
       const tx = await rig.connect(user2).spin(
         user2.address,
         newEpochId,
         1961439882,
         price.add(convert("1000", 6)),
+        "",
         { value: fee }
       );
 
@@ -245,7 +250,7 @@ describe("SpinRig Invariant Tests", function () {
     it("Treasury should receive 95%, team 4%, protocol 1%", async function () {
       // Get a fresh slot with known price
       await increaseTime(ONE_HOUR + 1);
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -254,6 +259,7 @@ describe("SpinRig Invariant Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -267,13 +273,14 @@ describe("SpinRig Invariant Tests", function () {
       const teamBefore = await paymentToken.balanceOf(team.address);
       const protocolBefore = await paymentToken.balanceOf(protocol.address);
 
-      const newEpochId = await rig.getEpochId();
+      const newEpochId = await rig.epochId();
       await paymentToken.connect(user1).approve(rig.address, price);
       await rig.connect(user1).spin(
         user1.address,
         newEpochId,
         1961439882,
         price,
+        "",
         { value: fee }
       );
 
@@ -367,7 +374,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
@@ -385,7 +392,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -403,7 +410,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
   });
@@ -413,7 +420,7 @@ describe("SpinRig Invariant Tests", function () {
    */
   describe("INVARIANT: Epoch ID Increments", function () {
     it("Epoch ID should increment by 1 after each slot", async function () {
-      const epochIdBefore = await rig.getEpochId();
+      const epochIdBefore = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -422,10 +429,11 @@ describe("SpinRig Invariant Tests", function () {
         epochIdBefore,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
-      const epochIdAfter = await rig.getEpochId();
+      const epochIdAfter = await rig.epochId();
       expect(epochIdAfter).to.equal(epochIdBefore.add(1));
     });
   });
@@ -467,9 +475,10 @@ describe("SpinRig Business Logic Tests", function () {
     rig = await rigArtifact.deploy(
       unitToken.address,
       paymentToken.address,
-      mockEntropy.address,
-      treasury.address,
       mockCore.address,
+      treasury.address,
+      AddressZero, // team (set later via setTeam)
+      mockEntropy.address,
       config
     );
 
@@ -486,7 +495,7 @@ describe("SpinRig Business Logic Tests", function () {
       // Wait for emissions to accumulate
       await increaseTime(ONE_HOUR);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
       const poolBefore = await rig.getPrizePool();
 
@@ -498,6 +507,7 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -531,7 +541,7 @@ describe("SpinRig Business Logic Tests", function () {
       // Accumulate emissions
       await increaseTime(ONE_HOUR * 2);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user1).approve(rig.address, convert("1000", 6));
@@ -540,6 +550,7 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -570,13 +581,13 @@ describe("SpinRig Business Logic Tests", function () {
 
   describe("Slippage Protection", function () {
     it("Should revert with expired deadline", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), { value: fee })
+        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), "", { value: fee })
       ).to.be.revertedWith("SpinRig__Expired()");
     });
 
@@ -591,6 +602,7 @@ describe("SpinRig Business Logic Tests", function () {
           99999,
           1961439882,
           convert("1000", 6),
+          "",
           { value: fee }
         )
       ).to.be.revertedWith("SpinRig__EpochIdMismatch()");
@@ -598,7 +610,7 @@ describe("SpinRig Business Logic Tests", function () {
 
     it("Should revert if price exceeds maxPrice", async function () {
       // Slot to reset epoch with high price
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -607,11 +619,12 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
       // Now try to slot with maxPrice = 0
-      const newEpochId = await rig.getEpochId();
+      const newEpochId = await rig.epochId();
       const price = await rig.getPrice();
 
       if (price.gt(0)) {
@@ -623,6 +636,7 @@ describe("SpinRig Business Logic Tests", function () {
             newEpochId,
             1961439882,
             0, // maxPrice = 0
+            "",
             { value: fee }
           )
         ).to.be.revertedWith("SpinRig__MaxPriceExceeded()");
@@ -630,7 +644,7 @@ describe("SpinRig Business Logic Tests", function () {
     });
 
     it("Should revert with insufficient entropy fee", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
@@ -640,13 +654,14 @@ describe("SpinRig Business Logic Tests", function () {
           epochId,
           1961439882,
           convert("1000", 6),
+          "",
           { value: 0 }
         )
       ).to.be.revertedWith("SpinRig__InsufficientFee()");
     });
 
     it("Should revert with zero spinner address", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -657,9 +672,10 @@ describe("SpinRig Business Logic Tests", function () {
           epochId,
           1961439882,
           convert("1000", 6),
+          "",
           { value: fee }
         )
-      ).to.be.revertedWith("SpinRig__InvalidSpinner()");
+      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
     });
   });
 
@@ -693,7 +709,7 @@ describe("SpinRig Business Logic Tests", function () {
       const pendingBefore = await rig.getPendingEmissions();
       const poolBefore = await rig.getPrizePool();
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -702,6 +718,7 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -721,7 +738,7 @@ describe("SpinRig Business Logic Tests", function () {
     it("New initPrice should be price * multiplier", async function () {
       // Slot to get fresh epoch
       await increaseTime(ONE_HOUR + 1);
-      let epochId = await rig.getEpochId();
+      let epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
@@ -730,6 +747,7 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -741,17 +759,18 @@ describe("SpinRig Business Logic Tests", function () {
         this.skip();
       }
 
-      epochId = await rig.getEpochId();
+      epochId = await rig.epochId();
       await paymentToken.connect(user1).approve(rig.address, price);
       await rig.connect(user1).spin(
         user1.address,
         epochId,
         1961439882,
         price,
+        "",
         { value: fee }
       );
 
-      const newInitPrice = await rig.getInitPrice();
+      const newInitPrice = await rig.initPrice();
       const expectedInitPrice = price.mul(priceMultiplier).div(PRECISION);
 
       expect(newInitPrice).to.be.closeTo(expectedInitPrice, expectedInitPrice.div(100).add(1));
@@ -764,7 +783,7 @@ describe("SpinRig Business Logic Tests", function () {
       const price = await rig.getPrice();
       expect(price).to.equal(0);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
       const minInitPrice = await rig.minInitPrice();
 
@@ -774,10 +793,11 @@ describe("SpinRig Business Logic Tests", function () {
         epochId,
         1961439882,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
-      const newInitPrice = await rig.getInitPrice();
+      const newInitPrice = await rig.initPrice();
       expect(newInitPrice).to.equal(minInitPrice);
     });
   });

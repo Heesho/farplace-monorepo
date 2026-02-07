@@ -24,7 +24,7 @@ export const DEFAULT_CHAIN_ID = base.id;
 export const DEFAULT_ETH_PRICE_USD = 3500;
 
 // IPFS/Pinata
-export const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://glazecorp.mypinata.cloud";
+export const PINATA_GATEWAY = process.env.NEXT_PUBLIC_PINATA_GATEWAY || "https://gateway.pinata.cloud";
 export const PINATA_GATEWAY_KEY = process.env.NEXT_PUBLIC_PINATA_GATEWAY_KEY || "";
 
 // Helper to convert IPFS URI to HTTP URL with gateway token
@@ -45,8 +45,3 @@ export function ipfsToHttp(uri: string): string {
 // File upload limits
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
-// Swap settings
-export const SWAP_FEE_BPS = 40; // 0.4%
-export const MIN_SLIPPAGE_PERCENT = 1;
-export const MAX_SLIPPAGE_PERCENT = 49;
-export const DEFAULT_SLIPPAGE_PERCENT = 2;

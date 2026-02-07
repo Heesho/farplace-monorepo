@@ -116,6 +116,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         uint256 rigEpochPeriod,
         uint256 rigPriceMultiplier,
         uint256 rigMinInitPrice,
+        uint256[] odds,
         uint256 auctionInitPrice,
         uint256 auctionEpochPeriod,
         uint256 auctionPriceMultiplier,
@@ -222,9 +223,9 @@ contract SpinCore is Ownable, ReentrancyGuard {
 
         // Deploy Auction with LP as payment token
         auction = IAuctionFactory(auctionFactory).deploy(
-            params.auctionInitPrice,
             lpToken,
             DEAD_ADDRESS,
+            params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,
             params.auctionMinInitPrice
@@ -235,9 +236,10 @@ contract SpinCore is Ownable, ReentrancyGuard {
         rig = ISpinRigFactory(spinRigFactory).deploy(
             unit,
             params.quoteToken,
-            entropy,
             address(this), // core
             auction, // treasury
+            params.launcher, // team
+            entropy,
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
             params.rigMinInitPrice,
@@ -249,9 +251,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
 
         // Transfer Unit minting rights to SpinRig (permanently locked)
         IUnit(unit).setRig(rig);
-
-        // Default team to launcher
-        ISpinRig(rig).setTeam(params.launcher);
 
         // Set initial URI for the rig (required)
         ISpinRig(rig).setUri(params.uri);
@@ -287,6 +286,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
             params.rigMinInitPrice,
+            params.odds,
             params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,

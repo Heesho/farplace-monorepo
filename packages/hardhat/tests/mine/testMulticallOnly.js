@@ -907,10 +907,10 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
 
             // 2. Read initial state via Multicall
             let state = await multicall.getRig(rigAddr, 0, user1.address);
-            expect(state.epochId).to.equal(0);
-            // Fresh rig's initial miner is address(0)
+            expect(state.epochId).to.equal(1);
+            // Fresh rig's initial miner is the launcher (slot 0 initialized in constructor)
             let slot = await rig.getSlot(0);
-            expect(slot.miner).to.equal(AddressZero);
+            expect(slot.miner).to.equal(user0.address);
 
             // 3. First user mines via Multicall
             let epochId = slot.epochId;
@@ -1088,6 +1088,11 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             const price = initialState.price;
             const deadline = await getFutureDeadline();
 
+            // Approve WETH for the mine price (slot 0 is pre-initialized with minInitPrice)
+            if (price.gt(0)) {
+                await weth.connect(user2).approve(multicall.address, price.mul(2));
+            }
+
             await multicall.connect(user2).mine(
                 rigAddr,
                 0, // index
@@ -1172,8 +1177,8 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             );
 
             const usdcAfter = await weth.balanceOf(user1.address);
-            // Should have spent the exact price
-            expect(usdcBefore.sub(usdcAfter)).to.be.closeTo(price, convert("0.001", 6));
+            // Should have spent approximately the quoted price (small difference from block time elapsed)
+            expect(usdcBefore.sub(usdcAfter)).to.be.closeTo(price, price.div(100));
         });
 
         it("Query non-existent rig reverts", async function () {

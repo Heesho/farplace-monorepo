@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import type { RigListItem } from "@/hooks/useAllRigs";
@@ -23,35 +23,32 @@ const formatUsd = (value: number | undefined | null) => {
   return `$${value.toFixed(2)}`;
 };
 
-// Mini sparkline chart component
-function MiniSparkline({ unitAddress, currentPrice }: { unitAddress: string; currentPrice: number }) {
-  const { data: candles } = useQuery({
-    queryKey: ["miniSparkline", unitAddress],
-    queryFn: async () => {
-      const now = Math.floor(Date.now() / 1000);
-      const since = now - 86400; // Last 24h
-      return getUnitHourData(unitAddress.toLowerCase(), since);
-    },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-  });
-
-  // Generate points for the sparkline
+// Mini sparkline chart component (takes pre-fetched candle prices)
+function MiniSparkline({ prices }: { prices: number[] }) {
   const points = (() => {
     const width = 60;
     const height = 24;
-    const padding = 2;
+    const padding = 3;
 
-    // If no data, create flat line at current price
-    if (!candles || candles.length === 0) {
+    if (prices.length === 0) {
       const y = height / 2;
       return `${padding},${y} ${width - padding},${y}`;
     }
 
-    const prices = candles.map((c) => parseFloat(c.close));
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
-    const priceRange = maxPrice - minPrice || 1;
+    const priceRange = maxPrice - minPrice;
+
+    // If all prices are the same, draw a flat line in the middle
+    if (priceRange === 0) {
+      const y = height / 2;
+      return prices
+        .map((_, i) => {
+          const x = padding + (i / (prices.length - 1)) * (width - padding * 2);
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        })
+        .join(" ");
+    }
 
     return prices
       .map((price, i) => {
@@ -62,17 +59,12 @@ function MiniSparkline({ unitAddress, currentPrice }: { unitAddress: string; cur
       .join(" ");
   })();
 
-  // Determine color based on price change
-  const isUp = candles && candles.length > 1
-    ? parseFloat(candles[candles.length - 1].close) >= parseFloat(candles[0].close)
-    : true;
-
   return (
     <svg width="60" height="24" className="overflow-visible">
       <polyline
         points={points}
         fill="none"
-        stroke={isUp ? "#22c55e" : "#ef4444"}
+        stroke="#a1a1aa"
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -82,9 +74,33 @@ function MiniSparkline({ unitAddress, currentPrice }: { unitAddress: string; cur
 }
 
 export function RigCard({ rig, isTopBump = false, isNewBump = false }: RigCardProps) {
-  // Market cap comes directly from subgraph as USD
   const marketCapUsd = rig.marketCapUsd;
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Fetch 24h candle data
+  const { data: candles } = useQuery({
+    queryKey: ["miniSparkline", rig.unitAddress],
+    queryFn: async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const since = now - 86400;
+      return getUnitHourData(rig.unitAddress.toLowerCase(), since);
+    },
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  // Compute sparkline prices and 24h change from candles
+  const { prices, change24h } = useMemo(() => {
+    if (!candles || candles.length === 0) {
+      return { prices: [], change24h: 0 };
+    }
+    const p = candles.map((c) => parseFloat(c.close));
+    const oldPrice = parseFloat(candles[0].close);
+    const change = oldPrice > 0
+      ? ((rig.priceUsd - oldPrice) / oldPrice) * 100
+      : 0;
+    return { prices: p, change24h: change };
+  }, [candles, rig.priceUsd]);
 
   // Fetch metadata to get image URL
   useEffect(() => {
@@ -142,7 +158,7 @@ export function RigCard({ rig, isTopBump = false, isNewBump = false }: RigCardPr
 
         {/* Mini Sparkline Chart */}
         <div className="flex-shrink-0 px-2">
-          <MiniSparkline unitAddress={rig.unitAddress} currentPrice={rig.priceUsd} />
+          <MiniSparkline prices={prices} />
         </div>
 
         {/* Market Cap & 24h Change */}
@@ -150,11 +166,8 @@ export function RigCard({ rig, isTopBump = false, isNewBump = false }: RigCardPr
           <div className="text-[15px] font-medium tabular-nums">
             {formatUsd(marketCapUsd)}
           </div>
-          <div className={cn(
-            "text-[13px] tabular-nums mt-0.5",
-            (rig.change24h ?? 0) >= 0 ? "text-green-500" : "text-red-500"
-          )}>
-            {(rig.change24h ?? 0) >= 0 ? "+" : ""}{Math.round(rig.change24h ?? 0)}%
+          <div className="text-[13px] tabular-nums mt-0.5 text-zinc-400">
+            {change24h >= 0 ? "+" : ""}{change24h.toFixed(2)}%
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getRig } from "@/lib/subgraph-launchpad";
 import RigDetailPage from "./client-page";
 
-const appDomain = "https://glazecorp-franchise.vercel.app";
+const appDomain = process.env.NEXT_PUBLIC_APP_URL || "https://farplace.app";
 const heroImageUrl = `${appDomain}/media/hero.png`;
 const splashImageUrl = `${appDomain}/media/splash.png`;
 
@@ -26,10 +26,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     version: "1",
     imageUrl: heroImageUrl,
     button: {
-      title: `Mine $${tokenSymbol}!`,
+      title: `$${tokenSymbol} on Farplace`,
       action: {
         type: "launch_miniapp" as const,
-        name: "Franchiser",
+        name: "Farplace",
         url: rigUrl,
         splashImageUrl,
         splashBackgroundColor: "#000000",
@@ -38,11 +38,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 
   return {
-    title: `${tokenName} ($${tokenSymbol}) | Franchiser`,
-    description: `Mine ${tokenName} ($${tokenSymbol}) on Franchiser. Start mining and earn tokens now!`,
+    title: `${tokenName} ($${tokenSymbol}) | Farplace`,
+    description: `${tokenName} ($${tokenSymbol}) on Farplace. Start earning tokens now!`,
     openGraph: {
-      title: `${tokenName} ($${tokenSymbol}) | Franchiser`,
-      description: `Mine ${tokenName} ($${tokenSymbol}) on Franchiser. Start mining and earn tokens now!`,
+      title: `${tokenName} ($${tokenSymbol}) | Farplace`,
+      description: `${tokenName} ($${tokenSymbol}) on Farplace. Start earning tokens now!`,
       url: rigUrl,
       images: [
         {

@@ -228,9 +228,11 @@ export function updateUnitPrice(unit: Unit, newPrice: BigDecimal): void {
 
   // Update current price
   unit.price = newPrice
+  unit.priceUSD = newPrice
 
   // Update market cap
   unit.marketCap = newPrice.times(unit.totalSupply)
+  unit.marketCapUSD = unit.marketCap
 }
 
 export function calculatePriceChange(currentPrice: BigDecimal, oldPrice: BigDecimal): BigDecimal {

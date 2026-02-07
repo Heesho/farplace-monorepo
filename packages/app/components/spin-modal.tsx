@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther } from "viem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +10,8 @@ import { SpinHistoryItem } from "@/components/spin-history-item";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useSpinRigState } from "@/hooks/useSpinRigState";
 import { useSpinHistory } from "@/hooks/useSpinHistory";
-import { useRigLeaderboard } from "@/hooks/useRigLeaderboard";
+import { useSpinLeaderboard } from "@/hooks/useSpinLeaderboard";
+import { useTokenMetadata } from "@/hooks/useMetadata";
 import {
   useBatchedTransaction,
   encodeApproveCall,
@@ -66,7 +67,7 @@ function TokenLogo({
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-semibold`}
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-white font-semibold`}
     >
       {symbol.charAt(0)}
     </div>
@@ -85,8 +86,10 @@ export function SpinModal({
 
   // Real data hooks
   const { spinState, odds, refetch: refetchSpin, isLoading: isSpinLoading } = useSpinRigState(rigAddress, account);
-  const { spins: spinHistory, isLoading: isSpinHistoryLoading } = useSpinHistory(rigAddress, 10);
-  const { entries: leaderboardEntries, userRank, isLoading: isLeaderboardLoading } = useRigLeaderboard(rigAddress, account, 10);
+  const { spins: spinHistory, isLoading: isSpinHistoryLoading, refetch: refetchHistoryFn } = useSpinHistory(rigAddress, 10);
+  const refetchHistoryRef = useRef(refetchHistoryFn);
+  refetchHistoryRef.current = refetchHistoryFn;
+  const { entries: leaderboardEntries, userRank, isLoading: isLeaderboardLoading } = useSpinLeaderboard(rigAddress, account, 10);
   const { execute, status: txStatus, txHash, error: txError, reset: resetTx } = useBatchedTransaction();
 
   // UI state
@@ -95,23 +98,51 @@ export function SpinModal({
   const [displayedAmount, setDisplayedAmount] = useState(0);
   const [minedPayoutPercent, setMinedPayoutPercent] = useState(0);
   const [message, setMessage] = useState("");
-  const defaultMessage = "gm";
+  const { metadata } = useTokenMetadata(spinState?.rigUri);
+  const defaultMessage = metadata?.defaultMessage || "gm";
+  const spinCountBeforeMine = useRef(0);
 
   // Derived values from real data
   const price = spinState?.price ?? 0n;
   const prizePool = spinState?.prizePool ?? 0n;
+  const pendingEmissions = spinState?.pendingEmissions ?? 0n;
+  const ups = spinState?.ups ?? 0n;
   const userQuoteBalance = spinState?.accountQuoteBalance ?? 0n;
   const userQuoteBalanceNum = Number(formatUnits(userQuoteBalance, QUOTE_TOKEN_DECIMALS));
   const priceNum = Number(formatUnits(price, QUOTE_TOKEN_DECIMALS));
-  const prizePoolNumber = Number(formatEther(prizePool));
+  const basePoolNumber = Number(formatEther(prizePool + pendingEmissions));
+  const upsPerSecond = Number(formatEther(ups));
   const tokenPrice = spinState?.unitPrice ? Number(formatEther(spinState.unitPrice)) : 0.01;
 
-  // Compute min/max mine from real odds
+  // Live-ticking prize pool — increments by UPS every second
+  const [poolTick, setPoolTick] = useState(0);
+  const poolSnapshotRef = useRef({ base: 0, time: Date.now() });
+
+  useEffect(() => {
+    poolSnapshotRef.current = { base: basePoolNumber, time: Date.now() };
+    setPoolTick(0);
+  }, [basePoolNumber]);
+
+  useEffect(() => {
+    if (upsPerSecond <= 0) return;
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - poolSnapshotRef.current.time) / 1000;
+      setPoolTick(elapsed * upsPerSecond);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [upsPerSecond]);
+
+  const prizePoolNumber = poolSnapshotRef.current.base + poolTick;
+
+  // Compute min/max mine from real odds + probabilities
   const oddsNumbers = odds.map((o) => Number(o));
   const minPayoutBps = oddsNumbers.length > 0 ? Math.min(...oddsNumbers) : 0;
   const maxPayoutBps = oddsNumbers.length > 0 ? Math.max(...oddsNumbers) : 0;
   const maxMine = prizePoolNumber * maxPayoutBps / 10000;
   const minMine = prizePoolNumber * minPayoutBps / 10000;
+  const totalOdds = oddsNumbers.length;
+  const maxChance = totalOdds > 0 ? (oddsNumbers.filter((o) => o === maxPayoutBps).length / totalOdds) * 100 : 0;
+  const minChance = totalOdds > 0 ? (oddsNumbers.filter((o) => o === minPayoutBps).length / totalOdds) * 100 : 0;
 
   // Last mine result (from spin history)
   const lastSpin = spinHistory[0];
@@ -155,6 +186,7 @@ export function SpinModal({
   const handleMine = useCallback(async () => {
     if (!account || !spinState || miningState !== "idle") return;
 
+    spinCountBeforeMine.current = spinHistory.length;
     setMiningState("mining");
     setDisplayedAmount(0);
 
@@ -175,7 +207,7 @@ export function SpinModal({
         CONTRACT_ADDRESSES.spinMulticall as `0x${string}`,
         SPIN_MULTICALL_ABI,
         "spin",
-        [rigAddress, spinState.epochId, deadline, maxPrice],
+        [rigAddress, spinState.epochId, deadline, maxPrice, message || defaultMessage],
         spinState.entropyFee
       )
     );
@@ -205,6 +237,7 @@ export function SpinModal({
         setTimeout(() => {
           setMiningState("idle");
           refetchSpin();
+          refetchHistoryRef.current();
         }, 2000);
       }
     }, duration / steps);
@@ -212,22 +245,37 @@ export function SpinModal({
     return () => clearInterval(interval);
   }, [miningState, minedAmount, minedPayoutPercent, refetchSpin]);
 
-  // Handle tx status changes
+  // After tx succeeds, poll subgraph for VRF callback result
   useEffect(() => {
-    if (txStatus === "success") {
-      const randomOdds = oddsNumbers.length > 0
-        ? oddsNumbers[Math.floor(Math.random() * oddsNumbers.length)]
-        : 500;
-      const result = Math.floor(prizePoolNumber * randomOdds / 10000);
-      setMinedAmount(result);
-      setMinedPayoutPercent(randomOdds / 100);
-      setDisplayedAmount(0);
-      setMiningState("revealing");
+    if (txStatus === "success" && miningState === "mining") {
+      const interval = setInterval(() => { refetchHistoryRef.current(); refetchSpin(); }, 3000);
+      return () => clearInterval(interval);
     }
+  }, [txStatus, miningState, refetchSpin]);
+
+  // When new spin result appears in subgraph, reveal the real amount
+  useEffect(() => {
+    if (txStatus === "success" && miningState === "mining" && spinHistory.length > spinCountBeforeMine.current) {
+      const latest = spinHistory[0];
+      const realAmount = Number(formatEther(latest.winAmount));
+      if (realAmount > 0) {
+        const realPercent = Number(latest.oddsBps) / 100;
+        setMinedAmount(Math.round(realAmount));
+        setMinedPayoutPercent(realPercent);
+        setDisplayedAmount(0);
+        setMiningState("revealing");
+      }
+    }
+  }, [txStatus, miningState, spinHistory]);
+
+  // Handle tx error — auto-reset after 2s
+  useEffect(() => {
     if (txStatus === "error") {
       setMiningState("idle");
+      const timer = setTimeout(() => resetTx(), 2000);
+      return () => clearTimeout(timer);
     }
-  }, [txStatus, oddsNumbers, prizePoolNumber]);
+  }, [txStatus, resetTx]);
 
   // Reset on modal close
   useEffect(() => {
@@ -243,7 +291,7 @@ export function SpinModal({
   const formattedSpins = spinHistory.map((spin, index) => ({
     id: spin.txHash || index.toString(),
     spinner: spin.spinner,
-    uri: "",
+    uri: spin.uri,
     price: spin.price,
     payoutPercent: Number(spin.oddsBps) / 100,
     won: spin.winAmount,
@@ -267,32 +315,21 @@ export function SpinModal({
           >
             <X className="w-5 h-5" />
           </button>
-          <span className="text-base font-semibold">Mine</span>
+          <span className="text-base font-semibold">Spin</span>
           <div className="w-9" />
         </div>
 
         {/* Sticky Top Section */}
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-2">
           {/* Max Mine & Min Mine */}
-          <div className="flex items-start justify-between mb-4">
-            {/* Max Mine */}
-            <div>
-              <div className="text-[11px] text-muted-foreground mb-0.5">MAX MINE</div>
-              <div className="flex items-center gap-1.5">
-                <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
-                <span className="text-lg font-bold tabular-nums">
-                  {maxMine.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-              <div className="text-[12px] text-muted-foreground tabular-nums">
-                ${(maxMine * tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
+          <div className="flex items-start justify-between mb-2">
             {/* Min Mine */}
-            <div className="text-right">
-              <div className="text-[11px] text-muted-foreground mb-0.5">MIN MINE</div>
-              <div className="flex items-center justify-end gap-1.5">
+            <div>
+              <div className="mb-0.5">
+                <span className="text-[13px] font-medium text-zinc-200">Min Mine</span>
+                <span className="text-[11px] text-zinc-500 ml-1.5">{minChance % 1 === 0 ? minChance.toFixed(0) : minChance.toFixed(1)}% chance</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
                 <span className="text-lg font-bold tabular-nums">
                   {minMine.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -302,10 +339,27 @@ export function SpinModal({
                 ${(minMine * tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
+
+            {/* Max Mine */}
+            <div className="text-right">
+              <div className="mb-0.5">
+                <span className="text-[11px] text-zinc-500">{maxChance % 1 === 0 ? maxChance.toFixed(0) : maxChance.toFixed(1)}% chance</span>
+                <span className="text-[13px] font-medium text-zinc-200 ml-1.5">Max Mine</span>
+              </div>
+              <div className="flex items-center justify-end gap-1.5">
+                <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
+                <span className="text-lg font-bold tabular-nums">
+                  {maxMine.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="text-[12px] text-muted-foreground tabular-nums">
+                ${(maxMine * tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
           </div>
 
           {/* Mining Result Area */}
-          <div className="py-4">
+          <div className="py-2">
             {miningState === "mining" && (
               <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
                 <div className="flex items-center gap-2">
@@ -320,8 +374,8 @@ export function SpinModal({
                 </div>
                 <div className="text-right">
                   <div className="flex items-center justify-end gap-2 h-8">
-                    <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="md" />
-                    <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+                    <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />
+                    <span className="text-[14px] text-zinc-400">Mining...</span>
                   </div>
                   <div className="text-[12px] text-muted-foreground h-4">
                     &nbsp;
@@ -400,11 +454,13 @@ export function SpinModal({
                   <div className="flex items-center justify-end gap-2 h-8">
                     <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="md" />
                     <span className="text-2xl font-bold tabular-nums">
-                      {lastMine.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      {lastMine.amount > 0 ? lastMine.amount.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "--"}
                     </span>
                   </div>
                   <div className="text-[12px] text-muted-foreground tabular-nums h-4">
-                    ${(lastMine.amount * tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {lastMine.amount > 0
+                      ? `$${(lastMine.amount * tokenPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "\u00A0"}
                   </div>
                 </div>
               </div>
@@ -486,9 +542,9 @@ export function SpinModal({
         {/* Bottom Action Bar */}
         <div
           className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 56px)" }}
         >
-          <div className="w-full max-w-[520px] px-4 pt-3 pb-3 bg-background">
+          <div className="w-full max-w-[520px] px-4 pt-2 pb-2 bg-background">
             {/* Message Input */}
             <input
               type="text"
@@ -496,13 +552,13 @@ export function SpinModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder={defaultMessage}
               maxLength={100}
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-[15px] outline-none placeholder:text-zinc-500 mb-3"
+              className="w-full bg-zinc-800 rounded-xl px-4 py-2 text-[15px] outline-none placeholder:text-zinc-500 mb-2"
             />
             {/* Price, Balance, Mine Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div>
-                  <div className="text-muted-foreground text-[12px]">Price</div>
+                  <div className="text-muted-foreground text-[12px]">Pay</div>
                   <div className="font-semibold text-[17px] tabular-nums">
                     ${priceNum.toFixed(4)}
                   </div>
@@ -520,9 +576,9 @@ export function SpinModal({
                 className={`
                   w-32 h-10 text-[14px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2
                   ${miningState === "complete"
-                    ? "bg-green-600 text-white"
+                    ? "bg-zinc-300 text-black"
                     : txStatus === "error"
-                    ? "bg-red-600 text-white"
+                    ? "bg-zinc-600 text-white"
                     : miningState !== "idle"
                     ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                     : account && spinState && userQuoteBalance >= price
@@ -537,7 +593,7 @@ export function SpinModal({
                     Success
                   </>
                 ) : txStatus === "error" ? (
-                  "Failed"
+                  txError?.message?.includes("cancelled") ? "Rejected" : "Failed"
                 ) : miningState !== "idle" ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />

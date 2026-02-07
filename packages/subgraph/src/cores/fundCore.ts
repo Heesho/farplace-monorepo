@@ -1,5 +1,6 @@
-import { Address } from '@graphprotocol/graph-ts'
+import { Address, BigInt } from '@graphprotocol/graph-ts'
 import { FundCore__Launched as FundCoreLaunchedEvent } from '../../generated/FundCore/FundCore'
+import { FundRig as FundRigContract } from '../../generated/FundCore/FundRig'
 import {
   UniswapV2Pair as PairTemplate,
   FundRig as FundRigTemplate,
@@ -11,7 +12,6 @@ import {
   ONE_BI,
   ZERO_BD,
   PROTOCOL_ID,
-  BI_18,
   RIG_TYPE_FUND,
 } from '../constants'
 import {
@@ -20,6 +20,8 @@ import {
   createUnit,
   convertTokenToDecimal,
 } from '../helpers'
+
+const DEFAULT_MIN_DONATION = BigInt.fromI32(10_000)
 
 export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   // Load or create Protocol entity (singleton)
@@ -64,7 +66,7 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   rig.uri = event.params.uri
   rig.initialUps = event.params.initialEmission
   rig.tailUps = event.params.minEmission
-  rig.halvingPeriod = ZERO_BI // FundRig uses daily emissions, not halving
+  rig.halvingPeriod = event.params.halvingPeriod
   rig.treasuryRevenue = ZERO_BD
   rig.teamRevenue = ZERO_BD
   rig.protocolRevenue = ZERO_BD
@@ -80,8 +82,14 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   fundRig.recipient = recipientAddress
   fundRig.initialEmission = event.params.initialEmission
   fundRig.minEmission = event.params.minEmission
-  fundRig.minDonation = ZERO_BI // Not emitted in launch event
+  let fundRigContract = FundRigContract.bind(rigAddress)
+  let minDonationResult = fundRigContract.try_MIN_DONATION()
+  fundRig.minDonation = minDonationResult.reverted ? DEFAULT_MIN_DONATION : minDonationResult.value
   fundRig.halvingPeriod = event.params.halvingPeriod
+  let treasuryResult = fundRigContract.try_treasury()
+  fundRig.treasury = treasuryResult.reverted ? Address.zero() : treasuryResult.value
+  let teamResult = fundRigContract.try_team()
+  fundRig.team = teamResult.reverted ? Address.zero() : teamResult.value
   fundRig.currentDay = ZERO_BI
   fundRig.totalDonated = ZERO_BD
   fundRig.totalMinted = ZERO_BD

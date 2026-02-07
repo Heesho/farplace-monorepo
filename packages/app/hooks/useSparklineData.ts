@@ -4,6 +4,7 @@ import { getBatchSparklineData, type SparklineDataPoint } from "@/lib/subgraph-l
 
 type SparklineResult = {
   getSparkline: (unitAddress: string, currentPrice?: number) => number[];
+  getChange24h: (unitAddress: string, currentPrice: number) => number;
   isLoading: boolean;
 };
 
@@ -56,8 +57,20 @@ export function useSparklineData(unitAddresses: string[]): SparklineResult {
     };
   }, [sparklineMap]);
 
+  const getChange24h = useMemo(() => {
+    return (unitAddress: string, currentPrice: number): number => {
+      const data = sparklineMap?.get(unitAddress.toLowerCase());
+      if (!data || data.length === 0 || currentPrice === 0) return 0;
+
+      const oldPrice = data[0].price;
+      if (oldPrice === 0) return 0;
+      return ((currentPrice - oldPrice) / oldPrice) * 100;
+    };
+  }, [sparklineMap]);
+
   return {
     getSparkline,
+    getChange24h,
     isLoading,
   };
 }

@@ -315,20 +315,22 @@ describe("Edge Case Security Audit Tests", function () {
       expect(newSlot.epochId).to.equal(slot.epochId.add(1));
     });
 
-    it("Mine at price=0: previous miner address is zero, no token mint", async function () {
+    it("Mine at price=0: previous miner is launcher, tokens minted for launcher's hold time", async function () {
       const { rigContract, rig, unitContract } = await launchMineRig(user0);
 
       await increaseTime(ONE_HOUR + 1);
 
       const slot = await rigContract.getSlot(0);
-      expect(slot.miner).to.equal(AddressZero);
+      // Slot 0 is now pre-initialized with launcher as miner
+      expect(slot.miner).to.equal(user0.address);
 
       const totalMintedBefore = await rigContract.totalMinted();
       const deadline = await getFutureDeadline();
       await rigContract.connect(user1).mine(user1.address, 0, slot.epochId, deadline, 0, "");
 
       const totalMintedAfter = await rigContract.totalMinted();
-      expect(totalMintedAfter).to.equal(totalMintedBefore);
+      // Launcher held the slot for ~1 hour, so tokens were minted
+      expect(totalMintedAfter).to.be.gt(totalMintedBefore);
     });
 
     it("Fund with MIN_DONATION (10000 units): fee splits work correctly", async function () {
@@ -346,7 +348,7 @@ describe("Edge Case Security Audit Tests", function () {
       const protocolBefore = await usdc.balanceOf(protocol.address);
 
       await usdc.connect(user2).approve(rig, MIN_DONATION);
-      await rigContract.connect(user2).fund(user2.address, MIN_DONATION);
+      await rigContract.connect(user2).fund(user2.address, MIN_DONATION, "");
 
       const recipientAfter = await usdc.balanceOf(recipientAddr);
       const treasuryAfter = await usdc.balanceOf(treasuryAddr);
@@ -554,7 +556,7 @@ describe("Edge Case Security Audit Tests", function () {
       const currentDay = await rigContract.currentDay();
 
       await usdc.connect(user2).approve(rig, convert("100", 6));
-      await rigContract.connect(user2).fund(user2.address, convert("100", 6));
+      await rigContract.connect(user2).fund(user2.address, convert("100", 6), "");
 
       await expect(
         rigContract.connect(user2).claim(user2.address, currentDay)
@@ -568,13 +570,14 @@ describe("Edge Case Security Audit Tests", function () {
       expect(balAfter).to.be.gt(balBefore);
     });
 
-    it("First mine on empty slot: no miner fee, no token mint to previous miner", async function () {
+    it("First mine displaces launcher: tokens minted for launcher's hold time", async function () {
       const { rigContract, rig, unitContract } = await launchMineRig(user0);
 
       await increaseTime(ONE_HOUR + 1);
 
       const slot = await rigContract.getSlot(0);
-      expect(slot.miner).to.equal(AddressZero);
+      // Slot 0 is now pre-initialized with launcher as miner
+      expect(slot.miner).to.equal(user0.address);
 
       const totalMintedBefore = await rigContract.totalMinted();
       const deadline = await getFutureDeadline();
@@ -582,7 +585,8 @@ describe("Edge Case Security Audit Tests", function () {
       await rigContract.connect(user1).mine(user1.address, 0, slot.epochId, deadline, 0, "");
 
       const totalMintedAfter = await rigContract.totalMinted();
-      expect(totalMintedAfter).to.equal(totalMintedBefore);
+      // Launcher held slot for ~1 hour, so tokens minted for that time
+      expect(totalMintedAfter).to.be.gt(totalMintedBefore);
 
       const newSlot = await rigContract.getSlot(0);
       expect(newSlot.miner).to.equal(user1.address);
@@ -668,21 +672,20 @@ describe("Edge Case Security Audit Tests", function () {
       expect(minted).to.be.lte(convert("10", 18));
     });
 
-    it("Mine immediately after deploy: works with price=0, mints 0 tokens to address(0)", async function () {
+    it("Mine immediately after deploy: slot has minInitPrice, displaces launcher", async function () {
       const { rigContract, rig, unitContract } = await launchMineRig(user0);
 
       const slot = await rigContract.getSlot(0);
       const price = await rigContract.getPrice(0);
-      // Unmined slot has initPrice=0, so price=0
-      expect(price).to.equal(0);
+      // Slot 0 is pre-initialized with initPrice=minInitPrice, so price > 0
+      expect(price).to.be.gt(0);
+      // Launcher is the initial miner
+      expect(slot.miner).to.equal(user0.address);
 
       const deadline = await getFutureDeadline();
-      const totalMintedBefore = await rigContract.totalMinted();
 
-      await rigContract.connect(user1).mine(user1.address, 0, slot.epochId, deadline, 0, "");
-
-      const totalMintedAfter = await rigContract.totalMinted();
-      expect(totalMintedAfter).to.equal(totalMintedBefore);
+      await weth.connect(user1).approve(rig, price.mul(2));
+      await rigContract.connect(user1).mine(user1.address, 0, slot.epochId, deadline, price.mul(2), "");
 
       const newSlot = await rigContract.getSlot(0);
       expect(newSlot.miner).to.equal(user1.address);
@@ -751,7 +754,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       for (let i = 0; i < donors.length; i++) {
         await usdc.connect(donors[i]).approve(rig, amounts[i]);
-        await rigContract.connect(donors[i]).fund(donors[i].address, amounts[i]);
+        await rigContract.connect(donors[i]).fund(donors[i].address, amounts[i], "");
       }
 
       await increaseTime(ONE_DAY + 1);
@@ -1239,7 +1242,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__ZeroLauncher()");
+        })).to.be.revertedWith("MineCore__ZeroLauncher()");
 
         // SpinCore
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
@@ -1280,7 +1283,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__ZeroQuoteToken()");
+        })).to.be.revertedWith("MineCore__ZeroQuoteToken()");
 
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
         await expect(spinCore.connect(user0).launch({
@@ -1319,7 +1322,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__EmptyTokenName()");
+        })).to.be.revertedWith("MineCore__EmptyTokenName()");
 
         await usdc.connect(user0).approve(mineCore.address, convert("100", 6));
         await expect(mineCore.connect(user0).launch({
@@ -1332,7 +1335,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__EmptyTokenSymbol()");
+        })).to.be.revertedWith("MineCore__EmptyTokenSymbol()");
       });
 
       it("Should revert with zero unitAmount", async function () {
@@ -1347,7 +1350,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__ZeroUnitAmount()");
+        })).to.be.revertedWith("MineCore__ZeroUnitAmount()");
       });
 
       it("Should revert with insufficient usdc", async function () {
@@ -1362,7 +1365,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("Core__InsufficientUsdc()");
+        })).to.be.revertedWith("MineCore__InsufficientUsdc()");
       });
     });
   });
@@ -1387,7 +1390,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await weth.connect(user1).approve(rig, convert("1", 18));
       const tx = await rigContract.connect(user1).spin(
-        user1.address, epochId, deadline, convert("1", 18), { value: entropyFee }
+        user1.address, epochId, deadline, convert("1", 18), "", { value: entropyFee }
       );
 
       const receipt = await tx.wait();
@@ -1408,7 +1411,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await usdc.connect(user2).approve(rig, 9999);
       await expect(
-        rigContract.connect(user2).fund(user2.address, 9999)
+        rigContract.connect(user2).fund(user2.address, 9999, "")
       ).to.be.revertedWith("FundRig__BelowMinDonation()");
     });
 
@@ -1418,7 +1421,7 @@ describe("Edge Case Security Audit Tests", function () {
       const day = await rigContract.currentDay();
 
       await usdc.connect(user2).approve(rig, convert("100", 6));
-      await rigContract.connect(user2).fund(user2.address, convert("100", 6));
+      await rigContract.connect(user2).fund(user2.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY + 1);
 
@@ -1435,7 +1438,7 @@ describe("Edge Case Security Audit Tests", function () {
       const day = await rigContract.currentDay();
 
       await usdc.connect(user1).approve(rig, convert("100", 6));
-      await rigContract.connect(user1).fund(user1.address, convert("100", 6));
+      await rigContract.connect(user1).fund(user1.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY + 1);
 
@@ -1516,8 +1519,8 @@ describe("Edge Case Security Audit Tests", function () {
 
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
-        rigContract.connect(user1).spin(AddressZero, epochId, dl, convert("1", 18), { value: fee })
-      ).to.be.revertedWith("SpinRig__InvalidSpinner()");
+        rigContract.connect(user1).spin(AddressZero, epochId, dl, convert("1", 18), "", { value: fee })
+      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
     });
 
     it("SpinRig: spin with wrong epochId should revert", async function () {
@@ -1528,7 +1531,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
-        rigContract.connect(user1).spin(user1.address, 9999, dl, convert("1", 18), { value: fee })
+        rigContract.connect(user1).spin(user1.address, 9999, dl, convert("1", 18), "", { value: fee })
       ).to.be.revertedWith("SpinRig__EpochIdMismatch()");
     });
 
@@ -1540,7 +1543,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
-        rigContract.connect(user1).spin(user1.address, epochId, 1, convert("1", 18), { value: fee })
+        rigContract.connect(user1).spin(user1.address, epochId, 1, convert("1", 18), "", { value: fee })
       ).to.be.revertedWith("SpinRig__Expired()");
     });
 
@@ -1552,7 +1555,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
-        rigContract.connect(user1).spin(user1.address, epochId, dl, convert("1", 18), { value: 0 })
+        rigContract.connect(user1).spin(user1.address, epochId, dl, convert("1", 18), "", { value: 0 })
       ).to.be.revertedWith("SpinRig__InsufficientFee()");
     });
 
@@ -1595,15 +1598,15 @@ describe("Edge Case Security Audit Tests", function () {
 
       await usdc.connect(user1).approve(rig, convert("100", 6));
       await expect(
-        rigContract.connect(user1).fund(AddressZero, convert("100", 6))
-      ).to.be.revertedWith("FundRig__InvalidAddress()");
+        rigContract.connect(user1).fund(AddressZero, convert("100", 6), "")
+      ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
 
     it("FundRig: claim to zero address should revert", async function () {
       const { rigContract, rig } = await launchFundRig(user0);
 
       await usdc.connect(user1).approve(rig, convert("100", 6));
-      await rigContract.connect(user1).fund(user1.address, convert("100", 6));
+      await rigContract.connect(user1).fund(user1.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY + 1);
 
@@ -1611,7 +1614,7 @@ describe("Edge Case Security Audit Tests", function () {
       // Claim for a completed day (day - 1 or whatever day the donation was on)
       await expect(
         rigContract.connect(user1).claim(AddressZero, day.sub(1))
-      ).to.be.revertedWith("FundRig__InvalidAddress()");
+      ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
 
     it("MineRig: UPS never falls below tailUps after many mines", async function () {

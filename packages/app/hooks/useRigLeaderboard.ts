@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { formatEther, formatUnits } from "viem";
 import { getMines, type SubgraphMineEvent } from "@/lib/subgraph-launchpad";
@@ -37,14 +38,15 @@ function aggregateMiners(
 ): LeaderboardEntry[] {
   const minerMap = new Map<
     string,
-    { minted: number; earned: number }
+    { minted: number; earned: number; spent: number }
   >();
 
   for (const e of events) {
     const minerId = e.miner.id.toLowerCase();
-    const prev = minerMap.get(minerId) ?? { minted: 0, earned: 0 };
+    const prev = minerMap.get(minerId) ?? { minted: 0, earned: 0, spent: 0 };
     prev.minted += parseFloat(e.minted);
     prev.earned += parseFloat(e.earned);
+    prev.spent += parseFloat(e.price);
     minerMap.set(minerId, prev);
   }
 
@@ -56,8 +58,10 @@ function aggregateMiners(
   return sorted.map(([addr, stats], index) => {
     const mined = BigInt(Math.floor(stats.minted * 1e18));
     const earned = BigInt(Math.floor(stats.earned * 1e6));
+    const spent = BigInt(Math.floor(stats.spent * 1e6));
     const minedNum = Number(formatEther(mined));
     const earnedNum = Number(formatUnits(earned, 6));
+    const spentNum = Number(formatUnits(spent, 6));
     return {
       miner: addr,
       mined,
@@ -70,8 +74,8 @@ function aggregateMiners(
           : minedNum >= 1_000
           ? `${(minedNum / 1_000).toFixed(1)}K`
           : minedNum.toFixed(0),
-      spent: 0n,
-      spentFormatted: "0",
+      spent,
+      spentFormatted: `$${spentNum.toFixed(2)}`,
       earnedFormatted: `$${earnedNum.toFixed(2)}`,
       isCurrentUser: account
         ? addr.toLowerCase() === account.toLowerCase()
@@ -106,10 +110,10 @@ export function useRigLeaderboard(
     staleTime: 15_000,
   });
 
-  const entries = raw ? aggregateMiners(raw, account, limit) : undefined;
+  const entries = useMemo(() => raw ? aggregateMiners(raw, account, limit) : undefined, [raw, account, limit]);
 
   // Compute user rank from the leaderboard data
-  const userRank =
+  const userRank = useMemo(() =>
     account && entries
       ? (() => {
           const idx = entries.findIndex(
@@ -117,7 +121,9 @@ export function useRigLeaderboard(
           );
           return idx >= 0 ? idx + 1 : undefined;
         })()
-      : undefined;
+      : undefined,
+    [account, entries]
+  );
 
   return {
     entries,

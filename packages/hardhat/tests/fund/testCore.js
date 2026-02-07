@@ -162,7 +162,7 @@ describe("FundCore Launch Tests", function () {
     const rigContract = await ethers.getContractAt("FundRig", fundRig);
 
     expect(await rigContract.unit()).to.equal(unit);
-    expect(await rigContract.paymentToken()).to.equal(usdc.address);
+    expect(await rigContract.quote()).to.equal(usdc.address);
     expect(await rigContract.treasury()).to.equal(auction); // treasury = auction
     expect(await rigContract.team()).to.equal(user0.address); // team = launcher
     expect(await rigContract.core()).to.equal(core.address);

@@ -10,9 +10,10 @@ interface IMineRigFactory {
     function deploy(
         address _unit,
         address _quote,
-        address _entropy,
         address _core,
         address _treasury,
+        address _team,
+        address _entropy,
         uint256 _epochPeriod,
         uint256 _priceMultiplier,
         uint256 _minInitPrice,

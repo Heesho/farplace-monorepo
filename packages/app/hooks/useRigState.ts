@@ -37,7 +37,7 @@ export function useRigState(
     chainId: base.id,
     query: {
       enabled: !!rigAddress && enabled,
-      refetchInterval: 15_000,
+      refetchInterval: 5_000,
       refetchOnWindowFocus: false,
     },
   });

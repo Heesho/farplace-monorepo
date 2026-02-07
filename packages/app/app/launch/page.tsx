@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Upload, ChevronDown, ChevronUp, ChevronLeft, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
-import { parseUnits, formatUnits } from "viem";
-import { useReadContract } from "wagmi";
+import { parseUnits, formatUnits, parseEventLogs } from "viem";
+import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   useBatchedTransaction,
@@ -81,11 +81,10 @@ const DEFAULTS = {
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
     rigMinInitPrice: 1, // $1
-    auctionInitPrice: 1, // 1 LP
-    auctionEpochPeriod: 3600, // 1 hour
-    auctionPriceMultiplier: 2, // 2x
-    auctionMinInitPrice: 1, // 1 LP
-    upsMultipliers: [1, 1, 1, 1, 1, 2, 2, 2, 3, 5] as number[], // ~1.9x average
+    auctionEpochPeriod: 86400, // 1 day
+    auctionPriceMultiplier: 1.2, // 1.2x
+    auctionTargetUsd: 100, // target $100 min auction price
+    upsMultipliers: [1, 1, 1, 1, 1, 1, 1, 2, 2, 3] as number[], // ~1.4x average
     upsMultiplierDuration: 86400, // 24h
   },
   spin: {
@@ -97,11 +96,18 @@ const DEFAULTS = {
     rigEpochPeriod: 3600, // 1 hour
     rigPriceMultiplier: 2, // 2x
     rigMinInitPrice: 1, // $1
-    auctionInitPrice: 1,
-    auctionEpochPeriod: 3600,
-    auctionPriceMultiplier: 2,
-    auctionMinInitPrice: 1,
-    odds: [100, 100, 100, 100, 200, 200, 200, 500, 500, 1000] as number[], // ~3% average payout
+    auctionEpochPeriod: 86400, // 1 day
+    auctionPriceMultiplier: 1.2, // 1.2x
+    auctionTargetUsd: 100, // target $100 min auction price
+    odds: [
+      ...Array(30).fill(20),   // 30% × 0.2% pool
+      ...Array(25).fill(50),   // 25% × 0.5% pool
+      ...Array(20).fill(100),  // 20% × 1% pool
+      ...Array(15).fill(250),  // 15% × 2.5% pool
+      ...Array(7).fill(500),   //  7% × 5% pool
+      ...Array(2).fill(1000),  //  2% × 10% pool
+      2000,                    //  1% × 20% pool (jackpot)
+    ] as number[], // ~1.5% avg — slot machine curve: frequent small wins, rare jackpot
   },
   fund: {
     usdcAmount: 1,
@@ -109,32 +115,169 @@ const DEFAULTS = {
     initialUps: 50000, // 50,000 tokens/day (expressed as daily)
     tailUps: 5000, // 5,000 tokens/day floor
     halvingPeriod: 30 * 24 * 3600, // 30 days
-    auctionInitPrice: 1,
-    auctionEpochPeriod: 3600,
-    auctionPriceMultiplier: 2,
-    auctionMinInitPrice: 1,
+    auctionEpochPeriod: 86400, // 1 day
+    auctionPriceMultiplier: 1.2, // 1.2x
+    auctionTargetUsd: 100, // target $100 min auction price
   },
 };
+
+type DistributionRow = {
+  id: string;
+  value: number;
+  probability: number;
+};
+
+const DISTRIBUTION_ARRAY_LENGTH = 100;
+const MAX_DISTRIBUTION_ROWS = 12;
+const SPIN_ODDS_BPS_MIN = 10; // 0.1%
+const SPIN_ODDS_BPS_MAX = 8000; // 80%
+const MINE_MULTIPLIER_MIN = 1; // 1x
+const MINE_MULTIPLIER_MAX = 10; // 10x
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const createDistributionRow = (value: number, probability: number): DistributionRow => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  value,
+  probability,
+});
+
+function arrayToDistributionRows(values: number[]): DistributionRow[] {
+  if (values.length === 0) return [];
+
+  const counts = new Map<string, { value: number; count: number }>();
+  values.forEach((raw) => {
+    const value = Number(raw.toFixed(4));
+    const key = value.toString();
+    const entry = counts.get(key);
+    if (entry) {
+      entry.count += 1;
+      return;
+    }
+    counts.set(key, { value, count: 1 });
+  });
+
+  const buckets = Array.from(counts.values()).sort((a, b) => a.value - b.value);
+  const withShares = buckets.map((bucket) => {
+    const exactShare = (bucket.count * DISTRIBUTION_ARRAY_LENGTH) / values.length;
+    const baseShare = Math.floor(exactShare);
+    return {
+      ...bucket,
+      probability: baseShare,
+      remainder: exactShare - baseShare,
+    };
+  });
+
+  let remaining = DISTRIBUTION_ARRAY_LENGTH - withShares.reduce((sum, bucket) => sum + bucket.probability, 0);
+  const byRemainder = [...withShares].sort((a, b) => b.remainder - a.remainder);
+  for (let i = 0; remaining > 0 && byRemainder.length > 0; i = (i + 1) % byRemainder.length) {
+    byRemainder[i].probability += 1;
+    remaining -= 1;
+  }
+
+  return byRemainder
+    .sort((a, b) => a.value - b.value)
+    .filter((bucket) => bucket.probability > 0)
+    .map((bucket) => createDistributionRow(bucket.value, bucket.probability));
+}
+
+function buildDistributionArray(
+  rows: DistributionRow[],
+  options: {
+    min: number;
+    max: number;
+    valueDecimals: number;
+    integerValues?: boolean;
+  }
+): {
+  array: number[];
+  totalProbability: number;
+  isValid: boolean;
+  error: string | null;
+} {
+  const normalizedRows = rows.map((row) => {
+    let value = Number.isFinite(row.value) ? row.value : options.min;
+    value = clamp(value, options.min, options.max);
+    if (options.integerValues) {
+      value = Math.round(value);
+    } else {
+      const factor = 10 ** options.valueDecimals;
+      value = Math.round(value * factor) / factor;
+    }
+
+    const probability = clamp(Math.floor(Number(row.probability) || 0), 0, 100);
+    return { value, probability };
+  });
+
+  const totalProbability = normalizedRows.reduce((sum, row) => sum + row.probability, 0);
+  const nonZeroRows = normalizedRows.filter((row) => row.probability > 0);
+
+  if (nonZeroRows.length === 0) {
+    return {
+      array: [],
+      totalProbability,
+      isValid: false,
+      error: "Add at least one outcome with a non-zero probability.",
+    };
+  }
+
+  if (totalProbability !== DISTRIBUTION_ARRAY_LENGTH) {
+    return {
+      array: [],
+      totalProbability,
+      isValid: false,
+      error: `Total probability must equal 100% (currently ${totalProbability}%).`,
+    };
+  }
+
+  const merged = new Map<string, { value: number; probability: number }>();
+  nonZeroRows.forEach((row) => {
+    const key = row.value.toString();
+    const existing = merged.get(key);
+    if (existing) {
+      existing.probability += row.probability;
+      return;
+    }
+    merged.set(key, { value: row.value, probability: row.probability });
+  });
+
+  const array: number[] = [];
+  Array.from(merged.values())
+    .sort((a, b) => a.value - b.value)
+    .forEach((entry) => {
+      for (let i = 0; i < entry.probability; i++) {
+        array.push(entry.value);
+      }
+    });
+
+  array.sort((a, b) => a - b); // enforce smallest value at index 0
+
+  return {
+    array,
+    totalProbability,
+    isValid: true,
+    error: null,
+  };
+}
 
 // Rig type info
 const RIG_INFO = {
   mine: {
     icon: Pickaxe,
     name: "Mine",
-    description: "Compete for seats. Get paid when someone takes your spot.",
-    color: "text-yellow-500",
+    description: "Best for competitive communities. Claim the active mining position and earn emissions until replaced.",
+    color: "text-zinc-400",
   },
   spin: {
     icon: Dices,
     name: "Spin",
-    description: "Spin for a chance to win tokens from the prize pool.",
-    color: "text-purple-500",
+    description: "Best for high-engagement launches. Users spin for randomized payouts from the prize pool.",
+    color: "text-zinc-400",
   },
   fund: {
     icon: Heart,
     name: "Fund",
-    description: "Fund daily to earn tokens. 50% goes to the cause.",
-    color: "text-pink-500",
+    description: "Best for causes, teams, charities, or agents. Fund daily and share emissions by contribution.",
+    color: "text-zinc-400",
   },
 };
 
@@ -159,7 +302,7 @@ function RigTypeCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-white">{info.name}</div>
-        <div className="text-sm text-zinc-400 mt-0.5">{info.description}</div>
+        <div className="text-sm text-zinc-400 mt-1 leading-snug">{info.description}</div>
       </div>
     </button>
   );
@@ -304,28 +447,28 @@ function EmissionPreview({
 
   const content = (
     <>
-      <div className="text-[13px] font-medium text-zinc-300">Emission Schedule</div>
+      <div className="text-[13px] font-semibold text-foreground">Emission Schedule</div>
       <div className="space-y-1.5 text-[12px]">
         <div className="flex justify-between items-center">
-          <span className="text-zinc-500">First halving</span>
-          <span className="text-zinc-300 font-medium tabular-nums">
-            {formatTime(firstHalvingDays)} · {formatSupply(firstHalvingSupply)} tokens
+          <span className="text-muted-foreground">First halving</span>
+          <span className="text-foreground font-semibold tabular-nums">
+            {formatTime(firstHalvingDays)} · {formatSupply(firstHalvingSupply)} coins
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-zinc-500">Floor reached</span>
-          <span className="text-zinc-300 font-medium tabular-nums">
-            {formatTime(floorDays)} · {formatSupply(floorSupply)} tokens
+          <span className="text-muted-foreground">Floor reached</span>
+          <span className="text-foreground font-semibold tabular-nums">
+            {formatTime(floorDays)} · {formatSupply(floorSupply)} coins
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-zinc-500">After floor</span>
-          <span className="text-zinc-300 font-medium tabular-nums">
+          <span className="text-muted-foreground">After floor</span>
+          <span className="text-foreground font-semibold tabular-nums">
             +{formatSupply(afterFloorPerYear)}/year forever
           </span>
         </div>
       </div>
-      <div className="text-[11px] text-zinc-500 pt-1">
+      <div className="text-[11px] text-muted-foreground pt-1">
         {totalHalvings} halvings
       </div>
     </>
@@ -335,11 +478,7 @@ function EmissionPreview({
     return <div className="space-y-2">{content}</div>;
   }
 
-  return (
-    <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
-      {content}
-    </div>
-  );
+  return <div className="rounded-xl ring-1 ring-zinc-700 bg-zinc-800/40 p-3 space-y-2">{content}</div>;
 }
 
 // Combined settings summary component
@@ -386,7 +525,7 @@ function SettingsSummary({
 
   // Calculate multiplier probabilities for display
   const getMultiplierSummary = () => {
-    if (upsMultipliers.length === 0) return "No multipliers (1x only)";
+    if (upsMultipliers.length === 0) return "1x: 100%";
     const counts: Record<number, number> = {};
     upsMultipliers.forEach(m => { counts[m] = (counts[m] || 0) + 1; });
     const parts = Object.entries(counts)
@@ -407,13 +546,13 @@ function SettingsSummary({
 
   return (
     <div className="bg-zinc-800/50 rounded-lg p-3 space-y-3">
-      <div className="text-[13px] font-medium text-zinc-300">Default Settings</div>
+      <div className="text-[13px] font-medium text-zinc-300">Current Parameters</div>
 
       {/* All settings as bullet points */}
       <div className="space-y-1">
         <div className="text-[12px] text-zinc-400 flex items-center gap-2">
           <span className="text-zinc-500">•</span>
-          Initial LP: ${formatNum(usdcAmount)} + {formatNum(unitAmount)} tokens
+          Initial LP: ${formatNum(usdcAmount)} + {formatNum(unitAmount)} coins
         </div>
         <div className="text-[12px] text-zinc-400 flex items-center gap-2">
           <span className="text-zinc-500">•</span>
@@ -427,11 +566,11 @@ function SettingsSummary({
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
-              Halving every {formatNum(halvingAmount)} tokens mined
+              Halving every {formatNum(halvingAmount)} coins mined
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
-              Mining: {formatDur(rigEpochPeriod)} epochs, ${rigMinInitPrice} min price, {rigPriceMultiplier}x multiplier
+              Market cycle: {formatDur(rigEpochPeriod)}, min ${rigMinInitPrice}, {rigPriceMultiplier}x reset
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
@@ -451,7 +590,7 @@ function SettingsSummary({
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
-              Spinning: {formatDur(rigEpochPeriod)} epochs, ${rigMinInitPrice} min price, {rigPriceMultiplier}x multiplier
+              Spin cycle: {formatDur(rigEpochPeriod)}, min ${rigMinInitPrice}, {rigPriceMultiplier}x reset
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
@@ -471,7 +610,7 @@ function SettingsSummary({
             </div>
             <div className="text-[12px] text-zinc-400 flex items-center gap-2">
               <span className="text-zinc-500">•</span>
-              50% of donations go to recipient
+              Funding split: 50% target, 45% treasury, 4% team, 1% protocol
             </div>
           </>
         )}
@@ -536,9 +675,119 @@ function Slider({
   );
 }
 
+// Minimal ABIs for parsing Launched events from tx receipts
+const LAUNCHED_EVENT_ABIS = [
+  {
+    type: "event",
+    name: "MineCore__Launched",
+    inputs: [
+      { name: "launcher", type: "address", indexed: false },
+      { name: "quoteToken", type: "address", indexed: false },
+      { name: "unit", type: "address", indexed: false },
+      { name: "rig", type: "address", indexed: false },
+      { name: "auction", type: "address", indexed: false },
+      { name: "lpToken", type: "address", indexed: false },
+      { name: "tokenName", type: "string", indexed: false },
+      { name: "tokenSymbol", type: "string", indexed: false },
+      { name: "uri", type: "string", indexed: false },
+      { name: "usdcAmount", type: "uint256", indexed: false },
+      { name: "unitAmount", type: "uint256", indexed: false },
+      { name: "initialUps", type: "uint256", indexed: false },
+      { name: "tailUps", type: "uint256", indexed: false },
+      { name: "halvingAmount", type: "uint256", indexed: false },
+      { name: "rigEpochPeriod", type: "uint256", indexed: false },
+      { name: "rigPriceMultiplier", type: "uint256", indexed: false },
+      { name: "rigMinInitPrice", type: "uint256", indexed: false },
+      { name: "auctionInitPrice", type: "uint256", indexed: false },
+      { name: "auctionEpochPeriod", type: "uint256", indexed: false },
+      { name: "auctionPriceMultiplier", type: "uint256", indexed: false },
+      { name: "auctionMinInitPrice", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "SpinCore__Launched",
+    inputs: [
+      { name: "launcher", type: "address", indexed: true },
+      { name: "rig", type: "address", indexed: true },
+      { name: "unit", type: "address", indexed: true },
+      { name: "auction", type: "address", indexed: false },
+      { name: "lpToken", type: "address", indexed: false },
+      { name: "quoteToken", type: "address", indexed: false },
+      { name: "tokenName", type: "string", indexed: false },
+      { name: "tokenSymbol", type: "string", indexed: false },
+      { name: "uri", type: "string", indexed: false },
+      { name: "usdcAmount", type: "uint256", indexed: false },
+      { name: "unitAmount", type: "uint256", indexed: false },
+      { name: "initialUps", type: "uint256", indexed: false },
+      { name: "tailUps", type: "uint256", indexed: false },
+      { name: "halvingPeriod", type: "uint256", indexed: false },
+      { name: "rigEpochPeriod", type: "uint256", indexed: false },
+      { name: "rigPriceMultiplier", type: "uint256", indexed: false },
+      { name: "rigMinInitPrice", type: "uint256", indexed: false },
+      { name: "auctionInitPrice", type: "uint256", indexed: false },
+      { name: "auctionEpochPeriod", type: "uint256", indexed: false },
+      { name: "auctionPriceMultiplier", type: "uint256", indexed: false },
+      { name: "auctionMinInitPrice", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FundCore__Launched",
+    inputs: [
+      { name: "launcher", type: "address", indexed: true },
+      { name: "rig", type: "address", indexed: true },
+      { name: "unit", type: "address", indexed: true },
+      { name: "recipient", type: "address", indexed: false },
+      { name: "auction", type: "address", indexed: false },
+      { name: "lpToken", type: "address", indexed: false },
+      { name: "quoteToken", type: "address", indexed: false },
+      { name: "tokenName", type: "string", indexed: false },
+      { name: "tokenSymbol", type: "string", indexed: false },
+      { name: "uri", type: "string", indexed: false },
+      { name: "usdcAmount", type: "uint256", indexed: false },
+      { name: "unitAmount", type: "uint256", indexed: false },
+      { name: "initialEmission", type: "uint256", indexed: false },
+      { name: "minEmission", type: "uint256", indexed: false },
+      { name: "halvingPeriod", type: "uint256", indexed: false },
+      { name: "auctionInitPrice", type: "uint256", indexed: false },
+      { name: "auctionEpochPeriod", type: "uint256", indexed: false },
+      { name: "auctionPriceMultiplier", type: "uint256", indexed: false },
+      { name: "auctionMinInitPrice", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
+
 export default function LaunchPage() {
-  const { address: account, isConnected, isInFrame, isConnecting, connect } = useFarcaster();
-  const { execute, status: txStatus, txHash, error: txError } = useBatchedTransaction();
+  const { address: account, isConnected, isConnecting, connect } = useFarcaster();
+  const { execute, status: txStatus, txHash, error: txError, reset: resetTx } = useBatchedTransaction();
+
+  // Extract rig address from tx receipt
+  const [launchedRigAddress, setLaunchedRigAddress] = useState<string | null>(null);
+  const { data: txReceipt } = useWaitForTransactionReceipt({
+    hash: txHash as `0x${string}` | undefined,
+  });
+
+  useEffect(() => {
+    if (!txReceipt?.logs) return;
+    try {
+      const parsed = parseEventLogs({
+        abi: LAUNCHED_EVENT_ABIS,
+        logs: txReceipt.logs,
+      });
+      const launchedEvent = parsed.find(
+        (e) =>
+          e.eventName === "MineCore__Launched" ||
+          e.eventName === "SpinCore__Launched" ||
+          e.eventName === "FundCore__Launched"
+      );
+      if (launchedEvent?.args && "rig" in launchedEvent.args) {
+        setLaunchedRigAddress(launchedEvent.args.rig as string);
+      }
+    } catch {
+      // If parsing fails, fall back to explore page
+    }
+  }, [txReceipt]);
 
   // Read user's USDC balance
   const { data: usdcBalance } = useReadContract({
@@ -581,19 +830,53 @@ export default function LaunchPage() {
   const [rigEpochPeriod, setRigEpochPeriod] = useState(DEFAULTS.mine.rigEpochPeriod);
   const [rigPriceMultiplier, setRigPriceMultiplier] = useState(DEFAULTS.mine.rigPriceMultiplier);
   const [rigMinInitPrice, setRigMinInitPrice] = useState(DEFAULTS.mine.rigMinInitPrice);
-  const [auctionInitPrice, setAuctionInitPrice] = useState(DEFAULTS.mine.auctionInitPrice);
-  const [auctionEpochPeriod, setAuctionEpochPeriod] = useState(DEFAULTS.mine.auctionEpochPeriod);
-  const [auctionPriceMultiplier, setAuctionPriceMultiplier] = useState(DEFAULTS.mine.auctionPriceMultiplier);
-  const [auctionMinInitPrice, setAuctionMinInitPrice] = useState(DEFAULTS.mine.auctionMinInitPrice);
 
   // Spin odds (basis points)
-  const [odds, setOdds] = useState<number[]>(DEFAULTS.spin.odds);
+  const [spinOddsRows, setSpinOddsRows] = useState<DistributionRow[]>(
+    () => arrayToDistributionRows(DEFAULTS.spin.odds)
+  );
 
   // Mine multipliers
-  const [upsMultipliers, setUpsMultipliers] = useState<number[]>(DEFAULTS.mine.upsMultipliers);
+  const [mineMultiplierRows, setMineMultiplierRows] = useState<DistributionRow[]>(
+    () => arrayToDistributionRows(DEFAULTS.mine.upsMultipliers)
+  );
   const [upsMultiplierDuration, setUpsMultiplierDuration] = useState(DEFAULTS.mine.upsMultiplierDuration);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Auto-reset error state after 2 seconds so button reverts to normal
+  useEffect(() => {
+    if (txStatus !== "error" && !launchError) return;
+    const timer = setTimeout(() => {
+      resetTx();
+      setLaunchError(null);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [txStatus, launchError, resetTx]);
+
+  const spinOddsConfig = useMemo(
+    () =>
+      buildDistributionArray(spinOddsRows, {
+        min: SPIN_ODDS_BPS_MIN,
+        max: SPIN_ODDS_BPS_MAX,
+        valueDecimals: 0,
+        integerValues: true,
+      }),
+    [spinOddsRows]
+  );
+
+  const mineMultiplierConfig = useMemo(
+    () =>
+      buildDistributionArray(mineMultiplierRows, {
+        min: MINE_MULTIPLIER_MIN,
+        max: MINE_MULTIPLIER_MAX,
+        valueDecimals: 1,
+      }),
+    [mineMultiplierRows]
+  );
+
+  const odds = spinOddsConfig.isValid ? spinOddsConfig.array : [];
+  const upsMultipliers = mineMultiplierConfig.isValid ? mineMultiplierConfig.array : [];
 
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -621,11 +904,7 @@ export default function LaunchPage() {
       setRigEpochPeriod(defaults.rigEpochPeriod);
       setRigPriceMultiplier(defaults.rigPriceMultiplier);
       setRigMinInitPrice(defaults.rigMinInitPrice);
-      setAuctionInitPrice(defaults.auctionInitPrice);
-      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
-      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
-      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
-      setUpsMultipliers([...defaults.upsMultipliers]);
+      setMineMultiplierRows(arrayToDistributionRows(defaults.upsMultipliers));
       setUpsMultiplierDuration(defaults.upsMultiplierDuration);
     } else if (type === "spin") {
       const defaults = DEFAULTS.spin;
@@ -637,11 +916,7 @@ export default function LaunchPage() {
       setRigEpochPeriod(defaults.rigEpochPeriod);
       setRigPriceMultiplier(defaults.rigPriceMultiplier);
       setRigMinInitPrice(defaults.rigMinInitPrice);
-      setAuctionInitPrice(defaults.auctionInitPrice);
-      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
-      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
-      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
-      setOdds([...defaults.odds]);
+      setSpinOddsRows(arrayToDistributionRows(defaults.odds));
     } else if (type === "fund") {
       const defaults = DEFAULTS.fund;
       setUsdcAmount(defaults.usdcAmount);
@@ -649,10 +924,6 @@ export default function LaunchPage() {
       setInitialUps(defaults.initialUps);
       setTailUps(defaults.tailUps);
       setHalvingPeriod(defaults.halvingPeriod);
-      setAuctionInitPrice(defaults.auctionInitPrice);
-      setAuctionEpochPeriod(defaults.auctionEpochPeriod);
-      setAuctionPriceMultiplier(defaults.auctionPriceMultiplier);
-      setAuctionMinInitPrice(defaults.auctionMinInitPrice);
     }
   };
 
@@ -667,12 +938,15 @@ export default function LaunchPage() {
 
   // Form validation
   const isFormValid = (() => {
-    if (!tokenName.length || !tokenSymbol.length) return false;
+    if (!logoFile) return false;
+    if (!tokenName.trim().length || !tokenSymbol.trim().length) return false;
+    if (!tokenDescription.trim().length || !miningMessage.trim().length) return false;
     if (rigType === "fund") {
-      if (!recipientName.length) return false;
+      if (!recipientName.trim().length) return false;
       if (!isValidAddress(recipientAddress)) return false;
     }
-    if (auctionInitPrice < auctionMinInitPrice) return false;
+    if (rigType === "spin" && !spinOddsConfig.isValid) return false;
+    if (rigType === "mine" && (!mineMultiplierConfig.isValid || upsMultipliers.length === 0)) return false;
     return true;
   })();
 
@@ -705,6 +979,7 @@ export default function LaunchPage() {
         image: imageUrl,
         description: tokenDescription,
         defaultMessage: miningMessage || "gm",
+        ...(rigType === "fund" && recipientName ? { recipientName } : {}),
         links: [],
       }),
     });
@@ -753,11 +1028,15 @@ export default function LaunchPage() {
       const rigPriceMultiplierWei = parseUnits(rigPriceMultiplier.toString(), 18);
       const rigMinInitPriceWei = parseUnits(rigMinInitPrice.toString(), QUOTE_TOKEN_DECIMALS);
 
-      // Auction params use LP token decimals (18)
-      const auctionInitPriceWei = parseUnits(auctionInitPrice.toString(), 18);
-      const auctionMinInitPriceWei = parseUnits(auctionMinInitPrice.toString(), 18);
-      const auctionEpochPeriodWei = BigInt(auctionEpochPeriod);
-      const auctionPriceMultiplierWei = parseUnits(auctionPriceMultiplier.toString(), 18);
+      // Compute auction price in LP tokens to target a dollar value
+      // Formula: auctionLpPrice = targetUsd / (2e6 * sqrt(usdcAmount / unitAmount))
+      const defaults = DEFAULTS[rigType!];
+      const auctionTargetUsd = defaults.auctionTargetUsd;
+      const auctionLpPrice = auctionTargetUsd / (2_000_000 * Math.sqrt(usdcAmount / unitAmount));
+      const auctionInitPriceWei = parseUnits(auctionLpPrice.toFixed(18), 18);
+      const auctionMinInitPriceWei = auctionInitPriceWei;
+      const auctionEpochPeriodWei = BigInt(defaults.auctionEpochPeriod);
+      const auctionPriceMultiplierWei = parseUnits(defaults.auctionPriceMultiplier.toString(), 18);
 
       const quoteToken = CONTRACT_ADDRESSES.usdc as `0x${string}`;
 
@@ -885,13 +1164,13 @@ export default function LaunchPage() {
   const getActionLabel = () => {
     switch (rigType) {
       case "mine":
-        return "Mining message (optional)";
+        return "Mining message";
       case "spin":
-        return "Spin message (optional)";
+        return "Spin message";
       case "fund":
-        return "Funding message (optional)";
+        return "Funding message";
       default:
-        return "Message (optional)";
+        return "Message";
     }
   };
 
@@ -907,23 +1186,8 @@ export default function LaunchPage() {
         {/* Header */}
         <div className="px-4 pb-4">
           {rigType === null ? (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <h1 className="text-2xl font-semibold tracking-tight">Launch</h1>
-              {isConnected && account ? (
-                <div className="px-3 py-1.5 rounded-full bg-secondary text-[13px] text-muted-foreground font-mono">
-                  {account.slice(0, 6)}...{account.slice(-4)}
-                </div>
-              ) : (
-                !isInFrame && (
-                  <button
-                    onClick={() => connect()}
-                    disabled={isConnecting}
-                    className="px-4 py-2 rounded-xl bg-white text-black text-[13px] font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
-                  >
-                    {isConnecting ? "Connecting..." : "Connect Wallet"}
-                  </button>
-                )
-              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -945,7 +1209,15 @@ export default function LaunchPage() {
           {rigType === null ? (
             // Rig Type Selection
             <div className="space-y-4">
-              <p className="text-zinc-400 text-sm mb-6">What type of rig?</p>
+              <div className="mb-6">
+                <h2 className="font-semibold text-foreground mb-2">
+                  Choose how your coin is mined
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Pick the mining model for your coin. You can adjust emissions,
+                  halving, and pricing behavior before launch.
+                </p>
+              </div>
               <RigTypeCard type="mine" onSelect={() => handleRigTypeSelect("mine")} />
               <RigTypeCard type="spin" onSelect={() => handleRigTypeSelect("spin")} />
               <RigTypeCard type="fund" onSelect={() => handleRigTypeSelect("fund")} />
@@ -967,7 +1239,7 @@ export default function LaunchPage() {
                     {logoPreview ? (
                       <img
                         src={logoPreview}
-                        alt="Token logo"
+                        alt="Coin logo"
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -980,10 +1252,10 @@ export default function LaunchPage() {
                 <div className="flex-1 min-w-0 space-y-2">
                   <input
                     type="text"
-                    placeholder="Token name"
+                    placeholder="Coin name"
                     value={tokenName}
                     onChange={(e) => setTokenName(e.target.value)}
-                    className="w-full h-10 px-3 rounded-lg bg-transparent ring-1 ring-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500"
+                    className="w-full h-10 px-3 rounded-lg bg-transparent ring-1 ring-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500 text-sm"
                   />
                   <input
                     type="text"
@@ -991,14 +1263,14 @@ export default function LaunchPage() {
                     value={tokenSymbol}
                     onChange={(e) => setTokenSymbol(e.target.value.toUpperCase())}
                     maxLength={10}
-                    className="w-full h-10 px-3 rounded-lg bg-transparent ring-1 ring-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500"
+                    className="w-full h-10 px-3 rounded-lg bg-transparent ring-1 ring-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500 text-sm"
                   />
                 </div>
               </div>
 
               {/* Description */}
               <textarea
-                placeholder="Description (optional)"
+                placeholder="Description"
                 value={tokenDescription}
                 onChange={(e) => setTokenDescription(e.target.value)}
                 rows={2}
@@ -1017,7 +1289,12 @@ export default function LaunchPage() {
               {/* FundRig-specific fields */}
               {rigType === "fund" && (
                 <div className="space-y-2 pt-2">
-                  <div className="text-[13px] text-zinc-400 mb-2">Recipient (required)</div>
+                  <div className="space-y-1 mb-2">
+                    <div className="text-[13px] font-semibold text-foreground">Recipient</div>
+                    <p className="text-[11px] text-muted-foreground">
+                      The wallet that receives 50% of every funding payment.
+                    </p>
+                  </div>
                   <input
                     type="text"
                     placeholder="Recipient name"
@@ -1027,17 +1304,17 @@ export default function LaunchPage() {
                   />
                   <input
                     type="text"
-                    placeholder="Recipient address (0x...)"
+                    placeholder="Recipient wallet address (0x...)"
                     value={recipientAddress}
                     onChange={(e) => setRecipientAddress(e.target.value)}
-                    className={`w-full h-10 px-3 rounded-lg bg-transparent ring-1 text-white placeholder:text-zinc-500 focus:outline-none text-sm font-mono ${
+                    className={`w-full h-10 px-3 rounded-lg bg-transparent ring-1 text-white placeholder:text-zinc-500 focus:outline-none text-sm ${
                       recipientAddress.length > 0 && !isValidAddress(recipientAddress)
-                        ? "ring-red-500/50 focus:ring-red-500"
+                        ? "ring-zinc-500/50 focus:ring-zinc-500"
                         : "ring-zinc-700 focus:ring-zinc-500"
                     }`}
                   />
                   {recipientAddress.length > 0 && !isValidAddress(recipientAddress) && (
-                    <p className="text-[11px] text-red-400">Enter a valid Ethereum address</p>
+                    <p className="text-[11px] text-zinc-400">Enter a valid Ethereum address</p>
                   )}
                 </div>
               )}
@@ -1047,7 +1324,7 @@ export default function LaunchPage() {
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="w-full flex items-center justify-between py-3 text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
               >
-                <span>Advanced Settings</span>
+                <span>Advanced Parameters</span>
                 {showAdvanced ? (
                   <ChevronUp className="w-4 h-4" />
                 ) : (
@@ -1078,33 +1355,35 @@ export default function LaunchPage() {
                 <div className="space-y-6 pb-4">
                   {/* Liquidity Section */}
                   <div>
-                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Liquidity</h3>
+                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Launch Liquidity</h3>
+                    <p className="text-muted-foreground text-[11px] mb-2">
+                      Sets the initial coin/USDC pool and starting market price. Initial LP is locked at launch.
+                    </p>
                     <Slider
-                      label="USDC for LP"
+                      label="USDC Side"
                       value={usdcAmount}
                       onChange={setUsdcAmount}
                       min={1}
                       max={1000}
                       step={1}
                       formatValue={formatNumber}
-                      description="USDC provided for initial liquidity"
+                      description="USDC paired into the initial LP."
                     />
                     <Slider
-                      label="Initial Token Supply"
+                      label="Coin Side"
                       value={unitAmount}
                       onChange={setUnitAmount}
                       min={100}
                       max={100000000}
                       step={100}
                       formatValue={formatNumber}
-                      description="Tokens minted for initial LP"
+                      description="Coin amount paired against USDC in the initial LP."
                     />
                     {/* Initial LP Summary */}
                     {(() => {
                       // USDC = $1, so price in USD = usdcAmount / unitAmount
                       const initialPriceUsdc = usdcAmount / unitAmount;
                       const initialPriceUsd = initialPriceUsdc; // USDC = $1
-                      const liquidityUsd = usdcAmount * 2; // Both sides of LP (USDC = $1)
                       const marketCapUsd = unitAmount * initialPriceUsd;
 
                       const formatUsd = (n: number) => {
@@ -1116,27 +1395,29 @@ export default function LaunchPage() {
                       };
 
                       return (
-                        <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2 mt-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] text-zinc-500">Initial Price</span>
-                            <div className="text-right">
-                              <span className="text-[12px] font-medium tabular-nums">
-                                ${initialPriceUsdc.toFixed(6)}
-                              </span>
+                        <div className="rounded-xl ring-1 ring-zinc-700 bg-zinc-800/40 p-3 space-y-2 mt-3">
+                          <div className="text-[13px] font-semibold text-foreground">Launch Snapshot</div>
+                          <div className="space-y-1.5 text-[12px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Initial Price</span>
+                              <div className="text-right">
+                                <span className="font-semibold text-foreground tabular-nums">
+                                  ${initialPriceUsdc.toFixed(6)}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] text-zinc-500">Initial Liquidity</span>
-                            <div className="text-right">
-                              <span className="text-[12px] font-medium tabular-nums">
-                                ${formatNumber(usdcAmount)} + {formatNumber(unitAmount)} tokens
-                              </span>
-                              <div className="text-[11px] text-zinc-500">{formatUsd(liquidityUsd)} TVL</div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Initial Liquidity</span>
+                              <div className="text-right">
+                                <span className="font-semibold text-foreground tabular-nums">
+                                  ${formatNumber(usdcAmount)} + {formatNumber(unitAmount)} coins
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] text-zinc-500">Initial Market Cap</span>
-                            <span className="text-[12px] font-medium tabular-nums">{formatUsd(marketCapUsd)}</span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Initial Market Cap</span>
+                              <span className="font-semibold text-foreground tabular-nums">{formatUsd(marketCapUsd)}</span>
+                            </div>
                           </div>
                         </div>
                       );
@@ -1145,7 +1426,12 @@ export default function LaunchPage() {
 
                   {/* Emission Section */}
                   <div>
-                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Emission</h3>
+                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Emission Schedule</h3>
+                    <p className="text-muted-foreground text-[11px] mb-2">
+                      {rigType === "fund"
+                        ? "Daily emissions distributed to funders based on contribution share."
+                        : "Continuous coin emissions with halving and a configurable floor rate."}
+                    </p>
                     {rigType === "fund" ? (
                       // FundRig: daily rates
                       <>
@@ -1160,7 +1446,7 @@ export default function LaunchPage() {
                           max={500000}
                           step={1000}
                           formatValue={formatDailyRate}
-                          description="Tokens distributed per day at launch"
+                          description="Initial daily coin emission before halvings."
                         />
                         <Slider
                           label="Floor Emission"
@@ -1170,7 +1456,7 @@ export default function LaunchPage() {
                           max={initialUps}
                           step={100}
                           formatValue={formatDailyRate}
-                          description="Minimum daily emission after halvings"
+                          description="Lowest daily emission after all halvings."
                         />
                       </>
                     ) : (
@@ -1186,7 +1472,7 @@ export default function LaunchPage() {
                           min={1}
                           max={100}
                           formatValue={formatRate}
-                          description="Tokens minted per second at launch"
+                          description="Initial per-second coin emission before halvings."
                         />
                         <Slider
                           label="Floor Emission"
@@ -1196,7 +1482,7 @@ export default function LaunchPage() {
                           max={initialUps}
                           step={0.01}
                           formatValue={formatRate}
-                          description="Minimum emission rate after halvings"
+                          description="Lowest per-second emission after all halvings."
                         />
                       </>
                     )}
@@ -1204,38 +1490,38 @@ export default function LaunchPage() {
                     {/* Halving - different per rig type */}
                     {rigType === "mine" && (
                       <Slider
-                        label="Halving Threshold"
+                        label="Halving Supply Threshold"
                         value={halvingAmount}
                         onChange={setHalvingAmount}
                         min={BOUNDS.halvingAmount.min}
                         max={100000000}
                         step={1000}
                         formatValue={formatNumber}
-                        description="Tokens minted before emission halves (min: 1,000)"
+                        description="After this many coins are minted, emission halves."
                       />
                     )}
                     {rigType === "spin" && (
                       <Slider
-                        label="Halving Period"
+                        label="Halving Interval"
                         value={halvingPeriod}
                         onChange={setHalvingPeriod}
                         min={BOUNDS.halvingPeriod.min}
                         max={BOUNDS.halvingPeriod.max}
                         step={86400} // 1 day steps
                         formatValue={formatDuration}
-                        description="Time between emission halvings (7d - 365d)"
+                        description="Time between emission halvings."
                       />
                     )}
                     {rigType === "fund" && (
                       <Slider
-                        label="Halving Period"
+                        label="Halving Interval"
                         value={halvingPeriod}
                         onChange={setHalvingPeriod}
                         min={BOUNDS.halvingPeriod.min}
                         max={BOUNDS.halvingPeriod.max}
                         step={86400} // 1 day steps
                         formatValue={formatDuration}
-                        description="Days between emission halvings (7d - 365d)"
+                        description="Days between daily emission halvings."
                       />
                     )}
 
@@ -1253,20 +1539,23 @@ export default function LaunchPage() {
                   {(rigType === "mine" || rigType === "spin") && (
                     <div>
                       <h3 className="text-[13px] font-semibold text-foreground mb-1">
-                        {rigType === "mine" ? "Mining" : "Spinning"}
+                        {rigType === "mine" ? "Mine Price Curve" : "Spin Price Curve"}
                       </h3>
+                      <p className="text-muted-foreground text-[11px] mb-2">
+                        Controls how fast the action price decays, then resets after each successful action.
+                      </p>
                       <Slider
-                        label="Epoch Duration"
+                        label="Price Decay Window"
                         value={rigEpochPeriod}
                         onChange={setRigEpochPeriod}
                         min={BOUNDS.epochPeriod.min}
                         max={604800} // 7 days max for good UX (contract allows up to 365 days)
                         step={600}
                         formatValue={formatDuration}
-                        description="Price resets after each epoch (10m - 7d)"
+                        description="Time for price to decay from start price to zero."
                       />
                       <Slider
-                        label="Price Multiplier"
+                        label="Reset Multiplier"
                         value={rigPriceMultiplier}
                         onChange={setRigPriceMultiplier}
                         min={BOUNDS.priceMultiplier.min}
@@ -1275,188 +1564,190 @@ export default function LaunchPage() {
                         formatValue={formatMultiplier}
                         description={
                           rigType === "mine"
-                            ? "Price multiplier when someone mines (1.1x - 3x)"
-                            : "Price multiplier when someone spins (1.1x - 3x)"
+                            ? "After each successful mine, next cycle starts at price × multiplier."
+                            : "After each successful spin, next cycle starts at price × multiplier."
                         }
                       />
                       <Slider
-                        label="Min Start Price"
+                        label="Minimum Reset Price"
                         value={rigMinInitPrice}
                         onChange={setRigMinInitPrice}
                         min={1}
                         max={100}
                         step={0.1}
                         formatValue={formatPrice}
-                        description="Minimum price at epoch start"
+                        description="Lower bound for cycle start price after each reset."
                       />
                     </div>
                   )}
 
-                  {/* Treasury Auction settings */}
-                  <div>
-                    <h3 className="text-[13px] font-semibold text-foreground mb-1">Treasury Auction</h3>
-                    <p className="text-muted-foreground text-[11px] mb-3">
-                      Prices are in LP tokens. Auctions sell accumulated treasury assets.
-                    </p>
-                    <Slider
-                      label="Auction Epoch Duration"
-                      value={auctionEpochPeriod}
-                      onChange={setAuctionEpochPeriod}
-                      min={BOUNDS.auctionEpochPeriod.min}
-                      max={BOUNDS.auctionEpochPeriod.max}
-                      step={3600}
-                      formatValue={formatDuration}
-                      description="How long each treasury auction lasts (1h - 365d)"
-                    />
-                    <Slider
-                      label="Auction Price Multiplier"
-                      value={auctionPriceMultiplier}
-                      onChange={setAuctionPriceMultiplier}
-                      min={BOUNDS.auctionPriceMultiplier.min}
-                      max={BOUNDS.auctionPriceMultiplier.max}
-                      step={0.1}
-                      formatValue={formatMultiplier}
-                      description="Price reset multiplier after a buy (1.1x - 3x)"
-                    />
-                    <Slider
-                      label="Auction Min Start Price"
-                      value={auctionMinInitPrice}
-                      onChange={setAuctionMinInitPrice}
-                      min={BOUNDS.auctionMinInitPrice.min}
-                      max={BOUNDS.auctionMinInitPrice.max}
-                      step={0.01}
-                      formatValue={formatLp}
-                      description="Minimum auction start price (LP tokens)"
-                    />
-                    <Slider
-                      label="Auction Init Price"
-                      value={auctionInitPrice}
-                      onChange={setAuctionInitPrice}
-                      min={BOUNDS.auctionInitPrice.min}
-                      max={BOUNDS.auctionInitPrice.max}
-                      step={0.01}
-                      formatValue={formatLp}
-                      description="First auction start price (must be >= min)"
-                    />
-                    {auctionInitPrice < auctionMinInitPrice && (
-                      <p className="text-[11px] text-red-400">
-                        Auction init price must be greater than or equal to min price.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Spin Odds (immutable at launch) */}
+                  {/* Spin Odds */}
                   {rigType === "spin" && (() => {
-                    const oddsPresets = [
-                      { value: 10, label: "0.1%" },
-                      { value: 50, label: "0.5%" },
-                      { value: 100, label: "1%" },
-                      { value: 200, label: "2%" },
-                      { value: 500, label: "5%" },
-                      { value: 1000, label: "10%" },
-                      { value: 2500, label: "25%" },
-                      { value: 5000, label: "50%" },
-                    ];
-                    const getOddsCount = (value: number) => odds.filter(o => o === value).length;
-                    const addOddsValue = (value: number) => {
-                      if (odds.length < 20) {
-                        setOdds([...odds, value].sort((a, b) => a - b));
-                      }
+                    const addSpinRow = () => {
+                      if (spinOddsRows.length >= MAX_DISTRIBUTION_ROWS) return;
+                      setSpinOddsRows((prev) => [...prev, createDistributionRow(100, 0)]);
                     };
-                    const removeOddsValue = (value: number) => {
-                      const idx = odds.indexOf(value);
-                      if (idx !== -1 && odds.length > 1) {
-                        const next = [...odds];
-                        next.splice(idx, 1);
-                        setOdds(next);
-                      }
+
+                    const balanceSpinRows = () => {
+                      setSpinOddsRows((prev) => {
+                        if (prev.length === 0) return prev;
+                        const others = prev.slice(0, -1).reduce(
+                          (sum, row) => sum + clamp(Math.floor(Number(row.probability) || 0), 0, 100),
+                          0
+                        );
+                        const lastProbability = clamp(DISTRIBUTION_ARRAY_LENGTH - others, 0, 100);
+                        return prev.map((row, idx) =>
+                          idx === prev.length - 1 ? { ...row, probability: lastProbability } : row
+                        );
+                      });
                     };
+
                     return (
                       <div>
-                        <h3 className="text-[13px] font-semibold text-foreground mb-1">Spin Odds</h3>
+                        <h3 className="text-[13px] font-semibold text-foreground mb-1">Spin Payout Distribution</h3>
                         <p className="text-muted-foreground text-[11px] mb-3">
-                          Payout pool ({odds.length}/20). One is randomly selected per spin. Set at launch and cannot be changed.
+                          Each payout value is a percent of the current accumulated prize pool at spin time. Set values and
+                          probabilities; this compiles into a 100-entry weighted array at launch.
                         </p>
-                        <div className="grid grid-cols-4 gap-2 mb-3">
-                          {oddsPresets.map((preset) => {
-                            const count = getOddsCount(preset.value);
-                            const canAdd = odds.length < 20;
-                            const canRemove = count > 0 && odds.length > 1;
-                            const probability = odds.length > 0
-                              ? Math.round((count / odds.length) * 100)
-                              : 0;
-                            return (
-                              <div key={preset.value} className="flex flex-col items-center gap-1 p-2 rounded-xl bg-zinc-800/30">
-                                <div className="text-[13px] font-semibold">{preset.label}</div>
-                                <div className="flex items-center gap-0.5">
-                                  <button
-                                    onClick={() => removeOddsValue(preset.value)}
-                                    disabled={!canRemove}
-                                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
-                                      canRemove
-                                        ? "bg-zinc-700 text-white hover:bg-zinc-600"
-                                        : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <div className="w-6 text-center text-[13px] font-bold tabular-nums">
-                                    {count}
-                                  </div>
-                                  <button
-                                    onClick={() => addOddsValue(preset.value)}
-                                    disabled={!canAdd}
-                                    className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
-                                      canAdd
-                                        ? "bg-zinc-700 text-white hover:bg-zinc-600"
-                                        : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                <div className="text-[10px] text-muted-foreground tabular-nums">
-                                  {probability}%
+                        <div className="space-y-2.5">
+                          {spinOddsRows.map((row) => (
+                            <div key={row.id} className="grid grid-cols-[1fr_100px_28px] gap-2 items-end">
+                              <div>
+                                <label className="text-[11px] text-muted-foreground mb-1 block">Pool Payout (%)</label>
+                                <input
+                                  type="number"
+                                  min={0.1}
+                                  max={80}
+                                  step={0.1}
+                                  value={(row.value / 100).toString()}
+                                  onChange={(e) => {
+                                    const nextPercent = Number(e.target.value);
+                                    const nextBps = Number.isFinite(nextPercent)
+                                      ? clamp(Math.round(nextPercent * 100), SPIN_ODDS_BPS_MIN, SPIN_ODDS_BPS_MAX)
+                                      : SPIN_ODDS_BPS_MIN;
+                                    setSpinOddsRows((prev) =>
+                                      prev.map((item) => (item.id === row.id ? { ...item, value: nextBps } : item))
+                                    );
+                                  }}
+                                  className="w-full h-9 px-2 rounded-lg bg-transparent ring-1 ring-zinc-700 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-muted-foreground mb-1 block">Probability</label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    value={row.probability}
+                                    onChange={(e) => {
+                                      const nextProbability = Number(e.target.value);
+                                      setSpinOddsRows((prev) =>
+                                        prev.map((item) =>
+                                          item.id === row.id
+                                            ? {
+                                                ...item,
+                                                probability: Number.isFinite(nextProbability)
+                                                  ? clamp(Math.floor(nextProbability), 0, 100)
+                                                  : 0,
+                                              }
+                                            : item
+                                        )
+                                      );
+                                    }}
+                                    className="w-full h-9 px-2 pr-6 rounded-lg bg-transparent ring-1 ring-zinc-700 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500 tabular-nums"
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">%</span>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                        {/* Visual summary */}
-                        <div className="p-3 rounded-xl bg-zinc-800/50">
-                          <div className="text-[11px] text-muted-foreground mb-1">Current pool:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {odds.map((o, i) => {
-                              const preset = oddsPresets.find(p => p.value === o);
-                              return (
-                                <span key={i} className="px-2 py-0.5 rounded bg-zinc-700 text-[12px] font-medium">
-                                  {preset ? preset.label : `${(o / 100).toFixed(1)}%`}
-                                </span>
-                              );
-                            })}
+                              <button
+                                onClick={() => {
+                                  if (spinOddsRows.length <= 1) return;
+                                  setSpinOddsRows((prev) => prev.filter((item) => item.id !== row.id));
+                                }}
+                                disabled={spinOddsRows.length <= 1}
+                                className={`h-9 w-7 rounded-lg flex items-center justify-center transition-all ${
+                                  spinOddsRows.length > 1
+                                    ? "bg-zinc-700 text-zinc-100 hover:bg-zinc-600"
+                                    : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                                }`}
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              onClick={addSpinRow}
+                              disabled={spinOddsRows.length >= MAX_DISTRIBUTION_ROWS}
+                              className={`h-8 px-2.5 rounded-lg text-[12px] font-medium transition-all flex items-center gap-1 ${
+                                spinOddsRows.length < MAX_DISTRIBUTION_ROWS
+                                  ? "bg-zinc-700 text-zinc-100 hover:bg-zinc-600"
+                                  : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                              }`}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add outcome
+                            </button>
+                            <button
+                              onClick={balanceSpinRows}
+                              className="text-[11px] text-zinc-300 hover:text-white transition-colors"
+                            >
+                              Balance to 100%
+                            </button>
                           </div>
+
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">Total probability</span>
+                            <span
+                              className={`font-semibold tabular-nums ${
+                                spinOddsConfig.totalProbability === DISTRIBUTION_ARRAY_LENGTH
+                                  ? "text-zinc-300"
+                                  : "text-zinc-400"
+                              }`}
+                            >
+                              {spinOddsConfig.totalProbability}%
+                            </span>
+                          </div>
+
+                          {spinOddsConfig.error && (
+                            <div className="rounded-lg ring-1 ring-zinc-500/30 bg-zinc-500/10 px-2.5 py-1.5 text-[11px] text-zinc-300">
+                              {spinOddsConfig.error}
+                            </div>
+                          )}
+
+                          <p className="text-[11px] text-muted-foreground">
+                            Stored smallest-first at launch. The smallest payout is used when randomness is turned off.
+                            Example: 5 means a 5% payout of the current pool.
+                          </p>
                         </div>
                       </div>
                     );
                   })()}
 
-                  {/* Mine Multipliers (optional, immutable at launch) */}
+                  {/* Mine Multipliers */}
                   {rigType === "mine" && (() => {
-                    const multiplierPresets = [1, 2, 3, 5, 10];
-                    const getMultiplierCount = (value: number) => upsMultipliers.filter(m => m === value).length;
-                    const addMultiplierValue = (value: number) => {
-                      if (upsMultipliers.length < 20) {
-                        setUpsMultipliers([...upsMultipliers, value].sort((a, b) => a - b));
-                      }
+                    const addMultiplierRow = () => {
+                      if (mineMultiplierRows.length >= MAX_DISTRIBUTION_ROWS) return;
+                      setMineMultiplierRows((prev) => [...prev, createDistributionRow(1, 0)]);
                     };
-                    const removeMultiplierValue = (value: number) => {
-                      const idx = upsMultipliers.indexOf(value);
-                      if (idx !== -1 && upsMultipliers.length > 0) {
-                        const next = [...upsMultipliers];
-                        next.splice(idx, 1);
-                        setUpsMultipliers(next);
-                      }
+
+                    const balanceMultiplierRows = () => {
+                      setMineMultiplierRows((prev) => {
+                        if (prev.length === 0) return prev;
+                        const others = prev.slice(0, -1).reduce(
+                          (sum, row) => sum + clamp(Math.floor(Number(row.probability) || 0), 0, 100),
+                          0
+                        );
+                        const lastProbability = clamp(DISTRIBUTION_ARRAY_LENGTH - others, 0, 100);
+                        return prev.map((row, idx) =>
+                          idx === prev.length - 1 ? { ...row, probability: lastProbability } : row
+                        );
+                      });
                     };
+
                     const durationOptions = [
                       { value: 3600, label: "1h" },
                       { value: 14400, label: "4h" },
@@ -1465,93 +1756,149 @@ export default function LaunchPage() {
                       { value: 172800, label: "2d" },
                       { value: 604800, label: "7d" },
                     ];
+
                     return (
                       <div>
-                        <h3 className="text-[13px] font-semibold text-foreground mb-1">Multipliers (Optional)</h3>
+                        <h3 className="text-[13px] font-semibold text-foreground mb-1">Mine Multiplier Distribution</h3>
                         <p className="text-muted-foreground text-[11px] mb-3">
-                          Leave empty for no multipliers (1x default). Set at launch and cannot be changed.
+                          Enter multiplier values and probabilities. This compiles into a 100-entry weighted array at launch.
                         </p>
-                        <div className="grid grid-cols-5 gap-2 mb-3">
-                          {multiplierPresets.map((mult) => {
-                            const count = getMultiplierCount(mult);
-                            const canAdd = upsMultipliers.length < 20;
-                            const canRemove = count > 0;
-                            const probability = upsMultipliers.length > 0
-                              ? Math.round((count / upsMultipliers.length) * 100)
-                              : 0;
-                            return (
-                              <div key={mult} className="flex flex-col items-center gap-1">
-                                <div className="text-[14px] font-semibold">{mult}x</div>
-                                <div className="flex items-center gap-0.5">
-                                  <button
-                                    onClick={() => removeMultiplierValue(mult)}
-                                    disabled={!canRemove}
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                                      canRemove
-                                        ? "bg-zinc-700 text-white hover:bg-zinc-600"
-                                        : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    <Minus className="w-3.5 h-3.5" />
-                                  </button>
-                                  <div className="w-8 text-center text-[14px] font-bold tabular-nums">
-                                    {count}
-                                  </div>
-                                  <button
-                                    onClick={() => addMultiplierValue(mult)}
-                                    disabled={!canAdd}
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                                      canAdd
-                                        ? "bg-zinc-700 text-white hover:bg-zinc-600"
-                                        : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
-                                    }`}
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                                <div className="text-[11px] text-muted-foreground tabular-nums">
-                                  {probability}%
+                        <div className="space-y-2.5 mb-3">
+                          {mineMultiplierRows.map((row) => (
+                            <div key={row.id} className="grid grid-cols-[1fr_100px_28px] gap-2 items-end">
+                              <div>
+                                <label className="text-[11px] text-muted-foreground mb-1 block">Multiplier (x)</label>
+                                <input
+                                  type="number"
+                                  min={MINE_MULTIPLIER_MIN}
+                                  max={MINE_MULTIPLIER_MAX}
+                                  step={0.1}
+                                  value={row.value.toString()}
+                                  onChange={(e) => {
+                                    const nextMultiplier = Number(e.target.value);
+                                    const rounded = Number.isFinite(nextMultiplier)
+                                      ? Math.round(clamp(nextMultiplier, MINE_MULTIPLIER_MIN, MINE_MULTIPLIER_MAX) * 10) / 10
+                                      : MINE_MULTIPLIER_MIN;
+                                    setMineMultiplierRows((prev) =>
+                                      prev.map((item) => (item.id === row.id ? { ...item, value: rounded } : item))
+                                    );
+                                  }}
+                                  className="w-full h-9 px-2 rounded-lg bg-transparent ring-1 ring-zinc-700 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[11px] text-muted-foreground mb-1 block">Probability</label>
+                                <div className="relative">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    value={row.probability}
+                                    onChange={(e) => {
+                                      const nextProbability = Number(e.target.value);
+                                      setMineMultiplierRows((prev) =>
+                                        prev.map((item) =>
+                                          item.id === row.id
+                                            ? {
+                                                ...item,
+                                                probability: Number.isFinite(nextProbability)
+                                                  ? clamp(Math.floor(nextProbability), 0, 100)
+                                                  : 0,
+                                              }
+                                            : item
+                                        )
+                                      );
+                                    }}
+                                    className="w-full h-9 px-2 pr-6 rounded-lg bg-transparent ring-1 ring-zinc-700 text-[13px] text-white placeholder:text-zinc-500 focus:outline-none focus:ring-zinc-500 tabular-nums"
+                                  />
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-zinc-500">%</span>
                                 </div>
                               </div>
-                            );
-                          })}
+                              <button
+                                onClick={() => {
+                                  if (mineMultiplierRows.length <= 1) return;
+                                  setMineMultiplierRows((prev) => prev.filter((item) => item.id !== row.id));
+                                }}
+                                disabled={mineMultiplierRows.length <= 1}
+                                className={`h-9 w-7 rounded-lg flex items-center justify-center transition-all ${
+                                  mineMultiplierRows.length > 1
+                                    ? "bg-zinc-700 text-zinc-100 hover:bg-zinc-600"
+                                    : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                                }`}
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+
+                          <div className="flex items-center justify-between pt-1">
+                            <button
+                              onClick={addMultiplierRow}
+                              disabled={mineMultiplierRows.length >= MAX_DISTRIBUTION_ROWS}
+                              className={`h-8 px-2.5 rounded-lg text-[12px] font-medium transition-all flex items-center gap-1 ${
+                                mineMultiplierRows.length < MAX_DISTRIBUTION_ROWS
+                                  ? "bg-zinc-700 text-zinc-100 hover:bg-zinc-600"
+                                  : "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                              }`}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add outcome
+                            </button>
+                            <button
+                              onClick={balanceMultiplierRows}
+                              className="text-[11px] text-zinc-300 hover:text-white transition-colors"
+                            >
+                              Balance to 100%
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-muted-foreground">Total probability</span>
+                            <span
+                              className={`font-semibold tabular-nums ${
+                                mineMultiplierConfig.totalProbability === DISTRIBUTION_ARRAY_LENGTH
+                                  ? "text-zinc-300"
+                                  : "text-zinc-400"
+                              }`}
+                            >
+                              {mineMultiplierConfig.totalProbability}%
+                            </span>
+                          </div>
+
+                          {mineMultiplierConfig.error && (
+                            <div className="rounded-lg ring-1 ring-zinc-500/30 bg-zinc-500/10 px-2.5 py-1.5 text-[11px] text-zinc-300">
+                              {mineMultiplierConfig.error}
+                            </div>
+                          )}
+
+                          <p className="text-[11px] text-muted-foreground">
+                            Stored smallest-first at launch. If randomness is turned off later, Mine rigs use fixed 1x.
+                          </p>
                         </div>
-                        {/* Visual summary */}
-                        {upsMultipliers.length > 0 && (
-                          <div className="p-3 rounded-xl bg-zinc-800/50 mb-3">
-                            <div className="text-[11px] text-muted-foreground mb-1">Current pool:</div>
-                            <div className="flex flex-wrap gap-1">
-                              {upsMultipliers.map((mult, i) => (
-                                <span key={i} className="px-2 py-0.5 rounded bg-zinc-700 text-[12px] font-medium">
-                                  {mult}x
-                                </span>
-                              ))}
-                            </div>
+                        <div>
+                          <label className="text-muted-foreground text-[12px] mb-1 block">
+                            Multiplier Duration
+                          </label>
+                          <p className="text-[11px] text-muted-foreground mb-2">
+                            How long a drawn multiplier stays active before a new draw can apply.
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {durationOptions.map((opt) => (
+                              <button
+                                key={opt.value}
+                                onClick={() => setUpsMultiplierDuration(opt.value)}
+                                className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
+                                  upsMultiplierDuration === opt.value
+                                    ? "bg-white text-black"
+                                    : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
                           </div>
-                        )}
-                        {/* Duration picker (only relevant if multipliers are set) */}
-                        {upsMultipliers.length > 0 && (
-                          <div>
-                            <label className="text-muted-foreground text-[12px] mb-2 block">
-                              Multiplier Duration
-                            </label>
-                            <div className="flex flex-wrap gap-1.5">
-                              {durationOptions.map((opt) => (
-                                <button
-                                  key={opt.value}
-                                  onClick={() => setUpsMultiplierDuration(opt.value)}
-                                  className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
-                                    upsMultiplierDuration === opt.value
-                                      ? "bg-white text-black"
-                                      : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
-                                  }`}
-                                >
-                                  {opt.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -1571,42 +1918,47 @@ export default function LaunchPage() {
             <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3 bg-background">
               <div className="flex items-center gap-5">
                 <div>
-                  <div className="text-muted-foreground text-[11px]">Amount</div>
-                  <div className="font-semibold text-[15px] tabular-nums">
+                  <div className="text-muted-foreground text-[12px]">Pay</div>
+                  <div className="font-semibold text-[17px] tabular-nums">
                     ${formatNumber(usdcAmount)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-[11px]">Balance</div>
-                  <div className="font-semibold text-[15px] tabular-nums">
+                  <div className="text-muted-foreground text-[12px]">Balance</div>
+                  <div className="font-semibold text-[17px] tabular-nums">
                     ${formatNumber(usdcBalance ? Number(formatUnits(usdcBalance, QUOTE_TOKEN_DECIMALS)) : 0)}
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-2">
+              {!isConnected ? (
+                <button
+                  onClick={() => connect()}
+                  disabled={isConnecting}
+                  className="w-40 h-10 text-[14px] font-semibold rounded-xl bg-white text-black hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  {isConnecting ? "Connecting..." : "Connect Wallet"}
+                </button>
+              ) : (
                 <button
                   onClick={handleLaunch}
                   disabled={!isFormValid || isLaunching || isUploading}
                   className={`w-32 h-10 text-[14px] font-semibold rounded-xl transition-all ${
-                    !isFormValid || isLaunching || isUploading
+                    launchError || txStatus === "error"
+                      ? "bg-zinc-700 text-zinc-300"
+                      : !isFormValid || isLaunching || isUploading
                       ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
                       : "bg-white text-black hover:bg-zinc-200"
                   }`}
                 >
-                  {isUploading
+                  {launchError || txStatus === "error"
+                    ? txError?.message?.includes("cancelled") ? "Rejected" : "Failed"
+                    : isUploading
                     ? "Uploading..."
                     : isLaunching
                     ? "Launching..."
-                    : !isConnected
-                    ? "Connect"
                     : "Launch"}
                 </button>
-                {(launchError || txError) && (
-                  <div className="text-[11px] text-red-400 max-w-[240px] text-right">
-                    {launchError || txError?.message}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -1630,16 +1982,9 @@ export default function LaunchPage() {
                 </div>
               )}
 
-              {/* Success icon */}
-              <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
-                <svg className="w-8 h-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-
               {/* Message */}
               <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Token Launched!</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Coin Launched!</h2>
                 <p className="text-zinc-400 text-[15px]">
                   <span className="font-semibold text-white">{tokenName}</span>
                   {" "}({tokenSymbol}) is now live
@@ -1649,10 +1994,10 @@ export default function LaunchPage() {
               {/* Actions */}
               <div className="space-y-3 pt-2 w-full">
                 <Link
-                  href="/explore"
+                  href={launchedRigAddress ? `/rig/${launchedRigAddress}` : "/explore"}
                   className="block w-full py-3.5 px-4 bg-white text-black font-semibold text-[15px] rounded-xl hover:bg-zinc-200 transition-colors"
                 >
-                  View on Explore
+                  View Coin
                 </Link>
                 <a
                   href={`https://basescan.org/tx/${txHash}`}
@@ -1660,7 +2005,7 @@ export default function LaunchPage() {
                   rel="noopener noreferrer"
                   className="block w-full py-3.5 px-4 bg-zinc-800 text-white font-semibold text-[15px] rounded-xl hover:bg-zinc-700 transition-colors"
                 >
-                  View Transaction
+                  View on Basescan
                 </a>
               </div>
             </div>

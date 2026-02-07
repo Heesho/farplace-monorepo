@@ -222,7 +222,7 @@ contract MineMulticall {
      * @return fee Entropy fee to send (0 if not needed)
      */
     function _calculateEntropyFee(address rig, uint256 index) internal view returns (uint256 fee) {
-        if (!IMineRig(rig).isEntropyEnabled()) {
+        if (!IMineRig(rig).entropyEnabled()) {
             return 0;
         }
 
@@ -263,7 +263,7 @@ contract MineMulticall {
         state.capacity = IMineRig(rig).capacity();
 
         // Entropy state
-        if (IMineRig(rig).isEntropyEnabled()) {
+        if (IMineRig(rig).entropyEnabled()) {
             uint256 duration = IMineRig(rig).upsMultiplierDuration();
             state.needsEntropy = block.timestamp - slot.lastUpsMultiplierTime > duration;
             state.entropyFee = state.needsEntropy ? IMineRig(rig).getEntropyFee() : 0;

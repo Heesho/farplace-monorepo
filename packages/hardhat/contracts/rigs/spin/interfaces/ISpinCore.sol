@@ -52,7 +52,7 @@ interface ISpinCore {
     function rigToIndex(address rig) external view returns (uint256);
     function rigToLP(address rig) external view returns (address);
 
-    // Functions
+    // External functions
     function launch(LaunchParams calldata params)
         external
         returns (address unit, address rig, address auction, address lpToken);
@@ -60,31 +60,4 @@ interface ISpinCore {
     // Restricted functions
     function setProtocolFeeAddress(address _protocolFeeAddress) external;
     function setMinUsdcForLaunch(uint256 _minUsdcForLaunch) external;
-
-    // Events
-    event SpinCore__Launched(
-        address indexed launcher,
-        address indexed rig,
-        address indexed unit,
-        address auction,
-        address lpToken,
-        address quoteToken,
-        string tokenName,
-        string tokenSymbol,
-        string uri,
-        uint256 usdcAmount,
-        uint256 unitAmount,
-        uint256 initialUps,
-        uint256 tailUps,
-        uint256 halvingPeriod,
-        uint256 rigEpochPeriod,
-        uint256 rigPriceMultiplier,
-        uint256 rigMinInitPrice,
-        uint256 auctionInitPrice,
-        uint256 auctionEpochPeriod,
-        uint256 auctionPriceMultiplier,
-        uint256 auctionMinInitPrice
-    );
-    event SpinCore__ProtocolFeeAddressSet(address protocolFeeAddress);
-    event SpinCore__MinUsdcForLaunchSet(uint256 minUsdcForLaunch);
 }

@@ -5,6 +5,7 @@ import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther, parseUnits } from "viem";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useFundRigState } from "@/hooks/useFundRigState";
+import { useTokenMetadata } from "@/hooks/useMetadata";
 import { useRigLeaderboard } from "@/hooks/useRigLeaderboard";
 import { useFundHistory, type DonationEvent } from "@/hooks/useFundHistory";
 import {
@@ -36,6 +37,7 @@ type FundModalProps = {
   tokenSymbol?: string;
   tokenName?: string;
   tokenLogoUrl?: string | null;
+  recipientName?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -68,7 +70,7 @@ function TokenLogo({
 
   return (
     <span
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-semibold`}
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-white font-semibold`}
     >
       {symbol.charAt(0)}
     </span>
@@ -117,13 +119,13 @@ export function FundModal({
   tokenSymbol = "TOKEN",
   tokenName = "Token",
   tokenLogoUrl,
+  recipientName,
 }: FundModalProps) {
   // ---------- Local UI state ----------
   const [fundAmount, setFundAmount] = useState("1");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(1);
   const [isCustom, setIsCustom] = useState(false);
   const [message, setMessage] = useState("");
-  const defaultMessage = "for the cause";
 
   // Day countdown ticker
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
@@ -138,6 +140,9 @@ export function FundModal({
     refetch: refetchFund,
     isLoading: isFundLoading,
   } = useFundRigState(rigAddress, account);
+
+  const { metadata } = useTokenMetadata(fundState?.rigUri);
+  const defaultMessage = metadata?.defaultMessage || "gm";
 
   const {
     execute,
@@ -226,13 +231,17 @@ export function FundModal({
     }
   }, [isOpen, resetTx]);
 
-  // Auto-refetch after successful tx
+  // Auto-refetch after successful tx, auto-reset after error
   useEffect(() => {
     if (txStatus === "success") {
       const timer = setTimeout(() => {
         refetchFund();
         resetTx();
       }, 3000);
+      return () => clearTimeout(timer);
+    }
+    if (txStatus === "error") {
+      const timer = setTimeout(() => resetTx(), 2000);
       return () => clearTimeout(timer);
     }
   }, [txStatus, refetchFund, resetTx]);
@@ -278,7 +287,7 @@ export function FundModal({
         CONTRACT_ADDRESSES.fundMulticall as `0x${string}`,
         FUND_MULTICALL_ABI,
         "fund",
-        [rigAddress, account, amount]
+        [rigAddress, account, amount, message || defaultMessage]
       )
     );
 
@@ -320,7 +329,7 @@ export function FundModal({
           >
             <X className="w-5 h-5" />
           </button>
-          <span className="text-base font-semibold">Mine</span>
+          <span className="text-base font-semibold">Fund</span>
           <div className="w-9" />
         </div>
 
@@ -335,14 +344,14 @@ export function FundModal({
           <>
             {/* Sticky Top Section - Compact */}
             <div className="px-4 pb-3 bg-background">
-              {/* Recipient - single line */}
-              <div className="flex items-center justify-between py-2">
+              {/* Recipient */}
+              <div className="py-2">
                 <div className="text-[15px] font-semibold">
-                  {recipientAddress
+                  {recipientName || (recipientAddress
                     ? `${recipientAddress.slice(0, 6)}...${recipientAddress.slice(-4)}`
-                    : "--"}
+                    : "--")}
                 </div>
-                {recipientAddress && (
+                {recipientName && recipientAddress && (
                   <a
                     href={`https://basescan.org/address/${recipientAddress}`}
                     target="_blank"
@@ -357,13 +366,13 @@ export function FundModal({
               {/* Pool Stats - compact 2x2 grid */}
               <div className="grid grid-cols-4 gap-2 py-2 mb-2">
                 <div>
-                  <div className="text-muted-foreground text-[10px]">Pool</div>
+                  <div className="text-muted-foreground text-[11px]">Pool</div>
                   <div className="font-semibold text-[13px] tabular-nums">
                     ${todayTotalDonated.toFixed(0)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-[10px]">Emission</div>
+                  <div className="text-muted-foreground text-[11px]">Emission</div>
                   <div className="font-semibold text-[13px] tabular-nums flex items-center gap-1">
                     <TokenLogo symbol={tokenSymbol} logoUrl={tokenLogoUrl} size="xs" />
                     {todayEmission >= 1_000_000 ? `${(todayEmission / 1_000_000).toFixed(2)}M`
@@ -372,13 +381,13 @@ export function FundModal({
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-[10px]">Price</div>
+                  <div className="text-muted-foreground text-[11px]">Pay</div>
                   <div className="font-semibold text-[13px] tabular-nums">
                     ${currentPricePerToken.toFixed(4)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground text-[10px]">Ends in</div>
+                  <div className="text-muted-foreground text-[11px]">Ends in</div>
                   <div className="font-semibold text-[13px] tabular-nums">
                     {formatCountdown(dayEndsIn)}
                   </div>
@@ -437,9 +446,8 @@ export function FundModal({
                   </div>
                 )}
                 {/* Estimate - always show */}
-                <div className="text-[12px] text-muted-foreground mt-1.5 text-center">
-                  ≈ {estimatedTokens.toLocaleString(undefined, { maximumFractionDigits: 0 })} {tokenSymbol}
-                  <span className="text-zinc-600 ml-1">@ current rate</span>
+                <div className="text-[13px] text-white mt-2">
+                  ≈ {estimatedTokens.toLocaleString(undefined, { maximumFractionDigits: 0 })} {tokenSymbol} <span className="text-muted-foreground">@ current rate</span>
                 </div>
               </div>
             </div>
@@ -471,9 +479,9 @@ export function FundModal({
                       disabled={txStatus === "pending" || txStatus === "success"}
                       className={`px-5 py-2 text-[13px] font-semibold rounded-xl transition-all flex items-center gap-1.5 ${
                         txStatus === "success"
-                          ? "bg-green-600 text-white"
+                          ? "bg-zinc-300 text-black"
                           : txStatus === "error"
-                          ? "bg-red-600 text-white"
+                          ? "bg-zinc-600 text-white"
                           : txStatus === "pending"
                           ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                           : "bg-white text-black hover:bg-zinc-200"
@@ -486,7 +494,7 @@ export function FundModal({
                         : txStatus === "success"
                         ? "Claimed!"
                         : txStatus === "error"
-                        ? "Failed"
+                        ? txError?.message?.includes("cancelled") ? "Rejected" : "Failed"
                         : "Claim"}
                     </button>
                   </div>
@@ -497,7 +505,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Estimated</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
                         {tokenSymbol.charAt(0)}
                       </span>
                       {todayTotalDonated > 0
@@ -518,7 +526,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
                         {tokenSymbol.charAt(0)}
                       </span>
                       {(userUnitBalance + pendingTokens) >= 1000
@@ -535,7 +543,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Claimed</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-[10px] text-white font-semibold">
+                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
                         {tokenSymbol.charAt(0)}
                       </span>
                       {userUnitBalance >= 1000
@@ -571,7 +579,7 @@ export function FundModal({
                         donation={{
                           id: `${donation.donor}-${donation.timestamp}-${index}`,
                           donor: donation.donor,
-                          uri: "",
+                          uri: donation.uri,
                           amount: donation.amount,
                           estimatedTokens: todayEmission > 0
                             ? BigInt(Math.floor((Number(formatUnits(donation.amount, QUOTE_TOKEN_DECIMALS)) / (todayTotalDonated || 1)) * todayEmission * 1e18))
@@ -602,9 +610,9 @@ export function FundModal({
         {/* Bottom Action Bar */}
         <div
           className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 56px)" }}
         >
-          <div className="w-full max-w-[520px] px-4 pt-3 pb-3 bg-background">
+          <div className="w-full max-w-[520px] px-4 pt-2 pb-2 bg-background">
             {/* Message Input */}
             <input
               type="text"
@@ -612,13 +620,13 @@ export function FundModal({
               onChange={(e) => setMessage(e.target.value)}
               placeholder={defaultMessage}
               maxLength={100}
-              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-[15px] outline-none placeholder:text-zinc-500 mb-3"
+              className="w-full bg-zinc-800 rounded-xl px-4 py-2 text-[15px] outline-none placeholder:text-zinc-500 mb-2"
             />
             {/* Amount, Balance, Mine Button */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div>
-                  <div className="text-muted-foreground text-[12px]">Amount</div>
+                  <div className="text-muted-foreground text-[12px]">Pay</div>
                   <div className="font-semibold text-[17px] tabular-nums">
                     ${parsedAmount.toFixed(2)}
                   </div>
@@ -636,9 +644,9 @@ export function FundModal({
                 className={`
                   w-32 h-10 text-[14px] font-semibold rounded-xl transition-all flex items-center justify-center gap-2
                   ${txStatus === "success"
-                    ? "bg-green-600 text-white"
+                    ? "bg-zinc-300 text-black"
                     : txStatus === "error"
-                    ? "bg-red-600 text-white"
+                    ? "bg-zinc-600 text-white"
                     : txStatus === "pending"
                     ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                     : parsedAmount > 0 && parsedAmount <= userBalance
@@ -650,11 +658,11 @@ export function FundModal({
                 {txStatus === "pending" && <Loader2 className="w-4 h-4 animate-spin" />}
                 {txStatus === "success" && <CheckCircle className="w-4 h-4" />}
                 {txStatus === "pending"
-                  ? "Mining..."
+                  ? "Funding..."
                   : txStatus === "success"
                   ? "Success"
                   : txStatus === "error"
-                  ? "Failed"
+                  ? txError?.message?.includes("cancelled") ? "Rejected" : "Failed"
                   : "Mine"}
               </button>
             </div>

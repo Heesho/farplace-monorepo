@@ -140,22 +140,28 @@ describe("Rig Comprehensive Tests", function () {
   });
 
   describe("Dutch Auction Price Decay", function () {
-    it("Should return 0 price for unmined slot (epoch expired)", async function () {
+    it("Should have minInitPrice on pre-initialized slot 0", async function () {
+      // Slot 0 is now pre-initialized with launcher as miner and initPrice = minInitPrice
       const price = await rigContract.getPrice(0);
-      expect(price).to.equal(0);
+      const minInitPrice = await rigContract.minInitPrice();
+      // Price should be decaying from minInitPrice (not 0)
+      expect(price).to.be.lte(minInitPrice);
+      expect(price).to.be.gte(0);
     });
 
-    it("Should start at initPrice after first mine", async function () {
+    it("Should set initPrice after first mine based on price * multiplier", async function () {
       const slot = await rigContract.getSlot(0);
+      const price = await rigContract.getPrice(0);
       await weth.connect(user1).approve(rig, convert("1", 18));
 
       await rigContract.connect(user1).mine(
         user1.address, 0, slot.epochId, 1961439882, convert("1", 18), ""
       );
 
-      // Price should be at initPrice (minInitPrice) right after mining
+      // initPrice = max(pricePaid * priceMultiplier, minInitPrice)
       const newSlot = await rigContract.getSlot(0);
-      expect(newSlot.initPrice).to.equal(convert("0.0001", 18));
+      const minInitPrice = await rigContract.minInitPrice();
+      expect(newSlot.initPrice).to.be.gte(minInitPrice);
     });
 
     it("Should decay price linearly over epoch period", async function () {
@@ -529,7 +535,7 @@ describe("Rig Comprehensive Tests", function () {
 
     it("Should allow enabling multipliers", async function () {
       await rigContract.connect(user0).setEntropyEnabled(true);
-      expect(await rigContract.isEntropyEnabled()).to.equal(true);
+      expect(await rigContract.entropyEnabled()).to.equal(true);
     });
 
     it("Should request entropy when multipliers enabled and multiplier needs update", async function () {
@@ -578,7 +584,7 @@ describe("Rig Comprehensive Tests", function () {
 
     it("Should disable multipliers", async function () {
       await rigContract.connect(user0).setEntropyEnabled(false);
-      expect(await rigContract.isEntropyEnabled()).to.equal(false);
+      expect(await rigContract.entropyEnabled()).to.equal(false);
     });
 
     it("Should revert with ETH when multipliers are disabled", async function () {
@@ -610,7 +616,7 @@ describe("Rig Comprehensive Tests", function () {
     it("Should revert setting treasury to address(0)", async function () {
       await expect(
         rigContract.connect(user0).setTreasury(AddressZero)
-      ).to.be.revertedWith("Rig__ZeroTreasury()");
+      ).to.be.revertedWith("MineRig__ZeroAddress()");
     });
 
     it("Should allow owner to set team", async function () {
@@ -974,8 +980,9 @@ describe("Rig Comprehensive Tests", function () {
       const slot1 = await multiRigContract.getSlot(1);
       const slot2 = await multiRigContract.getSlot(2);
 
-      // All should be at epoch 1 after first mine
-      expect(slot0.epochId).to.equal(1);
+      // Slot 0 is at epoch 2 (initialized at 1 by constructor, then mined once)
+      // Slots 1 and 2 are at epoch 1 (uninitialized, then mined once)
+      expect(slot0.epochId).to.equal(2);
       expect(slot1.epochId).to.equal(1);
       expect(slot2.epochId).to.equal(1);
     });

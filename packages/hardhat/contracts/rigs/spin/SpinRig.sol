@@ -100,14 +100,26 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     // Metadata URI for the rig
     string public uri;
 
+    /*----------  STRUCTS  ----------------------------------------------*/
+
+    struct Config {
+        uint256 epochPeriod;
+        uint256 priceMultiplier;
+        uint256 minInitPrice;
+        uint256 initialUps;
+        uint256 halvingPeriod;
+        uint256 tailUps;
+        uint256[] odds;
+    }
+
     /*----------  ERRORS  -----------------------------------------------*/
 
-    error SpinRig__InvalidSpinner();
+    error SpinRig__ZeroAddress();
+    error SpinRig__ZeroSpinner();
     error SpinRig__EpochIdMismatch();
     error SpinRig__MaxPriceExceeded();
     error SpinRig__Expired();
     error SpinRig__InsufficientFee();
-    error SpinRig__InvalidAddress();
     error SpinRig__InvalidOdds();
     error SpinRig__OddsTooLow();
     error SpinRig__EpochPeriodOutOfRange();
@@ -123,7 +135,8 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         address indexed sender,
         address indexed spinner,
         uint256 indexed epochId,
-        uint256 price
+        uint256 price,
+        string uri
     );
     event SpinRig__Win(
         address indexed spinner,
@@ -141,83 +154,74 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     event SpinRig__UriSet(string uri);
     event SpinRig__EntropyEnabledSet(bool enabled);
 
-    /*----------  STRUCTS  ----------------------------------------------*/
-
-    struct Config {
-        uint256 epochPeriod;
-        uint256 priceMultiplier;
-        uint256 minInitPrice;
-        uint256 initialUps;
-        uint256 halvingPeriod;
-        uint256 tailUps;
-        uint256[] odds;
-    }
-
     /*----------  CONSTRUCTOR  ------------------------------------------*/
 
     /**
      * @notice Deploy a new SpinRig contract.
      * @param _unit Unit token address
      * @param _quote Payment token address (e.g., USDC)
-     * @param _entropy Pyth Entropy contract address
-     * @param _treasury Treasury address for fee collection
      * @param _core Core contract address
-     * @param config Configuration struct with auction and emission parameters
+     * @param _treasury Treasury address for fee collection
+     * @param _team Team address for fee collection
+     * @param _entropy Pyth Entropy contract address
+     * @param _config Configuration struct with auction and emission parameters
      */
     constructor(
         address _unit,
         address _quote,
-        address _entropy,
-        address _treasury,
         address _core,
-        Config memory config
+        address _treasury,
+        address _team,
+        address _entropy,
+        Config memory _config
     ) {
-        if (_unit == address(0)) revert SpinRig__InvalidAddress();
-        if (_quote == address(0)) revert SpinRig__InvalidAddress();
-        if (_entropy == address(0)) revert SpinRig__InvalidAddress();
-        if (_treasury == address(0)) revert SpinRig__InvalidAddress();
-        if (_core == address(0)) revert SpinRig__InvalidAddress();
+        if (_unit == address(0)) revert SpinRig__ZeroAddress();
+        if (_quote == address(0)) revert SpinRig__ZeroAddress();
+        if (_core == address(0)) revert SpinRig__ZeroAddress();
+        if (_treasury == address(0)) revert SpinRig__ZeroAddress();
+        if (_entropy == address(0)) revert SpinRig__ZeroAddress();
 
         // Validate config
-        if (config.epochPeriod < MIN_EPOCH_PERIOD || config.epochPeriod > MAX_EPOCH_PERIOD) {
+        if (_config.epochPeriod < MIN_EPOCH_PERIOD || _config.epochPeriod > MAX_EPOCH_PERIOD) {
             revert SpinRig__EpochPeriodOutOfRange();
         }
-        if (config.priceMultiplier < MIN_PRICE_MULTIPLIER || config.priceMultiplier > MAX_PRICE_MULTIPLIER) {
+        if (_config.priceMultiplier < MIN_PRICE_MULTIPLIER || _config.priceMultiplier > MAX_PRICE_MULTIPLIER) {
             revert SpinRig__PriceMultiplierOutOfRange();
         }
-        if (config.minInitPrice < ABS_MIN_INIT_PRICE || config.minInitPrice > ABS_MAX_INIT_PRICE) {
+        if (_config.minInitPrice < ABS_MIN_INIT_PRICE || _config.minInitPrice > ABS_MAX_INIT_PRICE) {
             revert SpinRig__MinInitPriceOutOfRange();
         }
-        if (config.initialUps == 0 || config.initialUps > MAX_INITIAL_UPS) {
+        if (_config.initialUps == 0 || _config.initialUps > MAX_INITIAL_UPS) {
             revert SpinRig__InitialUpsOutOfRange();
         }
-        if (config.tailUps == 0 || config.tailUps > config.initialUps) {
+        if (_config.tailUps == 0 || _config.tailUps > _config.initialUps) {
             revert SpinRig__TailUpsOutOfRange();
         }
-        if (config.halvingPeriod < MIN_HALVING_PERIOD || config.halvingPeriod > MAX_HALVING_PERIOD) {
+        if (_config.halvingPeriod < MIN_HALVING_PERIOD || _config.halvingPeriod > MAX_HALVING_PERIOD) {
             revert SpinRig__HalvingPeriodOutOfRange();
         }
 
         unit = _unit;
         quote = _quote;
-        entropy = _entropy;
-        treasury = _treasury;
         core = _core;
+        treasury = _treasury;
+        team = _team;
+        entropy = _entropy;
 
-        epochPeriod = config.epochPeriod;
-        priceMultiplier = config.priceMultiplier;
-        minInitPrice = config.minInitPrice;
-        initialUps = config.initialUps;
-        tailUps = config.tailUps;
-        halvingPeriod = config.halvingPeriod;
+        epochPeriod = _config.epochPeriod;
+        priceMultiplier = _config.priceMultiplier;
+        minInitPrice = _config.minInitPrice;
+        initialUps = _config.initialUps;
+        tailUps = _config.tailUps;
+        halvingPeriod = _config.halvingPeriod;
 
         startTime = block.timestamp;
         lastEmissionTime = block.timestamp;
         spinStartTime = block.timestamp;
-        initPrice = config.minInitPrice;
+        initPrice = _config.minInitPrice;
 
         // Validate and set odds from config (immutable after deployment)
-        _validateAndSetOdds(config.odds);
+        _validateAndSetOdds(_config.odds);
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -235,9 +239,10 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         address spinner,
         uint256 _epochId,
         uint256 deadline,
-        uint256 maxPrice
+        uint256 maxPrice,
+        string calldata _uri
     ) external payable nonReentrant returns (uint256 price) {
-        if (spinner == address(0)) revert SpinRig__InvalidSpinner();
+        if (spinner == address(0)) revert SpinRig__ZeroSpinner();
         if (block.timestamp > deadline) revert SpinRig__Expired();
         if (_epochId != epochId) revert SpinRig__EpochIdMismatch();
 
@@ -286,7 +291,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         initPrice = newInitPrice;
         spinStartTime = block.timestamp;
 
-        emit SpinRig__Spin(msg.sender, spinner, currentEpochId, price);
+        emit SpinRig__Spin(msg.sender, spinner, currentEpochId, price, _uri);
 
         if (entropyEnabled) {
             // Request VRF for spin outcome
@@ -311,11 +316,53 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return price;
     }
 
-    /*----------  ENTROPY CALLBACK  -------------------------------------*/
+    /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
+
+    /**
+     * @notice Update the treasury address.
+     * @param _treasury New treasury address
+     */
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert SpinRig__ZeroAddress();
+        treasury = _treasury;
+        emit SpinRig__TreasurySet(_treasury);
+    }
+
+    /**
+     * @notice Update the team address.
+     * @dev Can be set to address(0) to redirect team fees to treasury.
+     * @param _team New team address (or address(0) to disable)
+     */
+    function setTeam(address _team) external onlyOwner {
+        team = _team;
+        emit SpinRig__TeamSet(_team);
+    }
+
+    /**
+     * @notice Enable or disable entropy for spin outcomes.
+     * @param _enabled True to enable entropy-based random odds, false to use odds[0] as fallback
+     */
+    function setEntropyEnabled(bool _enabled) external onlyOwner {
+        entropyEnabled = _enabled;
+        emit SpinRig__EntropyEnabledSet(_enabled);
+    }
+
+    /**
+     * @notice Update the metadata URI for the rig.
+     * @param _uri New metadata URI (e.g., for logo, branding)
+     */
+    function setUri(string calldata _uri) external onlyOwner {
+        uri = _uri;
+        emit SpinRig__UriSet(_uri);
+    }
+
+    /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
      * @notice Callback from Pyth Entropy with VRF result.
      * @dev Determines payout from odds array and transfers winnings.
+     * @param sequenceNumber Entropy request sequence number
+     * @param randomNumber Random bytes32 from Pyth Entropy
      */
     function entropyCallback(uint64 sequenceNumber, address, bytes32 randomNumber) internal override {
         address spinner = sequenceToSpinner[sequenceNumber];
@@ -339,8 +386,20 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         emit SpinRig__Win(spinner, epoch, oddsBps, winAmount);
     }
 
-    /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
+    /**
+     * @notice Get the Entropy contract address (required by IEntropyConsumer).
+     * @return Entropy contract address
+     */
+    function getEntropy() internal view override returns (address) {
+        return entropy;
+    }
 
+    /**
+     * @notice Draw a random payout percentage from the configured odds array.
+     * @dev Uses modulo to select index from odds array.
+     * @param randomNumber Random bytes32 to use for selection
+     * @return Selected odds value in basis points
+     */
     function _drawOdds(bytes32 randomNumber) internal view returns (uint256) {
         uint256 length = odds.length;
         if (length == 0) return MIN_ODDS_BPS;
@@ -348,6 +407,11 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return odds[index];
     }
 
+    /**
+     * @notice Mint accumulated emissions to the prize pool.
+     * @dev Calculates time-based emissions since last mint and adds to pool.
+     * @return amount Tokens minted to the prize pool
+     */
     function _mintEmissions() internal returns (uint256 amount) {
         uint256 timeElapsed = block.timestamp - lastEmissionTime;
         if (timeElapsed == 0) return 0;
@@ -363,6 +427,12 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return amount;
     }
 
+    /**
+     * @notice Calculate UPS based on time elapsed and halving schedule.
+     * @dev UPS halves every halvingPeriod of wall-clock time, floored at tailUps.
+     * @param time Timestamp to calculate UPS for
+     * @return ups Units per second at the given time
+     */
     function _getUpsFromTime(uint256 time) internal view returns (uint256 ups) {
         uint256 halvings = time <= startTime ? 0 : (time - startTime) / halvingPeriod;
         ups = initialUps >> halvings;
@@ -370,6 +440,11 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return ups;
     }
 
+    /**
+     * @notice Validate and store the odds array.
+     * @dev Each odds value must be between MIN_ODDS_BPS and MAX_ODDS_BPS.
+     * @param _odds Array of payout percentages in basis points
+     */
     function _validateAndSetOdds(uint256[] memory _odds) internal {
         uint256 length = _odds.length;
         if (length == 0) revert SpinRig__InvalidOdds();
@@ -382,58 +457,11 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         odds = _odds;
     }
 
-    /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
-
-    /**
-     * @notice Update the treasury address.
-     * @param _treasury New treasury address
-     */
-    function setTreasury(address _treasury) external onlyOwner {
-        if (_treasury == address(0)) revert SpinRig__InvalidAddress();
-        treasury = _treasury;
-        emit SpinRig__TreasurySet(_treasury);
-    }
-
-    /**
-     * @notice Update the team address.
-     * @dev Can be set to address(0) to redirect team fees to treasury.
-     * @param _team New team address (or address(0) to disable)
-     */
-    function setTeam(address _team) external onlyOwner {
-        team = _team;
-        emit SpinRig__TeamSet(_team);
-    }
-
-
-    /**
-     * @notice Enable or disable entropy for spin outcomes.
-     * @param _enabled True to enable entropy-based random odds, false to use odds[0] as fallback
-     */
-    function setEntropyEnabled(bool _enabled) external onlyOwner {
-        entropyEnabled = _enabled;
-        emit SpinRig__EntropyEnabledSet(_enabled);
-    }
-
-    /**
-     * @notice Update the metadata URI for the rig.
-     * @param _uri New metadata URI (e.g., for logo, branding)
-     */
-    function setUri(string calldata _uri) external onlyOwner {
-        uri = _uri;
-        emit SpinRig__UriSet(_uri);
-    }
-
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/
 
     /**
-     * @notice Get the Entropy contract address (required by IEntropyConsumer).
-     */
-    function getEntropy() internal view override returns (address) {
-        return address(entropy);
-    }
-
-    /**
      * @notice Get the current VRF fee required for a spin.
+     * @return Current entropy fee in wei
      */
     function getEntropyFee() external view returns (uint256) {
         return IEntropyV2(entropy).getFeeV2();
@@ -451,6 +479,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /**
      * @notice Get the current units per second emission rate.
+     * @return Current UPS after halvings
      */
     function getUps() external view returns (uint256) {
         return _getUpsFromTime(block.timestamp);
@@ -458,6 +487,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /**
      * @notice Get the current prize pool balance.
+     * @return Unit token balance held by this contract
      */
     function getPrizePool() external view returns (uint256) {
         return IERC20(unit).balanceOf(address(this));
@@ -465,6 +495,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /**
      * @notice Get pending emissions that would be minted on next spin.
+     * @return Amount of tokens that would be minted
      */
     function getPendingEmissions() external view returns (uint256) {
         uint256 timeElapsed = block.timestamp - lastEmissionTime;
@@ -475,6 +506,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /**
      * @notice Get the full odds array.
+     * @return Array of payout percentages in basis points
      */
     function getOdds() external view returns (uint256[] memory) {
         return odds;
@@ -482,29 +514,10 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /**
      * @notice Get the length of the odds array.
+     * @return Number of odds options
      */
     function getOddsLength() external view returns (uint256) {
         return odds.length;
     }
 
-    /**
-     * @notice Get the current epoch ID.
-     */
-    function getEpochId() external view returns (uint256) {
-        return epochId;
-    }
-
-    /**
-     * @notice Get the current init price.
-     */
-    function getInitPrice() external view returns (uint256) {
-        return initPrice;
-    }
-
-    /**
-     * @notice Get the spin start time.
-     */
-    function getSpinStartTime() external view returns (uint256) {
-        return spinStartTime;
-    }
 }

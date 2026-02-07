@@ -18,7 +18,7 @@ import {IFundCore} from "./interfaces/IFundCore.sol";
  *
  *      Emission Schedule:
  *      - Initial: configurable initial emission per day
- *      - Halving: Every 30 days
+ *      - Halving: Every `halvingPeriod` days (configurable, 7-365)
  *      - Floor: configurable minimum emission per day
  *
  *      Fund Split:
@@ -52,7 +52,7 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
-    address public immutable paymentToken;
+    address public immutable quote;
     address public immutable unit;
     address public immutable core;
     uint256 public immutable startTime;
@@ -73,13 +73,21 @@ contract FundRig is ReentrancyGuard, Ownable {
     // Metadata URI for the rig
     string public uri;
 
+    /*----------  STRUCTS  ----------------------------------------------*/
+
+    struct Config {
+        uint256 initialEmission;
+        uint256 minEmission;
+        uint256 halvingPeriod;
+    }
+
     /*----------  ERRORS  -----------------------------------------------*/
 
     error FundRig__ZeroAmount();
     error FundRig__DayNotEnded();
     error FundRig__AlreadyClaimed();
     error FundRig__NoDonation();
-    error FundRig__InvalidAddress();
+    error FundRig__ZeroAddress();
     error FundRig__RecipientNotSet();
     error FundRig__InvalidEmission();
     error FundRig__BelowMinDonation();
@@ -87,7 +95,7 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event FundRig__Funded(address indexed account, uint256 amount, uint256 day);
+    event FundRig__Funded(address indexed account, uint256 amount, uint256 day, string uri);
     event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
     event FundRig__RecipientSet(address indexed recipient);
     event FundRig__TreasurySet(address indexed treasury);
@@ -99,49 +107,45 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /**
      * @notice Deploy a new FundRig contract.
-     * @param _paymentToken The ERC-20 token accepted for donations
-     * @param _unit The Unit token that will be minted to donors
-     * @param _recipient Address to receive 50% of donations (required)
-     * @param _treasury Address to receive treasury portion of donations
-     * @param _team Address to receive team portion of donations
+     * @param _unit Unit token address
+     * @param _quote Payment token address (e.g., USDC)
      * @param _core Core contract address
-     * @param _initialEmission Initial Unit emission per day
-     * @param _minEmission Minimum Unit emission per day (floor)
-     * @param _halvingPeriod Number of days between emission halvings (must be >= 1)
+     * @param _treasury Treasury address for fee collection
+     * @param _team Team address for fee collection
+     * @param _recipient Address to receive 50% of donations (required)
+     * @param _config Configuration struct with emission parameters
      */
     constructor(
-        address _paymentToken,
         address _unit,
-        address _recipient,
+        address _quote,
+        address _core,
         address _treasury,
         address _team,
-        address _core,
-        uint256 _initialEmission,
-        uint256 _minEmission,
-        uint256 _halvingPeriod
+        address _recipient,
+        Config memory _config
     ) {
-        if (_paymentToken == address(0)) revert FundRig__InvalidAddress();
-        if (_unit == address(0)) revert FundRig__InvalidAddress();
-        if (_recipient == address(0)) revert FundRig__InvalidAddress();
-        if (_treasury == address(0)) revert FundRig__InvalidAddress();
-        if (_core == address(0)) revert FundRig__InvalidAddress();
-        if (_initialEmission < MIN_INITIAL_EMISSION || _initialEmission > MAX_INITIAL_EMISSION) {
+        if (_unit == address(0)) revert FundRig__ZeroAddress();
+        if (_quote == address(0)) revert FundRig__ZeroAddress();
+        if (_core == address(0)) revert FundRig__ZeroAddress();
+        if (_treasury == address(0)) revert FundRig__ZeroAddress();
+        if (_recipient == address(0)) revert FundRig__ZeroAddress();
+        if (_config.initialEmission < MIN_INITIAL_EMISSION || _config.initialEmission > MAX_INITIAL_EMISSION) {
             revert FundRig__InvalidEmission();
         }
-        if (_minEmission == 0 || _minEmission > _initialEmission) revert FundRig__InvalidEmission();
-        if (_halvingPeriod < MIN_HALVING_PERIOD || _halvingPeriod > MAX_HALVING_PERIOD) {
+        if (_config.minEmission == 0 || _config.minEmission > _config.initialEmission) revert FundRig__InvalidEmission();
+        if (_config.halvingPeriod < MIN_HALVING_PERIOD || _config.halvingPeriod > MAX_HALVING_PERIOD) {
             revert FundRig__InvalidHalvingPeriod();
         }
 
-        paymentToken = _paymentToken;
         unit = _unit;
-        recipient = _recipient;
+        quote = _quote;
+        core = _core;
         treasury = _treasury;
         team = _team;
-        core = _core;
-        initialEmission = _initialEmission;
-        minEmission = _minEmission;
-        halvingPeriod = _halvingPeriod;
+        recipient = _recipient;
+        initialEmission = _config.initialEmission;
+        minEmission = _config.minEmission;
+        halvingPeriod = _config.halvingPeriod;
         startTime = block.timestamp;
     }
 
@@ -154,15 +158,15 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @param account The account to credit for this funding (receives Unit on claim)
      * @param amount The amount of payment tokens to fund
      */
-    function fund(address account, uint256 amount) external nonReentrant {
-        if (account == address(0)) revert FundRig__InvalidAddress();
+    function fund(address account, uint256 amount, string calldata _uri) external nonReentrant {
+        if (account == address(0)) revert FundRig__ZeroAddress();
         if (amount < MIN_DONATION) revert FundRig__BelowMinDonation();
         if (recipient == address(0)) revert FundRig__RecipientNotSet();
 
         uint256 day = currentDay();
 
         // Transfer tokens from msg.sender (payer)
-        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(quote).safeTransferFrom(msg.sender, address(this), amount);
 
         // Calculate splits
         address protocol = IFundCore(core).protocolFeeAddress();
@@ -172,13 +176,13 @@ contract FundRig is ReentrancyGuard, Ownable {
         uint256 treasuryAmount = amount - recipientAmount - teamAmount - protocolAmount;
 
         // Distribute funds
-        IERC20(paymentToken).safeTransfer(recipient, recipientAmount);
-        IERC20(paymentToken).safeTransfer(treasury, treasuryAmount);
+        IERC20(quote).safeTransfer(recipient, recipientAmount);
+        IERC20(quote).safeTransfer(treasury, treasuryAmount);
         if (teamAmount > 0) {
-            IERC20(paymentToken).safeTransfer(team, teamAmount);
+            IERC20(quote).safeTransfer(team, teamAmount);
         }
         if (protocolAmount > 0) {
-            IERC20(paymentToken).safeTransfer(protocol, protocolAmount);
+            IERC20(quote).safeTransfer(protocol, protocolAmount);
             emit FundRig__ProtocolFee(protocol, protocolAmount, day);
         }
 
@@ -186,7 +190,7 @@ contract FundRig is ReentrancyGuard, Ownable {
         dayToTotalDonated[day] += amount;
         dayAccountToDonation[day][account] += amount;
 
-        emit FundRig__Funded(account, amount, day);
+        emit FundRig__Funded(account, amount, day, _uri);
     }
 
     /**
@@ -197,7 +201,7 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @param day The day number to claim for
      */
     function claim(address account, uint256 day) external nonReentrant {
-        if (account == address(0)) revert FundRig__InvalidAddress();
+        if (account == address(0)) revert FundRig__ZeroAddress();
         if (day >= currentDay()) revert FundRig__DayNotEnded();
         if (dayAccountToHasClaimed[day][account]) revert FundRig__AlreadyClaimed();
 
@@ -226,7 +230,7 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @param _recipient Address to receive donations
      */
     function setRecipient(address _recipient) external onlyOwner {
-        if (_recipient == address(0)) revert FundRig__InvalidAddress();
+        if (_recipient == address(0)) revert FundRig__ZeroAddress();
         recipient = _recipient;
         emit FundRig__RecipientSet(_recipient);
     }
@@ -236,7 +240,7 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @param _treasury New treasury address
      */
     function setTreasury(address _treasury) external onlyOwner {
-        if (_treasury == address(0)) revert FundRig__InvalidAddress();
+        if (_treasury == address(0)) revert FundRig__ZeroAddress();
         treasury = _treasury;
         emit FundRig__TreasurySet(_treasury);
     }
@@ -306,22 +310,4 @@ contract FundRig is ReentrancyGuard, Ownable {
         return (userDonation * dayEmission) / dayTotal;
     }
 
-    /**
-     * @notice Get user's donation amount for a specific day.
-     * @param day The day number to query
-     * @param account The user address to query
-     * @return The donation amount
-     */
-    function getUserDonation(uint256 day, address account) external view returns (uint256) {
-        return dayAccountToDonation[day][account];
-    }
-
-    /**
-     * @notice Get total donations for a specific day.
-     * @param day The day number to query
-     * @return The total donation amount
-     */
-    function getDayTotal(uint256 day) external view returns (uint256) {
-        return dayToTotalDonated[day];
-    }
 }

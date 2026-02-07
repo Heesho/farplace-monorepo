@@ -60,9 +60,10 @@ describe("SpinRig Tests", function () {
     rig = await rigArtifact.deploy(
       unitToken.address,
       paymentToken.address,
-      mockEntropy.address,
-      treasury.address,
       mockCore.address, // core
+      treasury.address,
+      AddressZero, // team (set later via setTeam)
+      mockEntropy.address,
       config
     );
     console.log("- SpinRig Initialized");
@@ -129,9 +130,10 @@ describe("SpinRig Tests", function () {
       const rig2 = await rigArtifact.deploy(
         unitToken.address,
         paymentToken.address,
-        mockEntropy.address,
-        treasury.address,
         mockCore2.address,
+        treasury.address,
+        AddressZero,
+        mockEntropy.address,
         multiOddsConfig
       );
       const odds = await rig2.getOdds();
@@ -156,7 +158,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
@@ -174,7 +176,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -192,7 +194,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockEntropy.address, treasury.address, mockCore2.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -234,7 +236,7 @@ describe("SpinRig Tests", function () {
       // Slot at price 0 to start new epoch
       const fee = await rig.getEntropyFee();
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
-      await rig.connect(user0).spin(user0.address, 0, Date.now() + 3600, convert("1000", 6), { value: fee });
+      await rig.connect(user0).spin(user0.address, 0, Date.now() + 3600, convert("1000", 6), "", { value: fee });
 
       // Now we have a fresh epoch with initPrice set
       const priceAfterSlot = await rig.getPrice();
@@ -271,7 +273,7 @@ describe("SpinRig Tests", function () {
       // Let epoch expire
       await increaseTime(ONE_HOUR + 1);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       // Approve and slot
@@ -282,6 +284,7 @@ describe("SpinRig Tests", function () {
         epochId,
         Date.now() + 3600,
         convert("1000", 6),
+        "",
         { value: fee }
       );
 
@@ -315,7 +318,7 @@ describe("SpinRig Tests", function () {
       // Let epoch expire
       await increaseTime(ONE_HOUR + 1);
 
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       // Record balances before
@@ -333,6 +336,7 @@ describe("SpinRig Tests", function () {
         epochId,
         Date.now() + 3600,
         price.add(convert("100", 6)),
+        "",
         { value: fee }
       );
 
@@ -350,13 +354,13 @@ describe("SpinRig Tests", function () {
     });
 
     it("Should prevent slot with expired deadline", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), { value: fee })
+        rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), "", { value: fee })
       ).to.be.revertedWith("SpinRig__Expired()");
     });
 
@@ -366,12 +370,12 @@ describe("SpinRig Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).spin(user0.address, 9999, Date.now() + 3600, convert("1000", 6), { value: fee })
+        rig.connect(user0).spin(user0.address, 9999, Date.now() + 3600, convert("1000", 6), "", { value: fee })
       ).to.be.revertedWith("SpinRig__EpochIdMismatch()");
     });
 
     it("Should prevent slot with price exceeding max", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
       const price = await rig.getPrice();
 
@@ -379,30 +383,30 @@ describe("SpinRig Tests", function () {
         await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
         await expect(
-          rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, 1, { value: fee })
+          rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, 1, "", { value: fee })
         ).to.be.revertedWith("SpinRig__MaxPriceExceeded()");
       }
     });
 
     it("Should prevent slot with insufficient entropy fee", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, convert("1000", 6), { value: 0 })
+        rig.connect(user0).spin(user0.address, epochId, Date.now() + 3600, convert("1000", 6), "", { value: 0 })
       ).to.be.revertedWith("SpinRig__InsufficientFee()");
     });
 
     it("Should prevent slot with zero spinner address", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       const fee = await rig.getEntropyFee();
 
       await paymentToken.connect(user0).approve(rig.address, convert("1000", 6));
 
       await expect(
-        rig.connect(user0).spin(AddressZero, epochId, Date.now() + 3600, convert("1000", 6), { value: fee })
-      ).to.be.revertedWith("SpinRig__InvalidSpinner()");
+        rig.connect(user0).spin(AddressZero, epochId, Date.now() + 3600, convert("1000", 6), "", { value: fee })
+      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
     });
   });
 
@@ -433,7 +437,7 @@ describe("SpinRig Tests", function () {
 
   describe("View Function Tests", function () {
     it("getEpochId should return current epoch", async function () {
-      const epochId = await rig.getEpochId();
+      const epochId = await rig.epochId();
       expect(epochId).to.be.gte(0);
     });
 

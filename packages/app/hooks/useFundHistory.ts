@@ -5,6 +5,7 @@ export type DonationEvent = {
   donor: string;
   day: bigint;
   amount: bigint;           // USDC 6 decimals
+  uri: string;
   recipientAmount: bigint;  // USDC 6 decimals
   timestamp: bigint;
   txHash: string;
@@ -22,6 +23,7 @@ export function useFundHistory(
         donor: d.donor.id,
         day: BigInt(d.day),
         amount: BigInt(Math.floor(parseFloat(d.amount) * 1e6)),
+        uri: d.uri || "",
         recipientAmount: BigInt(Math.floor(parseFloat(d.recipientAmount) * 1e6)),
         timestamp: BigInt(d.timestamp),
         txHash: d.txHash,

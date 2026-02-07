@@ -39,9 +39,9 @@ describe("Auction Invariant Tests", function () {
     // Deploy Auction
     const auctionArtifact = await ethers.getContractFactory("Auction");
     auction = await auctionArtifact.deploy(
-      convert("100", 18), // initPrice: 100 tokens
       paymentToken.address,
       paymentReceiver.address,
+      convert("100", 18), // initPrice: 100 tokens
       ONE_DAY, // epochPeriod
       convert("2", 18), // priceMultiplier (2x)
       convert("1", 18) // minInitPrice
@@ -302,9 +302,9 @@ describe("Auction Business Logic Tests", function () {
 
     const auctionArtifact = await ethers.getContractFactory("Auction");
     auction = await auctionArtifact.deploy(
-      convert("10", 18),
       paymentToken.address,
       paymentReceiver.address,
+      convert("10", 18),
       ONE_HOUR, // Short epoch for testing
       convert("1.5", 18),
       convert("0.1", 18)

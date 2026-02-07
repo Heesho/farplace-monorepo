@@ -1,18 +1,21 @@
 import { BigDecimal, BigInt, Address } from '@graphprotocol/graph-ts'
 import {
-  Rig__Mine as MineEvent,
-  Rig__MinerFee as MinerFeeEvent,
-  Rig__Mint as MintEvent,
-  Rig__TreasuryFee as TreasuryFeeEvent,
-  Rig__TeamFee as TeamFeeEvent,
-  Rig__ProtocolFee as ProtocolFeeEvent,
-  Rig__CapacitySet as CapacitySetEvent,
+  MineRig__Mine as MineEvent,
+  MineRig__MinerFee as MinerFeeEvent,
+  MineRig__Mint as MintEvent,
+  MineRig__TreasuryFee as TreasuryFeeEvent,
+  MineRig__TeamFee as TeamFeeEvent,
+  MineRig__ProtocolFee as ProtocolFeeEvent,
+  MineRig__CapacitySet as CapacitySetEvent,
+  MineRig__UriSet as UriSetEvent,
+  MineRig__Claimed as ClaimedEvent,
 } from '../../generated/templates/MineRig/MineRig'
 import {
   Rig,
   MineRig,
   MineSlot,
   MineAction,
+  MineClaim,
   Account,
   Unit,
   Protocol,
@@ -22,6 +25,7 @@ import {
   ONE_BI,
   ZERO_BD,
   BI_18,
+  BI_6,
   PROTOCOL_ID,
 } from '../constants'
 import {
@@ -33,6 +37,11 @@ import {
 // Helper to get slot ID
 function getSlotId(rigAddress: string, slotIndex: BigInt): string {
   return rigAddress + '-' + slotIndex.toString()
+}
+
+// Helper to get mine action ID (one action per rig/slot/epoch)
+function getMineActionId(rigAddress: string, slotIndex: BigInt, epochId: BigInt): string {
+  return rigAddress + '-' + slotIndex.toString() + '-' + epochId.toString()
 }
 
 // Helper to get or create a slot
@@ -70,7 +79,7 @@ export function handleMine(event: MineEvent): void {
   let minerAddress = event.params.miner
   let slotIndex = event.params.index
   let epochId = event.params.epochId
-  let price = convertTokenToDecimal(event.params.price, BI_18)
+  let price = convertTokenToDecimal(event.params.price, BI_6)
   let uri = event.params.uri
 
   // Get or create accounts
@@ -83,8 +92,10 @@ export function handleMine(event: MineEvent): void {
   let slot = getOrCreateSlot(mineRig, slotIndex)
   let prevMinerAccount = slot.currentMiner
 
-  // Create MineAction entity
-  let mineId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
+  // Create MineAction for this mine.
+  // earned/minted will be filled in when this miner is DISPLACED (by a future
+  // MinerFee/Mint event targeting epochId - 1).
+  let mineId = getMineActionId(rigAddress, slotIndex, epochId)
   let mine = new MineAction(mineId)
   mine.mineRig = mineRig.id
   mine.slot = slot.id
@@ -94,8 +105,8 @@ export function handleMine(event: MineEvent): void {
   mine.epochId = epochId
   mine.uri = uri
   mine.price = price
-  mine.minted = ZERO_BD // Will be set by Mint event
-  mine.earned = ZERO_BD // Will be set by MinerFee event
+  mine.minted = ZERO_BD
+  mine.earned = ZERO_BD
   mine.timestamp = event.block.timestamp
   mine.blockNumber = event.block.number
   mine.txHash = event.transaction.hash
@@ -107,8 +118,12 @@ export function handleMine(event: MineEvent): void {
   slot.uri = uri
   slot.startTime = event.block.timestamp
   slot.lastMined = event.block.timestamp
-  // initPrice will be updated based on price multiplier
-  slot.initPrice = price.times(mineRig.priceMultiplier)
+  // initPrice mirrors on-chain logic: price * priceMultiplier, clamped to minInitPrice
+  let computedInitPrice = price.times(mineRig.priceMultiplier)
+  if (computedInitPrice.lt(mineRig.minInitPrice)) {
+    computedInitPrice = mineRig.minInitPrice
+  }
+  slot.initPrice = computedInitPrice
   slot.save()
 
   // Update MineRig stats
@@ -131,24 +146,27 @@ export function handleMine(event: MineEvent): void {
 
 export function handleMineMinerFee(event: MinerFeeEvent): void {
   // Event params: miner (indexed), index (indexed), epochId (indexed), amount
+  // The fee goes to the PREVIOUS miner (being displaced). The epochId in the event
+  // is the current epoch; the previous miner's MineAction is at epochId - 1.
   let rigAddress = event.address.toHexString()
-  let minerAddress = event.params.miner
   let slotIndex = event.params.index
   let epochId = event.params.epochId
-  let amount = convertTokenToDecimal(event.params.amount, BI_18)
+  let amount = convertTokenToDecimal(event.params.amount, BI_6)
 
-  // Update miner earnings
-  let miner = getOrCreateAccount(minerAddress)
-  miner.totalMined = miner.totalMined.plus(amount)
-  miner.save()
-
-  // Try to find the corresponding MineAction and update earned
-  // Note: This event comes after Mine event in same tx, so we try to find it
-  // by matching tx hash, slot, and epochId
+  if (epochId.gt(ZERO_BI)) {
+    let prevMineId = getMineActionId(rigAddress, slotIndex, epochId.minus(ONE_BI))
+    let prevAction = MineAction.load(prevMineId)
+    if (prevAction !== null) {
+      prevAction.earned = prevAction.earned.plus(amount)
+      prevAction.save()
+    }
+  }
 }
 
 export function handleMineMint(event: MintEvent): void {
   // Event params: miner (indexed), index (indexed), epochId (indexed), amount
+  // Tokens are minted to the PREVIOUS miner (being displaced). The epochId in the
+  // event is the current epoch; the previous miner's MineAction is at epochId - 1.
   let rigAddress = event.address.toHexString()
   let minerAddress = event.params.miner
   let slotIndex = event.params.index
@@ -168,6 +186,16 @@ export function handleMineMint(event: MintEvent): void {
   let miner = getOrCreateAccount(minerAddress)
   miner.totalMined = miner.totalMined.plus(amount)
   miner.save()
+
+  // Update the PREVIOUS epoch's MineAction with minted tokens
+  if (epochId.gt(ZERO_BI)) {
+    let prevMineId = getMineActionId(rigAddress, slotIndex, epochId.minus(ONE_BI))
+    let prevAction = MineAction.load(prevMineId)
+    if (prevAction !== null) {
+      prevAction.minted = prevAction.minted.plus(amount)
+      prevAction.save()
+    }
+  }
 
   // Update slot minted
   let slot = getOrCreateSlot(mineRig, slotIndex)
@@ -192,7 +220,7 @@ export function handleMineMint(event: MintEvent): void {
 export function handleMineTreasuryFee(event: TreasuryFeeEvent): void {
   // Event params: treasury (indexed), index (indexed), epochId (indexed), amount
   let rigAddress = event.address.toHexString()
-  let amount = convertTokenToDecimal(event.params.amount, BI_18)
+  let amount = convertTokenToDecimal(event.params.amount, BI_6)
 
   let rig = Rig.load(rigAddress)
   if (rig === null) return
@@ -210,7 +238,7 @@ export function handleMineTreasuryFee(event: TreasuryFeeEvent): void {
 export function handleMineTeamFee(event: TeamFeeEvent): void {
   // Event params: team (indexed), index (indexed), epochId (indexed), amount
   let rigAddress = event.address.toHexString()
-  let amount = convertTokenToDecimal(event.params.amount, BI_18)
+  let amount = convertTokenToDecimal(event.params.amount, BI_6)
 
   let rig = Rig.load(rigAddress)
   if (rig === null) return
@@ -222,7 +250,7 @@ export function handleMineTeamFee(event: TeamFeeEvent): void {
 export function handleMineProtocolFee(event: ProtocolFeeEvent): void {
   // Event params: protocol (indexed), index (indexed), epochId (indexed), amount
   let rigAddress = event.address.toHexString()
-  let amount = convertTokenToDecimal(event.params.amount, BI_18)
+  let amount = convertTokenToDecimal(event.params.amount, BI_6)
 
   let rig = Rig.load(rigAddress)
   if (rig === null) return
@@ -244,4 +272,36 @@ export function handleMineCapacitySet(event: CapacitySetEvent): void {
 
   mineRig.capacity = event.params.capacity
   mineRig.save()
+}
+
+export function handleMineUriSet(event: UriSetEvent): void {
+  let rigAddress = event.address.toHexString()
+  let rig = Rig.load(rigAddress)
+  if (rig === null) return
+
+  rig.uri = event.params.uri
+  rig.save()
+}
+
+export function handleMineClaimed(event: ClaimedEvent): void {
+  let rigAddress = event.address.toHexString()
+  let mineRig = MineRig.load(rigAddress)
+  if (mineRig === null) return
+
+  let claimerAddress = event.params.account
+  let amount = convertTokenToDecimal(event.params.amount, BI_6)
+
+  let claimer = getOrCreateAccount(claimerAddress)
+  claimer.lastActivityAt = event.block.timestamp
+  claimer.save()
+
+  let claimId = event.transaction.hash.toHexString() + '-' + event.logIndex.toString()
+  let claim = new MineClaim(claimId)
+  claim.mineRig = mineRig.id
+  claim.claimer = claimer.id
+  claim.amount = amount
+  claim.timestamp = event.block.timestamp
+  claim.blockNumber = event.block.number
+  claim.txHash = event.transaction.hash
+  claim.save()
 }

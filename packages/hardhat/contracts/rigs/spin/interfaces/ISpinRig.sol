@@ -55,7 +55,8 @@ interface ISpinRig {
         address spinner,
         uint256 _epochId,
         uint256 deadline,
-        uint256 maxPrice
+        uint256 maxPrice,
+        string calldata _uri
     ) external payable returns (uint256 price);
 
     // Restricted functions
@@ -73,29 +74,4 @@ interface ISpinRig {
     function getPendingEmissions() external view returns (uint256);
     function getOdds() external view returns (uint256[] memory);
     function getOddsLength() external view returns (uint256);
-    function getEpochId() external view returns (uint256);
-    function getInitPrice() external view returns (uint256);
-    function getSpinStartTime() external view returns (uint256);
-
-    // Events
-    event SpinRig__Spin(
-        address indexed sender,
-        address indexed spinner,
-        uint256 indexed epochId,
-        uint256 price
-    );
-    event SpinRig__Win(
-        address indexed spinner,
-        uint256 indexed epochId,
-        uint256 oddsBps,
-        uint256 amount
-    );
-    event SpinRig__EntropyRequested(uint256 indexed epochId, uint64 indexed sequenceNumber);
-    event SpinRig__TreasuryFee(address indexed treasury, uint256 indexed epochId, uint256 amount);
-    event SpinRig__TeamFee(address indexed team, uint256 indexed epochId, uint256 amount);
-    event SpinRig__ProtocolFee(address indexed protocol, uint256 indexed epochId, uint256 amount);
-    event SpinRig__EmissionMinted(uint256 indexed epochId, uint256 amount);
-    event SpinRig__TreasurySet(address indexed treasury);
-    event SpinRig__TeamSet(address indexed team);
-    event SpinRig__UriSet(string uri);
 }

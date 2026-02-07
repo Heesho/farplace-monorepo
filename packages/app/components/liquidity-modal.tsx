@@ -1,17 +1,32 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { X, Delete } from "lucide-react";
+import { X, Delete, Loader2, CheckCircle } from "lucide-react";
+import { parseUnits, parseEther, formatEther, formatUnits } from "viem";
 import { NavBar } from "@/components/nav-bar";
+import { useFarcaster } from "@/hooks/useFarcaster";
+import {
+  useBatchedTransaction,
+  encodeApproveCall,
+  encodeContractCall,
+  type Call,
+} from "@/hooks/useBatchedTransaction";
+import {
+  CONTRACT_ADDRESSES,
+  UNIV2_ROUTER_ABI,
+  QUOTE_TOKEN_DECIMALS,
+} from "@/lib/contracts";
+import { DEADLINE_BUFFER_SECONDS } from "@/lib/constants";
 
 type LiquidityModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  unitAddress: `0x${string}`;
   tokenSymbol?: string;
   tokenName?: string;
   tokenBalance?: number;
   usdcBalance?: number;
-  tokenPrice?: number; // Token price in USD
+  tokenPrice?: number; // Token price in USDC
 };
 
 // Number pad button component
@@ -37,20 +52,26 @@ function NumPadButton({
 export function LiquidityModal({
   isOpen,
   onClose,
+  unitAddress,
   tokenSymbol = "TOKEN",
   tokenName = "Token",
-  tokenBalance = 25000,
-  usdcBalance = 1186.38,
-  tokenPrice = 0.00234,
+  tokenBalance = 0,
+  usdcBalance = 0,
+  tokenPrice = 0,
 }: LiquidityModalProps) {
+  const { address: account } = useFarcaster();
+  const { execute, status: txStatus, txHash, error: txError, reset: resetTx } = useBatchedTransaction();
   const [tokenAmount, setTokenAmount] = useState("0");
 
-  // Reset when modal opens
+  // Reset when modal opens/closes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isOpen) {
       setTokenAmount("0");
+      resetTx();
     }
-  }, [isOpen]);
+  }, [isOpen, resetTx]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Handle number pad input
   const handleNumPadPress = useCallback((value: string) => {
@@ -86,17 +107,65 @@ export function LiquidityModal({
 
   // Calculate values
   const tokenInputAmount = parseFloat(tokenAmount) || 0;
-
-  // Required USDC is calculated based on token amount and price (USDC ~= $1)
   const requiredUsdc = tokenInputAmount * tokenPrice;
-
-  // LP tokens received (simplified calculation)
   const lpTokensReceived = Math.sqrt(tokenInputAmount * requiredUsdc);
 
-  // Check if user has enough balance
+  // Validation
   const hasEnoughToken = tokenInputAmount <= tokenBalance;
   const hasEnoughUsdc = requiredUsdc <= usdcBalance;
-  const canCreate = tokenInputAmount > 0 && hasEnoughToken && hasEnoughUsdc;
+  const canCreate = tokenInputAmount > 0 && hasEnoughToken && hasEnoughUsdc && !!account;
+
+  const isPending = txStatus === "pending" || txStatus === "confirming";
+  const isSuccess = txStatus === "success";
+  const isError = txStatus === "error";
+
+  // Add liquidity handler
+  const handleAddLiquidity = useCallback(async () => {
+    if (!account || !canCreate) return;
+
+    const routerAddress = CONTRACT_ADDRESSES.uniV2Router as `0x${string}`;
+    const usdcAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
+
+    // Parse amounts to wei
+    const tokenAmountWei = parseEther(tokenInputAmount.toString());
+    const usdcAmountWei = parseUnits(requiredUsdc.toFixed(QUOTE_TOKEN_DECIMALS), QUOTE_TOKEN_DECIMALS);
+
+    // 1% slippage tolerance
+    const tokenAmountMin = (tokenAmountWei * 99n) / 100n;
+    const usdcAmountMin = (usdcAmountWei * 99n) / 100n;
+
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS);
+
+    const calls: Call[] = [];
+
+    // Approve unit token for router
+    calls.push(encodeApproveCall(unitAddress, routerAddress, tokenAmountWei));
+
+    // Approve USDC for router
+    calls.push(encodeApproveCall(usdcAddress, routerAddress, usdcAmountWei));
+
+    // Call addLiquidity on Uniswap V2 Router
+    calls.push(
+      encodeContractCall(
+        routerAddress,
+        UNIV2_ROUTER_ABI,
+        "addLiquidity",
+        [
+          unitAddress,
+          usdcAddress,
+          tokenAmountWei,
+          usdcAmountWei,
+          tokenAmountMin,
+          usdcAmountMin,
+          account,
+          deadline,
+        ],
+        0n
+      )
+    );
+
+    await execute(calls);
+  }, [account, canCreate, tokenInputAmount, requiredUsdc, unitAddress, execute]);
 
   if (!isOpen) return null;
 
@@ -141,10 +210,10 @@ export function LiquidityModal({
             <div className="flex items-center justify-between mt-1">
               <span className="text-[11px] text-muted-foreground">{tokenSymbol}</span>
               <button
-                onClick={() => setTokenAmount(tokenBalance.toString())}
+                onClick={() => setTokenAmount(tokenBalance.toFixed(2))}
                 className="text-[11px] text-muted-foreground hover:text-zinc-300 transition-colors"
               >
-                Balance: {tokenBalance.toLocaleString()}
+                Balance: {tokenBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </button>
             </div>
           </div>
@@ -161,37 +230,60 @@ export function LiquidityModal({
               <span className="text-[11px] text-muted-foreground">USDC</span>
               <button
                 onClick={() => {
-                  // Calculate max token amount based on USDC balance
+                  if (tokenPrice <= 0) return;
                   const maxTokenFromUsdc = usdcBalance / tokenPrice;
                   setTokenAmount(Math.min(tokenBalance, maxTokenFromUsdc).toFixed(2));
                 }}
                 className="text-[11px] text-muted-foreground hover:text-zinc-300 transition-colors"
               >
-                Balance: {usdcBalance.toLocaleString()}
+                Balance: {usdcBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </button>
             </div>
           </div>
 
           {/* LP Output */}
-          <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
-            <span className="tabular-nums">
-              You receive ~ {lpTokensReceived.toFixed(2)} LP tokens
-            </span>
-          </div>
+          {tokenInputAmount > 0 && (
+            <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
+              <span className="tabular-nums">
+                You receive ~ {lpTokensReceived.toFixed(2)} LP tokens
+              </span>
+            </div>
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
 
           {/* Action button */}
           <button
-            disabled={!canCreate}
-            className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all mb-4 ${
-              canCreate
-                ? "bg-white text-black hover:bg-zinc-200"
-                : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+            onClick={handleAddLiquidity}
+            disabled={!canCreate || isPending || isSuccess}
+            className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all mb-4 flex items-center justify-center gap-2 ${
+              isSuccess
+                ? "bg-zinc-300 text-black"
+                : isError
+                ? "bg-zinc-600 text-white"
+                : !canCreate || isPending
+                ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                : "bg-white text-black hover:bg-zinc-200"
             }`}
           >
-            {!hasEnoughUsdc && tokenInputAmount > 0 ? "Insufficient USDC" : "Create LP"}
+            {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isSuccess && <CheckCircle className="w-4 h-4" />}
+            {isPending
+              ? "Adding Liquidity..."
+              : isSuccess
+              ? "Liquidity Added!"
+              : isError
+              ? "Failed"
+              : !account
+              ? "Connect wallet"
+              : tokenInputAmount === 0
+              ? "Enter amount"
+              : !hasEnoughToken
+              ? `Insufficient ${tokenSymbol}`
+              : !hasEnoughUsdc
+              ? "Insufficient USDC"
+              : "Add Liquidity"}
           </button>
 
           {/* Number pad */}

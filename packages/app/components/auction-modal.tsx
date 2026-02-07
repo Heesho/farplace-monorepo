@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { X, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { X, Loader2, CheckCircle } from "lucide-react";
 import { NavBar } from "@/components/nav-bar";
 import { formatEther, formatUnits } from "viem";
 import { useAuctionState } from "@/hooks/useAuctionState";
@@ -210,17 +210,6 @@ export function AuctionModal({
                 </div>
               )}
 
-              {/* Insufficient balance warning */}
-              {account && isAuctionActive && !hasEnoughLp && !isError && !isSuccess && (
-                <div className="flex items-center gap-2 text-[13px] text-zinc-400 bg-secondary/30 rounded-lg px-3 py-2 mb-4">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>
-                    You need {Number(lpPriceFormatted).toFixed(3)} LP tokens. You have{" "}
-                    {Number(userLpBalance).toFixed(3)}.
-                  </span>
-                </div>
-              )}
-
               {/* Spacer */}
               <div className="flex-1" />
 
@@ -239,9 +228,9 @@ export function AuctionModal({
                   disabled={!account || !isAuctionActive || !hasEnoughLp || isPending || isSuccess}
                   className={`w-full h-11 rounded-xl font-semibold text-[14px] transition-all flex items-center justify-center gap-2 ${
                     isSuccess
-                      ? "bg-green-600 text-white"
+                      ? "bg-zinc-300 text-black"
                       : isError
-                      ? "bg-red-600 text-white"
+                      ? "bg-zinc-600 text-white"
                       : !account || !isAuctionActive || !hasEnoughLp || isPending
                       ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
                       : "bg-white text-black hover:bg-zinc-200"

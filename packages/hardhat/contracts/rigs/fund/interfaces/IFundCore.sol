@@ -48,7 +48,7 @@ interface IFundCore {
     function rigToIndex(address rig) external view returns (uint256);
     function rigToLP(address rig) external view returns (address);
 
-    // Functions
+    // External functions
     function launch(LaunchParams calldata params)
         external
         returns (address unit, address rig, address auction, address lpToken);
@@ -56,29 +56,4 @@ interface IFundCore {
     // Restricted functions
     function setProtocolFeeAddress(address _protocolFeeAddress) external;
     function setMinUsdcForLaunch(uint256 _minUsdcForLaunch) external;
-
-    // Events
-    event FundCore__Launched(
-        address indexed launcher,
-        address indexed rig,
-        address indexed unit,
-        address recipient,
-        address auction,
-        address lpToken,
-        address quoteToken,
-        string tokenName,
-        string tokenSymbol,
-        string uri,
-        uint256 usdcAmount,
-        uint256 unitAmount,
-        uint256 initialEmission,
-        uint256 minEmission,
-        uint256 halvingPeriod,
-        uint256 auctionInitPrice,
-        uint256 auctionEpochPeriod,
-        uint256 auctionPriceMultiplier,
-        uint256 auctionMinInitPrice
-    );
-    event FundCore__ProtocolFeeAddressSet(address protocolFeeAddress);
-    event FundCore__MinUsdcForLaunchSet(uint256 minUsdcForLaunch);
 }

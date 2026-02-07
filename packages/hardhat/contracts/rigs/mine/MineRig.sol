@@ -124,7 +124,6 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     error MineRig__DeadlinePassed();
     error MineRig__InsufficientFee();
     error MineRig__NoEntropyRequired();
-    error MineRig__ZeroTreasury();
     error MineRig__CapacityBelowCurrent();
     error MineRig__CapacityExceedsMax();
     error MineRig__UpsMultiplierOutOfRange();
@@ -169,17 +168,18 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     constructor(
         address _unit,
         address _quote,
-        address _entropy,
         address _core,
         address _treasury,
+        address _team,
+        address _entropy,
         Config memory _config
     ) {
         // Validate addresses (protocol is resolved via core)
         if (_unit == address(0)) revert MineRig__ZeroAddress();
         if (_quote == address(0)) revert MineRig__ZeroAddress();
-        if (_entropy == address(0)) revert MineRig__ZeroAddress();
         if (_core == address(0)) revert MineRig__ZeroAddress();
         if (_treasury == address(0)) revert MineRig__ZeroAddress();
+        if (_entropy == address(0)) revert MineRig__ZeroAddress();
 
         // Validate epoch period
         if (_config.epochPeriod < MIN_EPOCH_PERIOD || _config.epochPeriod > MAX_EPOCH_PERIOD) {
@@ -224,8 +224,8 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         // Set immutables
         unit = _unit;
         quote = _quote;
-        entropy = _entropy;
         core = _core;
+        entropy = _entropy;
         startTime = block.timestamp;
 
         epochPeriod = _config.epochPeriod;
@@ -238,9 +238,22 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
         // Set initial state
         treasury = _treasury;
+        team = _team;
         upsMultipliers = _config.upsMultipliers;
         entropyEnabled = true;
 
+        // Initialize slot 0 with the team as the first miner
+        indexToSlot[0] = Slot({
+            epochId: 1,
+            initPrice: _config.minInitPrice,
+            startTime: block.timestamp,
+            ups: _config.initialUps,
+            upsMultiplier: DEFAULT_UPS_MULTIPLIER,
+            lastUpsMultiplierTime: block.timestamp,
+            miner: _team,
+            uri: ""
+        });
+        emit MineRig__Mine(_team, _team, 0, 0, 0, "");
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -371,6 +384,60 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         emit MineRig__Claimed(account, amount);
     }
 
+    /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
+
+    /**
+     * @notice Update the treasury address for fee collection.
+     * @param _treasury New treasury address (cannot be zero)
+     */
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert MineRig__ZeroAddress();
+        treasury = _treasury;
+        emit MineRig__TreasurySet(_treasury);
+    }
+
+    /**
+     * @notice Update the team address for fee collection.
+     * @dev Can be set to address(0) to disable team fees (redirects to treasury).
+     * @param _team New team address
+     */
+    function setTeam(address _team) external onlyOwner {
+        team = _team;
+        emit MineRig__TeamSet(_team);
+    }
+
+    /**
+     * @notice Increase the number of mining slots.
+     * @dev Can only increase, never decrease.
+     * @param _capacity New capacity (must be greater than current)
+     */
+    function setCapacity(uint256 _capacity) external onlyOwner {
+        if (_capacity <= capacity) revert MineRig__CapacityBelowCurrent();
+        if (_capacity > MAX_CAPACITY) revert MineRig__CapacityExceedsMax();
+        capacity = _capacity;
+        emit MineRig__CapacitySet(_capacity);
+    }
+
+    /**
+     * @notice Enable or disable entropy for UPS multipliers.
+     * @param _enabled True to enable entropy-based random multipliers
+     */
+    function setEntropyEnabled(bool _enabled) external onlyOwner {
+        entropyEnabled = _enabled;
+        emit MineRig__EntropyEnabledSet(_enabled);
+    }
+
+    /**
+     * @notice Update the global metadata URI for the rig.
+     * @param _uri New metadata URI (e.g., for logo, branding)
+     */
+    function setUri(string calldata _uri) external onlyOwner {
+        uri = _uri;
+        emit MineRig__UriSet(_uri);
+    }
+
+    /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
+
     /**
      * @notice Callback from Pyth Entropy with random number for UPS multiplier.
      * @dev Called by Entropy contract after randomness is generated.
@@ -394,6 +461,14 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
         indexToSlot[index] = slotCache;
         emit MineRig__UpsMultiplierSet(index, epoch, upsMultiplier);
+    }
+
+    /**
+     * @notice Get the Entropy contract address (required by IEntropyConsumer).
+     * @return Entropy contract address
+     */
+    function getEntropy() internal view override returns (address) {
+        return entropy;
     }
 
     /**
@@ -464,89 +539,56 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         return ups;
     }
 
-    /*----------  OWNER FUNCTIONS  --------------------------------------*/
-
-    /**
-     * @notice Update the treasury address for fee collection.
-     * @param _treasury New treasury address (cannot be zero)
-     */
-    function setTreasury(address _treasury) external onlyOwner {
-        if (_treasury == address(0)) revert MineRig__ZeroTreasury();
-        treasury = _treasury;
-        emit MineRig__TreasurySet(_treasury);
-    }
-
-    /**
-     * @notice Update the team address for fee collection.
-     * @dev Can be set to address(0) to disable team fees (redirects to treasury).
-     * @param _team New team address
-     */
-    function setTeam(address _team) external onlyOwner {
-        team = _team;
-        emit MineRig__TeamSet(_team);
-    }
-
-    /**
-     * @notice Increase the number of mining slots.
-     * @dev Can only increase, never decrease.
-     * @param _capacity New capacity (must be greater than current)
-     */
-    function setCapacity(uint256 _capacity) external onlyOwner {
-        if (_capacity <= capacity) revert MineRig__CapacityBelowCurrent();
-        if (_capacity > MAX_CAPACITY) revert MineRig__CapacityExceedsMax();
-        capacity = _capacity;
-        emit MineRig__CapacitySet(_capacity);
-    }
-
-    /**
-     * @notice Enable or disable entropy for UPS multipliers.
-     * @param _enabled True to enable entropy-based random multipliers
-     */
-    function setEntropyEnabled(bool _enabled) external onlyOwner {
-        entropyEnabled = _enabled;
-        emit MineRig__EntropyEnabledSet(_enabled);
-    }
-
-    /**
-     * @notice Update the global metadata URI for the rig.
-     * @param _uri New metadata URI (e.g., for logo, branding)
-     */
-    function setUri(string calldata _uri) external onlyOwner {
-        uri = _uri;
-        emit MineRig__UriSet(_uri);
-    }
-
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/
 
-    function getEntropy() internal view override returns (address) {
-        return entropy;
-    }
-
+    /**
+     * @notice Get the current VRF fee required for entropy.
+     * @return Current entropy fee in wei
+     */
     function getEntropyFee() external view returns (uint256) {
         return IEntropyV2(entropy).getFeeV2();
     }
 
+    /**
+     * @notice Get the current Dutch auction price for a slot.
+     * @param index Slot index to query
+     * @return Current price (linearly decays from initPrice to 0 over epochPeriod)
+     */
     function getPrice(uint256 index) external view returns (uint256) {
         return _getPriceFromCache(indexToSlot[index]);
     }
 
+    /**
+     * @notice Get the current global units per second emission rate.
+     * @return Current UPS (before capacity division)
+     */
     function getUps() external view returns (uint256) {
         return _getUpsFromSupply();
     }
 
+    /**
+     * @notice Get the full state of a mining slot.
+     * @param index Slot index to query
+     * @return Slot struct with all state fields
+     */
     function getSlot(uint256 index) external view returns (Slot memory) {
         return indexToSlot[index];
     }
 
+    /**
+     * @notice Get the full UPS multipliers array.
+     * @return Array of possible UPS multiplier values
+     */
     function getUpsMultipliers() external view returns (uint256[] memory) {
         return upsMultipliers;
     }
 
+    /**
+     * @notice Get the length of the UPS multipliers array.
+     * @return Number of multiplier options
+     */
     function getUpsMultipliersLength() external view returns (uint256) {
         return upsMultipliers.length;
     }
 
-    function isEntropyEnabled() external view returns (bool) {
-        return entropyEnabled;
-    }
 }

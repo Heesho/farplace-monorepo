@@ -7,6 +7,19 @@ pragma solidity 0.8.19;
  * @notice Interface for the Auction contract.
  */
 interface IAuction {
+    // Immutables
+    function paymentToken() external view returns (address);
+    function paymentReceiver() external view returns (address);
+    function epochPeriod() external view returns (uint256);
+    function priceMultiplier() external view returns (uint256);
+    function minInitPrice() external view returns (uint256);
+
+    // State
+    function epochId() external view returns (uint256);
+    function initPrice() external view returns (uint256);
+    function startTime() external view returns (uint256);
+
+    // External functions
     function buy(
         address[] calldata assets,
         address recipient,
@@ -14,9 +27,7 @@ interface IAuction {
         uint256 deadline,
         uint256 maxPaymentTokenAmount
     ) external;
-    function epochId() external view returns (uint256);
-    function initPrice() external view returns (uint256);
-    function startTime() external view returns (uint256);
-    function paymentToken() external view returns (address);
+
+    // View functions
     function getPrice() external view returns (uint256);
 }

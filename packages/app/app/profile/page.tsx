@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { formatEther, formatUnits, parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { NavBar } from "@/components/nav-bar";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTokenMetadata } from "@/hooks/useMetadata";
 import { CONTRACT_ADDRESSES, ERC20_ABI, MOCK_MINT_ABI, QUOTE_TOKEN_DECIMALS } from "@/lib/contracts";
-import type { UserRigData, UserLaunchedRig } from "@/hooks/useUserProfile";
+import type { UserHolding, UserLaunchedRig } from "@/hooks/useUserProfile";
 
 type Tab = "holdings" | "launched";
 
@@ -32,28 +32,7 @@ function formatUsd(value: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Token icons
-// ---------------------------------------------------------------------------
-
-// USDC token icon - blue circle with $ sign
-function UsdcIcon({ size = 40 }: { size?: number }) {
-  return (
-    <div
-      className="rounded-full bg-[#2775CA] flex items-center justify-center flex-shrink-0"
-      style={{ width: size, height: size }}
-    >
-      <span
-        className="font-bold text-white"
-        style={{ fontSize: size * 0.5 }}
-      >
-        $
-      </span>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// TokenLogo (mirrors rig detail page)
+// TokenLogo
 // ---------------------------------------------------------------------------
 
 function TokenLogo({
@@ -91,49 +70,34 @@ function TokenLogo({
 }
 
 // ---------------------------------------------------------------------------
-// HoldingRow -- each row calls useTokenMetadata so we get the logo per token
+// HoldingRow
 // ---------------------------------------------------------------------------
 
-function HoldingRow({
-  rig,
-}: {
-  rig: UserRigData;
-}) {
-  const { logoUrl } = useTokenMetadata(rig.rigUri);
-
-  const userMined = Number(formatEther(rig.userMined));
-  const userSpent = Number(formatEther(rig.userSpent));
-  const userEarned = Number(formatEther(rig.userEarned));
-  const price = Number(formatEther(rig.price));
-  // Price is in USDC (~$1), so value = mined * price directly
-  const estimatedValueUsd = userMined * price;
-  const netUsdc = userEarned - userSpent;
+function HoldingRow({ holding }: { holding: UserHolding }) {
+  const { logoUrl } = useTokenMetadata(holding.rigUri);
 
   return (
-    <Link href={`/rig/${rig.address}`} className="block">
+    <Link href={`/rig/${holding.address}`} className="block">
       <div className="flex items-center justify-between py-3 hover:bg-secondary/30 -mx-4 px-4 transition-colors rounded-lg">
         <div className="flex items-center gap-3 min-w-0">
-          <TokenLogo name={rig.tokenName} logoUrl={logoUrl} size="md" />
+          <TokenLogo name={holding.tokenName} logoUrl={logoUrl} size="md" />
           <div className="min-w-0">
             <div className="text-[15px] font-medium truncate">
-              {rig.tokenName}
+              {holding.tokenName}
             </div>
             <div className="text-[12px] text-muted-foreground">
-              {formatNumber(userMined)} {rig.tokenSymbol} mined
+              {formatNumber(holding.balanceNum)} {holding.tokenSymbol}
             </div>
           </div>
         </div>
         <div className="text-right shrink-0 ml-3">
           <div className="text-[15px] font-semibold tabular-nums">
-            {estimatedValueUsd > 0 ? formatUsd(estimatedValueUsd) : "--"}
+            {holding.valueUsd > 0 ? formatUsd(holding.valueUsd) : "--"}
           </div>
-          <div
-            className={`text-[12px] tabular-nums ${
-              netUsdc >= 0 ? "text-zinc-300" : "text-zinc-500"
-            }`}
-          >
-            {netUsdc >= 0 ? "+" : ""}
-            {formatNumber(netUsdc)} USDC
+          <div className="text-[12px] text-muted-foreground tabular-nums">
+            {holding.priceUsd > 0
+              ? `$${holding.priceUsd >= 0.01 ? holding.priceUsd.toFixed(4) : holding.priceUsd.toFixed(6)}`
+              : "--"}
           </div>
         </div>
       </div>
@@ -145,19 +109,8 @@ function HoldingRow({
 // LaunchedRow
 // ---------------------------------------------------------------------------
 
-function LaunchedRow({
-  rig,
-}: {
-  rig: UserLaunchedRig;
-}) {
+function LaunchedRow({ rig }: { rig: UserLaunchedRig }) {
   const { logoUrl } = useTokenMetadata(rig.rigUri);
-
-  const totalMinted = Number(formatEther(rig.totalMinted));
-  const unitPrice = Number(formatEther(rig.unitPrice));
-  const revenue = Number(formatEther(rig.revenue));
-  // Price is in USDC (~$1), so value = minted * price directly
-  const marketCapUsd = totalMinted * unitPrice;
-  const revenueUsd = revenue; // revenue is already in USDC
 
   return (
     <Link href={`/rig/${rig.address}`} className="block">
@@ -175,10 +128,10 @@ function LaunchedRow({
         </div>
         <div className="text-right shrink-0 ml-3">
           <div className="text-[15px] font-semibold tabular-nums">
-            {marketCapUsd > 0 ? formatUsd(marketCapUsd) : "--"}
+            {rig.marketCapUsd > 0 ? formatUsd(rig.marketCapUsd) : "--"}
           </div>
           <div className="text-[12px] text-muted-foreground tabular-nums">
-            {revenue > 0 ? `$${formatNumber(revenueUsd)} earned` : "No revenue yet"}
+            Mcap
           </div>
         </div>
       </div>
@@ -200,7 +153,6 @@ function ProfileSkeleton() {
           paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
         }}
       >
-        {/* Header skeleton */}
         <div className="px-4 pb-4">
           <div className="flex items-center gap-3 py-4">
             <div className="w-12 h-12 rounded-full bg-secondary animate-pulse" />
@@ -210,14 +162,10 @@ function ProfileSkeleton() {
             </div>
           </div>
         </div>
-
-        {/* Tabs skeleton */}
         <div className="flex border-b border-secondary mx-4 mb-4">
           <div className="w-24 h-8 bg-secondary rounded animate-pulse mr-4" />
           <div className="w-24 h-8 bg-secondary rounded animate-pulse" />
         </div>
-
-        {/* Row skeletons */}
         <div className="flex-1 px-4 space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 py-3">
@@ -233,7 +181,6 @@ function ProfileSkeleton() {
             </div>
           ))}
         </div>
-
         <NavBar />
       </div>
     </main>
@@ -314,9 +261,9 @@ export default function ProfilePage() {
 
   // Data hooks
   const { user, address } = useFarcaster();
-  const { minedRigs, launchedRigs, isLoading } = useUserProfile(address);
+  const { holdings, launchedRigs, totalHoldingsValueUsd, isLoading } = useUserProfile(address);
 
-  // Token balance reads
+  // USDC balance
   const { data: usdcBalance, refetch: refetchUsdc } = useReadContract({
     address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
     abi: ERC20_ABI,
@@ -325,7 +272,7 @@ export default function ProfilePage() {
     query: { enabled: !!address },
   });
 
-  // Mint transactions
+  // Mock USDC mint (staging only)
   const {
     writeContract: mintUsdc,
     data: usdcTxHash,
@@ -336,7 +283,6 @@ export default function ProfilePage() {
   const { isLoading: isUsdcTxConfirming, isSuccess: isUsdcTxSuccess } =
     useWaitForTransactionReceipt({ hash: usdcTxHash });
 
-  // Refetch balances after tx confirmation
   useEffect(() => {
     if (isUsdcTxSuccess) {
       refetchUsdc();
@@ -344,38 +290,31 @@ export default function ProfilePage() {
     }
   }, [isUsdcTxSuccess, refetchUsdc, resetUsdcMint]);
 
-  // Not connected
   if (!address) {
     return <NotConnected />;
   }
 
-  // Loading
   if (isLoading) {
     return <ProfileSkeleton />;
   }
 
-  // Format token balances + USD values
   const usdcNum = usdcBalance != null ? Number(formatUnits(usdcBalance as bigint, QUOTE_TOKEN_DECIMALS)) : 0;
   const formattedUsdc = usdcBalance != null
     ? usdcNum.toLocaleString(undefined, { maximumFractionDigits: 2 })
     : "--";
-  const usdcValueUsd = usdcNum; // USDC is 1:1 USD
-
-  // Calculate total portfolio value (wallet balances + mined token holdings)
-  // Price is in USDC (~$1), so value = mined * price directly
-  const minedValueUsd = minedRigs.reduce((sum, rig) => {
-    const mined = Number(formatEther(rig.userMined));
-    const price = Number(formatEther(rig.price));
-    return sum + mined * price;
-  }, 0);
-  const totalValueUsd = usdcValueUsd + minedValueUsd;
 
   const isUsdcMinting = isUsdcMintPending || isUsdcTxConfirming;
-
-  // Display values
-  const displayName = user?.displayName || user?.username || "Anon";
+  const totalValueUsd = usdcNum + totalHoldingsValueUsd;
+  const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const displayName = user?.displayName || user?.username || shortAddress;
   const pfpUrl = user?.pfpUrl || null;
   const username = user?.username ? `@${user.username}` : null;
+  const isAddressFallbackAvatar = !user?.displayName && !user?.username;
+  const avatarFallback = user?.displayName
+    ? user.displayName.charAt(0).toUpperCase()
+    : user?.username
+      ? user.username.charAt(0).toUpperCase()
+      : address.slice(-2).toUpperCase();
 
   return (
     <main className="flex h-screen w-screen justify-center bg-zinc-800">
@@ -388,13 +327,8 @@ export default function ProfilePage() {
       >
         {/* Header */}
         <div className="px-4 pb-2">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3">
             <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-            {address && (
-              <div className="px-3 py-1.5 rounded-full bg-secondary text-[13px] text-muted-foreground font-mono">
-                {address.slice(0, 6)}...{address.slice(-4)}
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-3 py-3">
             {pfpUrl ? (
@@ -404,8 +338,14 @@ export default function ProfilePage() {
                 className="w-12 h-12 rounded-full object-cover"
               />
             ) : (
-              <div className="w-12 h-12 rounded-full flex items-center justify-center font-semibold text-lg bg-gradient-to-br from-zinc-500 to-zinc-700 text-white">
-                {displayName.charAt(0)}
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${
+                  isAddressFallbackAvatar
+                    ? "font-mono text-[15px] tracking-wide bg-gradient-to-br from-zinc-600 to-zinc-800"
+                    : "font-semibold text-lg bg-gradient-to-br from-zinc-500 to-zinc-700"
+                }`}
+              >
+                {avatarFallback}
               </div>
             )}
             <div>
@@ -466,9 +406,9 @@ export default function ProfilePage() {
             }`}
           >
             Holdings
-            {minedRigs.length > 0 && (
+            {holdings.length > 0 && (
               <span className="ml-1.5 text-[12px] text-muted-foreground">
-                {minedRigs.length}
+                {holdings.length}
               </span>
             )}
           </button>
@@ -492,16 +432,48 @@ export default function ProfilePage() {
         {/* Tab Content */}
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide px-4">
           {activeTab === "holdings" && (
-            <div className="py-1">
-              {/* Mined token rows */}
-              {minedRigs.map((rig) => (
-                <HoldingRow
-                  key={rig.address}
-                  rig={rig}
-                />
-              ))}
-
-            </div>
+            <>
+              {holdings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mb-3">
+                    <svg
+                      className="w-6 h-6 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3.75 9h16.5m-16.5 6h16.5m-15-9h13.5A2.25 2.25 0 0121 8.25v7.5A2.25 2.25 0 0118.75 18H5.25A2.25 2.25 0 013 15.75v-7.5A2.25 2.25 0 015.25 6z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="text-[15px] font-medium mb-1">
+                    No holdings yet
+                  </div>
+                  <div className="text-[13px] text-muted-foreground mb-4">
+                    Mine, spin, or trade to earn coins
+                  </div>
+                  <Link
+                    href="/explore"
+                    className="px-4 py-2 rounded-xl bg-white text-black text-[13px] font-semibold hover:bg-zinc-200 transition-colors"
+                  >
+                    Explore coins
+                  </Link>
+                </div>
+              ) : (
+                <div className="py-1">
+                  {holdings.map((holding) => (
+                    <HoldingRow
+                      key={holding.unitAddress}
+                      holding={holding}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === "launched" && (
@@ -527,13 +499,13 @@ export default function ProfilePage() {
                     No launches yet
                   </div>
                   <div className="text-[13px] text-muted-foreground mb-4">
-                    You haven&apos;t launched any tokens yet
+                    You haven&apos;t launched any coins yet
                   </div>
                   <Link
                     href="/launch"
                     className="px-4 py-2 rounded-xl bg-white text-black text-[13px] font-semibold hover:bg-zinc-200 transition-colors"
                   >
-                    Launch a token
+                    Launch a coin
                   </Link>
                 </div>
               ) : (
@@ -542,7 +514,7 @@ export default function ProfilePage() {
                     <LaunchedRow
                       key={rig.address}
                       rig={rig}
-                        />
+                    />
                   ))}
                 </div>
               )}

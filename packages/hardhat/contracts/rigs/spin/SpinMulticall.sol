@@ -97,7 +97,8 @@ contract SpinMulticall {
         address rig,
         uint256 epochId,
         uint256 deadline,
-        uint256 maxPrice
+        uint256 maxPrice,
+        string calldata _uri
     ) external payable {
         if (!ISpinCore(core).rigToIsRig(rig)) revert SpinMulticall__InvalidRig();
 
@@ -116,7 +117,7 @@ contract SpinMulticall {
         }
 
         // Spin with entropy fee forwarded
-        ISpinRig(rig).spin{value: entropyFee}(msg.sender, epochId, deadline, maxPrice);
+        ISpinRig(rig).spin{value: entropyFee}(msg.sender, epochId, deadline, maxPrice, _uri);
 
         // Refund any unused quote tokens (in case price changed)
         uint256 quoteBalance = IERC20(quoteToken).balanceOf(address(this));

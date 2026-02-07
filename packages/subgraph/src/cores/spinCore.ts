@@ -1,5 +1,6 @@
 import { Address, BigInt } from '@graphprotocol/graph-ts'
 import { SpinCore__Launched as SpinCoreLaunchedEvent } from '../../generated/SpinCore/SpinCore'
+import { SpinRig as SpinRigContract } from '../../generated/SpinCore/SpinRig'
 import {
   UniswapV2Pair as PairTemplate,
   SpinRig as SpinRigTemplate,
@@ -12,6 +13,7 @@ import {
   ZERO_BD,
   PROTOCOL_ID,
   BI_18,
+  BI_6,
   RIG_TYPE_SPIN,
 } from '../constants'
 import {
@@ -82,7 +84,7 @@ export function handleSpinCoreLaunched(event: SpinCoreLaunchedEvent): void {
   spinRig.halvingPeriod = event.params.halvingPeriod
   spinRig.epochPeriod = event.params.rigEpochPeriod
   spinRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)
-  spinRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_18)
+  spinRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_6)
 
   // Dutch auction state
   spinRig.currentEpochId = ZERO_BI
@@ -91,7 +93,9 @@ export function handleSpinCoreLaunched(event: SpinCoreLaunchedEvent): void {
 
   // Prize pool
   spinRig.prizePool = ZERO_BD
-  spinRig.currentOdds = new Array<BigInt>()
+  let spinRigContract = SpinRigContract.bind(rigAddress)
+  let oddsResult = spinRigContract.try_getOdds()
+  spinRig.currentOdds = oddsResult.reverted ? new Array<BigInt>() : oddsResult.value
 
   // Stats
   spinRig.totalSpins = ZERO_BI

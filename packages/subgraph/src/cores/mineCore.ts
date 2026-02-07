@@ -12,6 +12,7 @@ import {
   ZERO_BD,
   PROTOCOL_ID,
   BI_18,
+  BI_6,
   RIG_TYPE_MINE,
 } from '../constants'
 import {
@@ -82,7 +83,7 @@ export function handleMineCoreLaunched(event: CoreLaunchedEvent): void {
   mineRig.capacity = ONE_BI // Default, updated via CapacitySet event
   mineRig.epochPeriod = event.params.rigEpochPeriod
   mineRig.priceMultiplier = convertTokenToDecimal(event.params.rigPriceMultiplier, BI_18)
-  mineRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_18)
+  mineRig.minInitPrice = convertTokenToDecimal(event.params.rigMinInitPrice, BI_6)
   mineRig.activeMiners = ZERO_BI
   mineRig.totalMines = ZERO_BI
   mineRig.save()

@@ -494,9 +494,10 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
       rig = await rigArtifact.deploy(
         unitToken.address,
         paymentToken.address,
-        mockEntropy.address,
-        treasury.address,
         mockCore.address,
+        treasury.address,
+        AddressZero, // team
+        mockEntropy.address,
         config
       );
 
@@ -565,15 +566,13 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
 
       const rigArtifact = await ethers.getContractFactory("FundRig");
       rig = await rigArtifact.deploy(
-        paymentToken.address,
         unitToken.address,
-        recipient.address,
+        paymentToken.address,
+        mockCore.address,
         treasury.address,
         team.address,
-        mockCore.address,
-        INITIAL_EMISSION,
-        MIN_EMISSION,
-        HALVING_PERIOD_DAYS
+        recipient.address,
+        [INITIAL_EMISSION, MIN_EMISSION, HALVING_PERIOD_DAYS] // Config
       );
 
       await unitToken.setRig(rig.address);
@@ -797,15 +796,13 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
 
     const rigArtifact = await ethers.getContractFactory("FundRig");
     rig = await rigArtifact.deploy(
-      paymentToken.address,
       unitToken.address,
-      recipient.address,
+      paymentToken.address,
+      mockCore.address,
       treasury.address,
       team.address,
-      mockCore.address,
-      INITIAL_EMISSION,
-      MIN_EMISSION,
-      30
+      recipient.address,
+      [INITIAL_EMISSION, MIN_EMISSION, 30] // Config
     );
 
     await unitToken.setRig(rig.address);
@@ -839,7 +836,7 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
         const donationAmount = randomBigNumber(minDonation, maxDonation);
 
         await paymentToken.connect(users[u]).approve(rig.address, donationAmount);
-        await rig.connect(users[u]).fund(users[u].address, donationAmount);
+        await rig.connect(users[u]).fund(users[u].address, donationAmount, "");
 
         donations.push(donationAmount);
         totalDonated = totalDonated.add(donationAmount);
@@ -935,9 +932,10 @@ describe("FUZZ Category 6: Random bytes32 - Odds Drawing (SpinRig)", function ()
         rig = await rigArtifact.deploy(
           unitToken.address,
           paymentToken.address,
-          mockEntropy.address,
-          treasury.address,
           mockCore.address,
+          treasury.address,
+          AddressZero, // team (set later via setTeam)
+          mockEntropy.address,
           config
         );
 
@@ -957,7 +955,7 @@ describe("FUZZ Category 6: Random bytes32 - Odds Drawing (SpinRig)", function ()
           // Wait for epoch to expire so we get price=0 (fast iteration)
           await increaseTime(ONE_HOUR + 1);
 
-          const epochId = await rig.getEpochId();
+          const epochId = await rig.epochId();
           const fee = await rig.getEntropyFee();
 
           await paymentToken.connect(user0).approve(rig.address, convert("10000", 6));
@@ -966,6 +964,7 @@ describe("FUZZ Category 6: Random bytes32 - Odds Drawing (SpinRig)", function ()
             epochId,
             1961439882,
             convert("10000", 6),
+            "",
             { value: fee }
           );
 

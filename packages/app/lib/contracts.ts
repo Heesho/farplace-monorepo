@@ -1,15 +1,15 @@
 export const CONTRACT_ADDRESSES = {
   // Per-rig-type Core contracts
-  mineCore: "0x56EeA24F447A1609784566c84f40554B5742f7B6",
-  spinCore: "0x3CD87981596590E08dfad6Bf294406f05A6f5481",
-  fundCore: "0x9517B14d24DD4644347c80985473627866a6Eb40",
+  mineCore: "0x5d98C870276D270bD876b694444CC8647a331f31",
+  spinCore: "0x58e3777B0baea6D47F21689B5b70C092A09ae42b",
+  fundCore: "0xb510499f2239103b9daC96b23657f20EF6F2a110",
   // Per-rig-type Multicall contracts
-  mineMulticall: "0xD84568ad3876f9f707A6034292D69fE26827D0C7",
-  spinMulticall: "0x81Af1ba8f13A1Bc79e76cb0dD62Ce9313d88C0EA",
-  fundMulticall: "0x015ceD893eBcC1403662587CdbEfe25738e61A7F",
+  mineMulticall: "0x9ca9D1D06b6027F358CEe08aA32FEa316664480d",
+  spinMulticall: "0x11ba1C6609f7718db40e2fCcDe9adf4703DF0CC6",
+  fundMulticall: "0x655cE15715fd3FadA60eCcb1FD46b91F2B80b956",
   // Legacy aliases (point to mine variants for backwards compat)
-  core: "0x56EeA24F447A1609784566c84f40554B5742f7B6",
-  multicall: "0xD84568ad3876f9f707A6034292D69fE26827D0C7",
+  core: "0x5d98C870276D270bD876b694444CC8647a331f31",
+  multicall: "0x9ca9D1D06b6027F358CEe08aA32FEa316664480d",
   // Token addresses (Mock tokens for staging)
   usdc: "0xe90495BE187d434e23A9B1FeC0B6Ce039700870e", // Mock USDC
   // Uniswap V2 on Base
@@ -121,28 +121,6 @@ export const MULTICALL_ABI = [
       { internalType: "string", name: "slotUri", type: "string" },
     ],
     name: "mine",
-    outputs: [],
-    stateMutability: "payable",
-    type: "function",
-  },
-  // Mine multiple slots
-  {
-    inputs: [
-      { internalType: "address", name: "rig", type: "address" },
-      {
-        components: [
-          { internalType: "uint256", name: "index", type: "uint256" },
-          { internalType: "uint256", name: "epochId", type: "uint256" },
-          { internalType: "uint256", name: "maxPrice", type: "uint256" },
-          { internalType: "string", name: "slotUri", type: "string" },
-        ],
-        internalType: "struct Multicall.MineParams[]",
-        name: "params",
-        type: "tuple[]",
-      },
-      { internalType: "uint256", name: "deadline", type: "uint256" },
-    ],
-    name: "mineMultiple",
     outputs: [],
     stateMutability: "payable",
     type: "function",
@@ -306,20 +284,6 @@ export const MULTICALL_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // estimateMineMultipleCost function
-  {
-    inputs: [
-      { internalType: "address", name: "rig", type: "address" },
-      { internalType: "uint256[]", name: "indices", type: "uint256[]" },
-    ],
-    name: "estimateMineMultipleCost",
-    outputs: [
-      { internalType: "uint256", name: "totalEntropyFee", type: "uint256" },
-      { internalType: "uint256", name: "totalQuoteNeeded", type: "uint256" },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
   // Core and token addresses
   {
     inputs: [],
@@ -378,6 +342,7 @@ export const SPIN_MULTICALL_ABI = [
       { internalType: "uint256", name: "epochId", type: "uint256" },
       { internalType: "uint256", name: "deadline", type: "uint256" },
       { internalType: "uint256", name: "maxPrice", type: "uint256" },
+      { internalType: "string", name: "_uri", type: "string" },
     ],
     name: "spin",
     outputs: [],
@@ -529,6 +494,7 @@ export const FUND_MULTICALL_ABI = [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
       { internalType: "uint256", name: "amount", type: "uint256" },
+      { internalType: "string", name: "_uri", type: "string" },
     ],
     name: "fund",
     outputs: [],
@@ -940,6 +906,13 @@ export const RIG_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "getOdds",
+    outputs: [{ internalType: "uint256[]", name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
 
 // Auction contract ABI
@@ -1125,7 +1098,7 @@ export const LAUNCH_DEFAULTS = {
   auctionMinInitPrice: BigInt("1000000000000000000000"), // 1000 LP
 } as const;
 
-// Mock token mint ABI - for test minting on MockUSDC
+// Mock USDC mint ABI (for staging/testing only)
 export const MOCK_MINT_ABI = [
   {
     inputs: [
@@ -1139,7 +1112,7 @@ export const MOCK_MINT_ABI = [
   },
 ] as const;
 
-// Uniswap V2 Router ABI (only addLiquidity)
+// Uniswap V2 Router ABI
 export const UNIV2_ROUTER_ABI = [
   {
     inputs: [
@@ -1159,6 +1132,49 @@ export const UNIV2_ROUTER_ABI = [
       { internalType: "uint256", name: "liquidity", type: "uint256" },
     ],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "amountIn", type: "uint256" },
+      { internalType: "address[]", name: "path", type: "address[]" },
+    ],
+    name: "getAmountsOut",
+    outputs: [
+      { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "amountIn", type: "uint256" },
+      { internalType: "uint256", name: "amountOutMin", type: "uint256" },
+      { internalType: "address[]", name: "path", type: "address[]" },
+      { internalType: "address", name: "to", type: "address" },
+      { internalType: "uint256", name: "deadline", type: "uint256" },
+    ],
+    name: "swapExactTokensForTokens",
+    outputs: [
+      { internalType: "uint256[]", name: "amounts", type: "uint256[]" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+// Uniswap V2 Factory ABI
+export const UNIV2_FACTORY_ABI = [
+  {
+    inputs: [
+      { internalType: "address", name: "tokenA", type: "address" },
+      { internalType: "address", name: "tokenB", type: "address" },
+    ],
+    name: "getPair",
+    outputs: [
+      { internalType: "address", name: "pair", type: "address" },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ] as const;

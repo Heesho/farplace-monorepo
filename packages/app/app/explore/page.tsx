@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Search, Zap, Clock, Star, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { NavBar } from "@/components/nav-bar";
 import { useExploreRigs, type RigListItem, type SortOption } from "@/hooks/useAllRigs";
 import { useBatchMetadata } from "@/hooks/useMetadata";
@@ -20,12 +21,12 @@ function formatMarketCap(mcap: number): string {
 function rigTypeGradient(rigType: string): string {
   switch (rigType) {
     case "spin":
-      return "from-purple-500 to-violet-600";
+      return "from-purple-500 to-purple-700";
     case "fund":
-      return "from-sky-500 to-blue-600";
+      return "from-emerald-500 to-emerald-700";
     case "mine":
     default:
-      return "from-zinc-500 to-zinc-600";
+      return "from-blue-500 to-blue-700";
   }
 }
 
@@ -35,12 +36,13 @@ function Sparkline({ data, isPositive }: { data: number[]; isPositive: boolean }
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min;
+  const pad = 4; // padding so strokes aren't clipped at edges
 
+  const divisor = data.length > 1 ? data.length - 1 : 1;
   const points = data
     .map((value, i) => {
-      const x = (i / (data.length - 1)) * 100;
-      // If flat line (range=0), draw in the middle (y=50)
-      const y = range === 0 ? 50 : 100 - ((value - min) / range) * 100;
+      const x = pad + (i / divisor) * (100 - pad * 2);
+      const y = range === 0 ? 50 : pad + (1 - (value - min) / range) * (100 - pad * 2);
       return `${x},${y}`;
     })
     .join(" ");
@@ -53,7 +55,7 @@ function Sparkline({ data, isPositive }: { data: number[]; isPositive: boolean }
     >
       <polyline
         fill="none"
-        stroke={isPositive ? "#a1a1aa" : "#52525b"}
+        stroke="#a1a1aa"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -126,7 +128,7 @@ function SkeletonRow() {
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("bump");
-  const { address: account, isConnected, isInFrame, isConnecting, connect } = useFarcaster();
+  const { address: account } = useFarcaster();
 
   const { rigs, isLoading } = useExploreRigs(sortBy, searchQuery, account);
 
@@ -136,7 +138,7 @@ export default function ExplorePage() {
 
   // Batch fetch sparkline data for all units
   const unitAddresses = rigs.map((r) => r.unitAddress).filter(Boolean);
-  const { getSparkline } = useSparklineData(unitAddresses);
+  const { getSparkline, getChange24h } = useSparklineData(unitAddresses);
 
   const isSearching = searchQuery.length > 0;
   const showEmpty = !isLoading && rigs.length === 0;
@@ -152,23 +154,8 @@ export default function ExplorePage() {
       >
         {/* Header */}
         <div className="px-4 pb-2">
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h1 className="text-2xl font-semibold tracking-tight">Explore</h1>
-            {isConnected && account ? (
-              <div className="px-3 py-1.5 rounded-full bg-secondary text-[13px] text-muted-foreground font-mono">
-                {account.slice(0, 6)}...{account.slice(-4)}
-              </div>
-            ) : (
-              !isInFrame && (
-                <button
-                  onClick={() => connect()}
-                  disabled={isConnecting}
-                  className="px-4 py-2 rounded-xl bg-white text-black text-[13px] font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
-                >
-                  {isConnecting ? "Connecting..." : "Connect Wallet"}
-                </button>
-              )
-            )}
           </div>
 
           {/* Search Bar */}
@@ -176,7 +163,7 @@ export default function ExplorePage() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search tokens..."
+              placeholder="Search coins..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-11 pl-10 pr-10 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-white/20 text-[15px] transition-shadow"
@@ -228,67 +215,83 @@ export default function ExplorePage() {
           {/* Loaded - render rig rows */}
           {!isLoading && rigs.length > 0 && (
             <div>
-              {rigs.map((rig, index) => (
-                <Link
-                  key={rig.address}
-                  href={`/rig/${rig.address}`}
-                  className="grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4 transition-all duration-200 hover:bg-white/[0.02]"
-                  style={{
-                    borderBottom:
-                      index < rigs.length - 1
-                        ? "1px solid rgba(255,255,255,0.06)"
-                        : "none",
-                  }}
-                >
-                  {/* Left side - Logo, Symbol, Name */}
-                  <div className="flex items-center gap-3">
-                    <TokenLogo
-                      rigUri={rig.rigUri}
-                      name={rig.tokenName}
-                      rigType={rig.rigType}
-                      getLogoUrl={getLogoUrl}
-                    />
-                    <div>
-                      <div className="font-semibold text-[15px]">
-                        {rig.tokenSymbol.length > 6
-                          ? `${rig.tokenSymbol.slice(0, 6)}...`
-                          : rig.tokenSymbol}
-                      </div>
-                      <div className="text-[13px] text-muted-foreground">
-                        {rig.tokenName.length > 12
-                          ? `${rig.tokenName.slice(0, 12)}...`
-                          : rig.tokenName}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Middle - Sparkline */}
-                  <div className="flex justify-center">
-                    <Sparkline
-                      data={getSparkline(rig.unitAddress, rig.priceUsd)}
-                      isPositive={rig.change24h >= 0}
-                    />
-                  </div>
-
-                  {/* Right side - Market cap and 24h change */}
-                  <div className="text-right">
-                    <div className="font-medium text-[15px] tabular-nums">
-                      {rig.marketCapUsd > 0
-                        ? formatMarketCap(rig.marketCapUsd)
-                        : "--"}
-                    </div>
-                    <div
-                      className={`text-[13px] tabular-nums ${
-                        rig.change24h >= 0 ? "text-zinc-400" : "text-zinc-500"
-                      }`}
+              <AnimatePresence initial={false}>
+                {rigs.map((rig, index) => (
+                  <motion.div
+                    key={rig.address}
+                    layout
+                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <Link
+                      href={`/rig/${rig.address}`}
+                      className="grid grid-cols-[1.2fr_1fr_0.8fr] items-center gap-2 py-4 transition-colors duration-200 hover:bg-white/[0.02]"
+                      style={{
+                        borderBottom:
+                          index < rigs.length - 1
+                            ? "1px solid rgba(255,255,255,0.06)"
+                            : "none",
+                      }}
                     >
-                      {rig.marketCapUsd > 0
-                        ? `${rig.change24h >= 0 ? "+" : ""}${rig.change24h.toFixed(2)}%`
-                        : "--"}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+                      {/* Left side - Logo, Symbol, Name */}
+                      <div className="flex items-center gap-3">
+                        <TokenLogo
+                          rigUri={rig.rigUri}
+                          name={rig.tokenName}
+                          rigType={rig.rigType}
+                          getLogoUrl={getLogoUrl}
+                        />
+                        <div>
+                          <div className="font-semibold text-[15px]">
+                            {rig.tokenSymbol.length > 6
+                              ? `${rig.tokenSymbol.slice(0, 6)}...`
+                              : rig.tokenSymbol}
+                          </div>
+                          <div className="text-[13px] text-muted-foreground">
+                            {rig.tokenName.length > 12
+                              ? `${rig.tokenName.slice(0, 12)}...`
+                              : rig.tokenName}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Middle - Sparkline */}
+                      <div className="flex justify-center">
+                        {(() => {
+                          const change = getChange24h(rig.unitAddress, rig.priceUsd);
+                          return (
+                            <Sparkline
+                              data={getSparkline(rig.unitAddress, rig.priceUsd)}
+                              isPositive={change >= 0}
+                            />
+                          );
+                        })()}
+                      </div>
+
+                      {/* Right side - Market cap and 24h change */}
+                      <div className="text-right">
+                        <div className="font-medium text-[15px] tabular-nums">
+                          {rig.marketCapUsd > 0
+                            ? formatMarketCap(rig.marketCapUsd)
+                            : "--"}
+                        </div>
+                        {(() => {
+                          const change = getChange24h(rig.unitAddress, rig.priceUsd);
+                          return (
+                            <div className="text-[13px] tabular-nums text-zinc-400">
+                              {rig.marketCapUsd > 0
+                                ? `${change >= 0 ? "+" : ""}${change.toFixed(2)}%`
+                                : "--"}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
 
@@ -296,7 +299,7 @@ export default function ExplorePage() {
           {showEmpty && isSearching && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Search className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-[15px] font-medium">No tokens found</p>
+              <p className="text-[15px] font-medium">No coins found</p>
               <p className="text-[13px] mt-1 opacity-70">Try a different search term</p>
             </div>
           )}
@@ -304,8 +307,8 @@ export default function ExplorePage() {
           {showEmpty && !isSearching && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Zap className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-[15px] font-medium">No tokens deployed yet</p>
-              <p className="text-[13px] mt-1 opacity-70">Be the first to launch a token</p>
+              <p className="text-[15px] font-medium">No coins launched yet</p>
+              <p className="text-[13px] mt-1 opacity-70">Be the first to launch a coin</p>
             </div>
           )}
         </div>

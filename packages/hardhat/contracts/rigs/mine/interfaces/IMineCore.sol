@@ -39,7 +39,7 @@ interface IMineCore {
     function uniswapV2Factory() external view returns (address);
     function uniswapV2Router() external view returns (address);
     function unitFactory() external view returns (address);
-    function rigFactory() external view returns (address);
+    function mineRigFactory() external view returns (address);
     function auctionFactory() external view returns (address);
     function entropy() external view returns (address);
 
@@ -53,7 +53,7 @@ interface IMineCore {
     function rigToIndex(address rig) external view returns (uint256);
     function rigToLP(address rig) external view returns (address);
 
-    // Functions
+    // External functions
     function launch(LaunchParams calldata params)
         external
         returns (address unit, address rig, address auction, address lpToken);
@@ -61,31 +61,4 @@ interface IMineCore {
     // Restricted functions
     function setProtocolFeeAddress(address _protocolFeeAddress) external;
     function setMinUsdcForLaunch(uint256 _minUsdcForLaunch) external;
-
-    // Events
-    event MineCore__Launched(
-        address launcher,
-        address quoteToken,
-        address unit,
-        address rig,
-        address auction,
-        address lpToken,
-        string tokenName,
-        string tokenSymbol,
-        string uri,
-        uint256 usdcAmount,
-        uint256 unitAmount,
-        uint256 initialUps,
-        uint256 tailUps,
-        uint256 halvingAmount,
-        uint256 rigEpochPeriod,
-        uint256 rigPriceMultiplier,
-        uint256 rigMinInitPrice,
-        uint256 auctionInitPrice,
-        uint256 auctionEpochPeriod,
-        uint256 auctionPriceMultiplier,
-        uint256 auctionMinInitPrice
-    );
-    event MineCore__ProtocolFeeAddressSet(address protocolFeeAddress);
-    event MineCore__MinUsdcForLaunchSet(uint256 minUsdcForLaunch);
 }

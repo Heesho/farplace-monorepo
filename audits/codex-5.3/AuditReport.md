@@ -10,6 +10,7 @@ The codebase is generally structured and heavily tested, with good use of `Reent
 Additionally, three medium issues were identified around entropy ETH overpayment retention, unsupported token behavior enforcement, and protocol fee recipient DoS sensitivity.
 
 No proxy upgrade risk was identified (contracts are non-upgradeable).
+As of **February 6, 2026**, all reported findings are explicitly accepted risks by project owner decision for current release posture.
 
 ---
 
@@ -142,6 +143,8 @@ See full breakdown: `audits/codex-5.3/Architecture.md`.
 
 ### H-01: SpinRig callback-time payout enables delayed-settlement extraction
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - Payout amount is computed against the **live pool at callback time**, not spin time. Under delayed/reordered callbacks, economic outcome diverges from expected spin context.
 - External callback dependency (entropy/provider/liveness) is a hostile surface in this threat model.
@@ -195,6 +198,8 @@ uint256 winAmount = pool * oddsBps / DIVISOR;
 
 ### H-02: MineRig capacity updates do not rebalance existing slot UPS
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - `setCapacity` updates only global `capacity`; existing slots keep legacy cached `slot.ups` until individually mined.
 - A malicious owner can preserve higher-rate legacy slots while adding lower-rate new slots, then realize disproportionate minting.
@@ -245,6 +250,8 @@ function setCapacity(uint256 _capacity) external onlyOwner {
 
 ### M-01: Entropy fee overpayment can trap ETH in rig contracts
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - Direct calls to payable entropy paths accept `msg.value > fee` and retain excess ETH in contract.
 - No native ETH withdrawal/recovery path exists.
@@ -277,6 +284,8 @@ function setCapacity(uint256 _capacity) external onlyOwner {
 
 ### M-02: Unsupported ERC20 token behavior is not enforced onchain
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - Protocol expects standard ERC20s but accepts arbitrary quote/payment tokens at launch.
 - Fee-on-transfer, rebasing, or blocklist behavior can break accounting or liveness.
@@ -308,6 +317,8 @@ function setCapacity(uint256 _capacity) external onlyOwner {
 
 ### M-03: Protocol fee recipient mutability can induce global fee-flow DoS
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - Core owner can set protocol fee recipient to any address.
 - If recipient cannot accept token transfer semantics, user-facing rig actions may revert system-wide for that rig class.
@@ -338,6 +349,8 @@ function setCapacity(uint256 _capacity) external onlyOwner {
 
 ### L-01: Unbounded multicall read loops can be gas-heavy on large ranges
 
+**Disposition**: Accepted risk (project owner decision, February 6, 2026).
+
 **Severity justification**
 - User-supplied ranges/arrays in view helpers can become impractical at large sizes.
 
@@ -364,15 +377,15 @@ function setCapacity(uint256 _capacity) external onlyOwner {
 ---
 
 ## Remediation Roadmap
-1. **Immediate (pre-mainnet)**
-   - Fix `H-01` spin settlement model (snapshot + callback expiry policy).
-   - Fix `H-02` capacity/UPS consistency in MineRig.
-2. **Short term**
-   - Add entropy overpayment handling (`M-01`).
-   - Enforce quote token support policy onchain (`M-02`).
-3. **Operational hardening**
-   - Harden admin mutations with timelock/two-step flows (`M-03`).
-   - Add pagination caps and API guidance for multicall views (`L-01`).
+1. **Current posture**
+   - All findings accepted as known design/governance/UX risks for release.
+2. **Optional hardening (recommended)**
+   - Snapshot-based spin settlement or callback liveness guardrails (`H-01`).
+   - Explicit capacity economics policy controls (`H-02`).
+   - Exact entropy fee or refund model (`M-01`).
+   - Onchain quote-token allowlist (`M-02`).
+   - Timelocked/two-step protocol fee recipient changes (`M-03`).
+   - Multicall pagination limits (`L-01`).
 
 ---
 

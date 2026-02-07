@@ -39,6 +39,7 @@ contract FundMulticall {
         uint256 todayEmission;
         uint256 todayTotalDonated;
         uint256 startTime;
+        address recipient;
         address treasury;
         address team;
         // Global rig state
@@ -101,15 +102,16 @@ contract FundMulticall {
     function fund(
         address rig,
         address account,
-        uint256 amount
+        uint256 amount,
+        string calldata _uri
     ) external {
         if (!IFundCore(core).rigToIsRig(rig)) revert FundMulticall__InvalidRig();
 
-        address paymentToken = IFundRig(rig).paymentToken();
-        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(paymentToken).safeApprove(rig, 0);
-        IERC20(paymentToken).safeApprove(rig, amount);
-        IFundRig(rig).fund(account, amount);
+        address quoteToken = IFundRig(rig).quote();
+        IERC20(quoteToken).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(quoteToken).safeApprove(rig, 0);
+        IERC20(quoteToken).safeApprove(rig, amount);
+        IFundRig(rig).fund(account, amount, _uri);
     }
 
     /**
@@ -163,7 +165,7 @@ contract FundMulticall {
         address lpToken = IAuction(auction).paymentToken();
         uint256 price = IAuction(auction).getPrice();
         address[] memory assets = new address[](1);
-        assets[0] = IFundRig(rig).paymentToken();
+        assets[0] = IFundRig(rig).quote();
 
         IERC20(lpToken).safeTransferFrom(msg.sender, address(this), price);
         IERC20(lpToken).safeApprove(auction, 0);
@@ -224,8 +226,9 @@ contract FundMulticall {
 
         state.currentDay = day;
         state.todayEmission = IFundRig(rig).getDayEmission(day);
-        state.todayTotalDonated = IFundRig(rig).getDayTotal(day);
+        state.todayTotalDonated = IFundRig(rig).dayToTotalDonated(day);
         state.startTime = IFundRig(rig).startTime();
+        state.recipient = IFundRig(rig).recipient();
         state.treasury = IFundRig(rig).treasury();
         state.team = IFundRig(rig).team();
 
@@ -244,11 +247,11 @@ contract FundMulticall {
         state.rigUri = IFundRig(rig).uri();
 
         // User balances
-        address paymentToken = IFundRig(rig).paymentToken();
-        state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(paymentToken).balanceOf(account);
+        address quoteToken = IFundRig(rig).quote();
+        state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
         state.accountUsdcBalance = account == address(0) ? 0 : IERC20(usdc).balanceOf(account);
         state.accountUnitBalance = account == address(0) ? 0 : IERC20(unitToken).balanceOf(account);
-        state.accountTodayDonation = account == address(0) ? 0 : IFundRig(rig).getUserDonation(day, account);
+        state.accountTodayDonation = account == address(0) ? 0 : IFundRig(rig).dayAccountToDonation(day, account);
 
         return state;
     }
@@ -384,9 +387,9 @@ contract FundMulticall {
         state.paymentTokenPrice =
             lpTotalSupply == 0 ? 0 : IERC20(usdc).balanceOf(state.paymentToken) * 2e30 / lpTotalSupply;
 
-        address paymentToken = IFundRig(rig).paymentToken();
-        state.quoteAccumulated = IERC20(paymentToken).balanceOf(auction);
-        state.accountQuoteBalance = account == address(0) ? 0 : IERC20(paymentToken).balanceOf(account);
+        address quoteToken = IFundRig(rig).quote();
+        state.quoteAccumulated = IERC20(quoteToken).balanceOf(auction);
+        state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
         state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(state.paymentToken).balanceOf(account);
 
         return state;

@@ -214,9 +214,9 @@ contract FundCore is Ownable, ReentrancyGuard {
 
         // Deploy Auction with LP as payment token (receives treasury fees, burns LP)
         auction = IAuctionFactory(auctionFactory).deploy(
-            params.auctionInitPrice,
             lpToken,
             DEAD_ADDRESS,
+            params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,
             params.auctionMinInitPrice
@@ -227,12 +227,12 @@ contract FundCore is Ownable, ReentrancyGuard {
         // Treasury is the Auction contract (receives 45% of donations)
         // Team is the launcher (receives 4% of donations)
         rig = IFundRigFactory(fundRigFactory).deploy(
-            params.quoteToken,
             unit,
-            params.recipient, // recipient (50%)
+            params.quoteToken,
+            address(this), // core
             auction, // treasury (45%)
             params.launcher, // team (4%)
-            address(this), // core
+            params.recipient, // recipient (50%)
             params.initialEmission,
             params.minEmission,
             params.halvingPeriod
@@ -303,16 +303,6 @@ contract FundCore is Ownable, ReentrancyGuard {
         emit FundCore__MinUsdcForLaunchSet(_minUsdcForLaunch);
     }
 
-    /*----------  VIEW FUNCTIONS  ---------------------------------------*/
-
-    /**
-     * @notice Returns the number of deployed rigs.
-     * @return The length of the rigs array
-     */
-    function rigsLength() external view returns (uint256) {
-        return rigs.length;
-    }
-
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
@@ -329,6 +319,16 @@ contract FundCore is Ownable, ReentrancyGuard {
         if (bytes(params.tokenSymbol).length == 0) revert FundCore__EmptyTokenSymbol();
         if (bytes(params.uri).length == 0) revert FundCore__EmptyUri();
         if (params.unitAmount == 0) revert FundCore__ZeroUnitAmount();
+    }
+
+    /*----------  VIEW FUNCTIONS  ---------------------------------------*/
+
+    /**
+     * @notice Returns the number of deployed rigs.
+     * @return The length of the rigs array
+     */
+    function rigsLength() external view returns (uint256) {
+        return rigs.length;
     }
 
 }

@@ -2,7 +2,7 @@ import "@/app/globals.css";
 import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 
-const appDomain = "https://glazecorp-franchise.vercel.app";
+const appDomain = process.env.NEXT_PUBLIC_APP_URL || "https://farplace.app";
 const heroImageUrl = `${appDomain}/media/hero.png`;
 const splashImageUrl = `${appDomain}/media/splash.png`;
 
@@ -10,10 +10,10 @@ const miniAppEmbed = {
   version: "1",
   imageUrl: heroImageUrl,
   button: {
-    title: "Open a Franchise!",
+    title: "Launch on Farplace!",
     action: {
       type: "launch_miniapp" as const,
-      name: "Franchiser",
+      name: "Farplace",
       url: appDomain,
       splashImageUrl,
       splashBackgroundColor: "#000000",
@@ -22,11 +22,11 @@ const miniAppEmbed = {
 };
 
 export const metadata: Metadata = {
-  title: "Franchiser",
-  description: "Instantly deploy tokens as mining projects. Customize your settings and launch with the click of a button.",
+  title: "Farplace",
+  description: "Launch and distribute tokens through gamified mechanisms. No presales, no VCs — just fair distribution.",
   openGraph: {
-    title: "Franchiser, by Glaze Corp",
-    description: "Instantly Deploy Mining Tokens.",
+    title: "Farplace",
+    description: "Launch and distribute tokens through gamified mechanisms.",
     url: appDomain,
     images: [
       {

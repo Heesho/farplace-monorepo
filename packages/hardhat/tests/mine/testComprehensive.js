@@ -771,7 +771,7 @@ describe("Comprehensive Security Tests", function () {
             }
 
             const slot = await rig.getSlot(0);
-            expect(slot.epochId).to.equal(50);
+            expect(slot.epochId).to.equal(51);
         });
 
         it("STRESS: Launch 10 rigs rapidly", async function () {
@@ -811,7 +811,7 @@ describe("Comprehensive Security Tests", function () {
             }
 
             const slot = await rig.getSlot(0);
-            expect(slot.epochId).to.equal(15);
+            expect(slot.epochId).to.equal(16);
         });
 
         it("STRESS: Large time jumps", async function () {
@@ -972,7 +972,7 @@ describe("Comprehensive Security Tests", function () {
 
                 // Contract should still be functional
                 const slot = await rig.getSlot(0);
-                expect(slot.epochId).to.equal(3);
+                expect(slot.epochId).to.equal(4);
             }
         });
 

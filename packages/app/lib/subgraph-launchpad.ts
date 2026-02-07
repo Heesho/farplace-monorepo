@@ -136,6 +136,7 @@ export type SubgraphSpin = {
   spinner: { id: string };
   epochId: string;
   price: string; // BigDecimal (USDC amount)
+  uri: string;
   won: boolean;
   winAmount: string; // BigDecimal (Unit tokens won)
   oddsBps: string;
@@ -148,6 +149,7 @@ export type SubgraphDonation = {
   donor: { id: string };
   day: string;
   amount: string; // BigDecimal (USDC)
+  uri: string;
   recipientAmount: string; // BigDecimal
   timestamp: string;
   txHash: string;
@@ -441,6 +443,7 @@ export const GET_SPINS_QUERY = gql`
       }
       epochId
       price
+      uri
       won
       winAmount
       oddsBps
@@ -465,6 +468,7 @@ export const GET_DONATIONS_QUERY = gql`
       }
       day
       amount
+      uri
       recipientAmount
       timestamp
       txHash
@@ -566,6 +570,15 @@ export const GET_UNITS_BY_CREATED_AT_QUERY = gql`
   }
 `;
 
+// Get all units (for portfolio balance checks)
+export const GET_ALL_UNITS_QUERY = gql`
+  query GetAllUnits($first: Int!) {
+    units(first: $first, orderBy: createdAt, orderDirection: desc) {
+      ${UNIT_LIST_FIELDS}
+    }
+  }
+`;
+
 // =============================================================================
 // API Functions
 // =============================================================================
@@ -576,7 +589,8 @@ export async function getLaunchpadStats(): Promise<SubgraphLaunchpad | null> {
       protocol: SubgraphLaunchpad | null;
     }>(GET_LAUNCHPAD_STATS_QUERY);
     return data.protocol;
-  } catch {
+  } catch (error) {
+    console.error("[getLaunchpadStats] Error:", error);
     return null;
   }
 }
@@ -599,7 +613,8 @@ export async function getRigs(
       orderDirection,
     });
     return data.rigs;
-  } catch {
+  } catch (error) {
+    console.error("[getRigs] Error:", error);
     return [];
   }
 }
@@ -617,7 +632,8 @@ export async function searchRigs(
       }
     );
     return data.units;
-  } catch {
+  } catch (error) {
+    console.error("[searchRigs] Error:", error);
     return [];
   }
 }
@@ -631,7 +647,8 @@ export async function getRig(id: string): Promise<SubgraphRig | null> {
       }
     );
     return data.rig;
-  } catch {
+  } catch (error) {
+    console.error("[getRig] Error:", error);
     return null;
   }
 }
@@ -687,7 +704,8 @@ export async function getAccount(id: string): Promise<SubgraphAccount | null> {
       }
     );
     return data.account;
-  } catch {
+  } catch (error) {
+    console.error("[getAccount] Error:", error);
     return null;
   }
 }
@@ -761,6 +779,21 @@ export async function getUnitsByCreatedAt(
     return data.units ?? [];
   } catch (error) {
     console.error("[getUnitsByCreatedAt] Error:", error);
+    return [];
+  }
+}
+
+export async function getAllUnits(
+  first = 100
+): Promise<SubgraphUnitListItem[]> {
+  try {
+    const data = await client.request<{ units: SubgraphUnitListItem[] }>(
+      GET_ALL_UNITS_QUERY,
+      { first }
+    );
+    return data.units ?? [];
+  } catch (error) {
+    console.error("[getAllUnits] Error:", error);
     return [];
   }
 }

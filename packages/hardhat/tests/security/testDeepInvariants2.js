@@ -59,15 +59,13 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
 
     const FundRig = await ethers.getContractFactory("FundRig");
     rig = await FundRig.deploy(
-      paymentToken.address,
       unitToken.address,
-      recipient.address,
+      paymentToken.address,
+      mockCore.address,
       treasury.address,
       team.address,
-      mockCore.address,
-      convert("1000", 18),  // initialEmission
-      convert("10", 18),    // minEmission
-      30                    // halvingPeriod in days
+      recipient.address,
+      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
     );
 
     await unitToken.setRig(rig.address);
@@ -103,7 +101,7 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
         const protocolBefore = await paymentToken.balanceOf(protocol.address);
 
         await paymentToken.connect(user0).approve(rig.address, amount);
-        await rig.connect(user0).fund(user0.address, amount);
+        await rig.connect(user0).fund(user0.address, amount, "");
 
         const recipientReceived = (await paymentToken.balanceOf(recipient.address)).sub(recipientBefore);
         const treasuryReceived = (await paymentToken.balanceOf(treasury.address)).sub(treasuryBefore);
@@ -141,15 +139,13 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
 
       const FundRig = await ethers.getContractFactory("FundRig");
       rigNoTeam = await FundRig.deploy(
-        paymentToken.address,
         unitNoTeam.address,
-        recipient.address,
+        paymentToken.address,
+        mockCore.address,
         treasury.address,
         AddressZero,           // team == address(0)
-        mockCore.address,
-        convert("1000", 18),
-        convert("10", 18),
-        30
+        recipient.address,
+        [convert("1000", 18), convert("10", 18), 30] // Config
       );
 
       await unitNoTeam.setRig(rigNoTeam.address);
@@ -170,7 +166,7 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
         const protocolBefore = await paymentToken.balanceOf(protocol.address);
 
         await paymentToken.connect(user0).approve(rigNoTeam.address, amount);
-        await rigNoTeam.connect(user0).fund(user0.address, amount);
+        await rigNoTeam.connect(user0).fund(user0.address, amount, "");
 
         const recipientReceived = (await paymentToken.balanceOf(recipient.address)).sub(recipientBefore);
         const treasuryReceived = (await paymentToken.balanceOf(treasury.address)).sub(treasuryBefore);
@@ -214,7 +210,7 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
 
       for (let i = 0; i < amounts.length; i++) {
         await paymentToken.connect(users[i]).approve(rig.address, amounts[i]);
-        await rig.connect(users[i]).fund(users[i].address, amounts[i]);
+        await rig.connect(users[i]).fund(users[i].address, amounts[i], "");
 
         const rigBalance = await paymentToken.balanceOf(rig.address);
         expect(rigBalance).to.equal(0,
@@ -250,15 +246,13 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
     const FundRig = await ethers.getContractFactory("FundRig");
     rig = await FundRig.deploy(
-      paymentToken.address,
       unitToken.address,
-      recipient.address,
+      paymentToken.address,
+      mockCore.address,
       treasury.address,
       team.address,
-      mockCore.address,
-      convert("1000", 18),  // initialEmission: 1000 tokens/day
-      convert("10", 18),    // minEmission: 10 tokens/day
-      30                    // halvingPeriod: 30 days
+      recipient.address,
+      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
     );
 
     await unitToken.setRig(rig.address);
@@ -280,7 +274,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
       // User0 donates on day 0
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
-      await rig.connect(user0).fund(user0.address, convert("100", 6));
+      await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
       // Advance to day 30
       await increaseTime(30 * ONE_DAY);
@@ -290,7 +284,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
       // User0 donates on day 30
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
-      await rig.connect(user0).fund(user0.address, convert("100", 6));
+      await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
       // Advance to day 60
       await increaseTime(30 * ONE_DAY);
@@ -300,7 +294,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
       // User0 donates on day 60
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
-      await rig.connect(user0).fund(user0.address, convert("100", 6));
+      await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
       // Advance past day 60 to allow claiming
       await increaseTime(ONE_DAY);
@@ -352,7 +346,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
           const amount = donationMatrix[d][u];
           if (amount.gt(0)) {
             await paymentToken.connect(users[u]).approve(rig.address, amount);
-            await rig.connect(users[u]).fund(users[u].address, amount);
+            await rig.connect(users[u]).fund(users[u].address, amount, "");
           }
         }
 
@@ -405,17 +399,17 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
       // Create donations on three separate days
       dayA = await rig.currentDay();
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
-      await rig.connect(user0).fund(user0.address, convert("100", 6));
+      await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY);
       dayB = await rig.currentDay();
       await paymentToken.connect(user0).approve(rig.address, convert("200", 6));
-      await rig.connect(user0).fund(user0.address, convert("200", 6));
+      await rig.connect(user0).fund(user0.address, convert("200", 6), "");
 
       await increaseTime(ONE_DAY);
       dayC = await rig.currentDay();
       await paymentToken.connect(user0).approve(rig.address, convert("300", 6));
-      await rig.connect(user0).fund(user0.address, convert("300", 6));
+      await rig.connect(user0).fund(user0.address, convert("300", 6), "");
 
       // Advance past dayC so all days can be claimed
       await increaseTime(ONE_DAY);

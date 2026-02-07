@@ -61,6 +61,8 @@ export function handleSync(event: SyncEvent): void {
   let unit = getUnitByLpPair(pairAddress)
   if (unit === null) return
 
+  let previousLiquidity = unit.liquidity
+
   let pair = UniswapV2Pair.bind(pairAddress)
   let token0Result = pair.try_token0()
   if (token0Result.reverted) return
@@ -99,6 +101,7 @@ export function handleSync(event: SyncEvent): void {
 
   // Update liquidity (USDC side)
   unit.liquidity = reserveUsdc
+  unit.liquidityUSD = reserveUsdc
 
   // Update hour/day data OHLC
   let hourData = getOrCreateUnitHourData(unit, event)
@@ -129,8 +132,12 @@ export function handleSync(event: SyncEvent): void {
 
   // Update Protocol liquidity
   let protocol = getOrCreateProtocol()
-  // Note: We'd need to sum all units' liquidity for accurate total
-  // For simplicity, we can track this separately or recalculate periodically
+  protocol.totalLiquidityUsdc = protocol.totalLiquidityUsdc
+    .minus(previousLiquidity)
+    .plus(reserveUsdc)
+  if (protocol.totalLiquidityUsdc.lt(ZERO_BD)) {
+    protocol.totalLiquidityUsdc = ZERO_BD
+  }
   protocol.lastUpdated = event.block.timestamp
   protocol.save()
 }
@@ -222,6 +229,11 @@ export function handleSwap(event: SwapEvent): void {
   dayData.volumeUsdc = dayData.volumeUsdc.plus(amountUsdc)
   dayData.txCount = dayData.txCount.plus(ONE_BI)
   dayData.save()
+
+  // Keep convenience aggregates in sync for API consumers.
+  unit.volume24h = dayData.volumeUsdc
+  unit.txCount24h = dayData.txCount
+  unit.save()
 
   // Update Protocol volume
   let protocol = getOrCreateProtocol()

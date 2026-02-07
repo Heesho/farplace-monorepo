@@ -62,17 +62,17 @@ contract Auction is ReentrancyGuard {
 
     /**
      * @notice Deploy a new Auction contract.
-     * @param _initPrice Starting price for the first epoch
      * @param _paymentToken LP token address used for payments
      * @param _paymentReceiver Address to receive payments (typically burn address)
+     * @param _initPrice Starting price for the first epoch
      * @param _epochPeriod Duration of each auction epoch
      * @param _priceMultiplier Price multiplier for calculating next epoch's starting price
      * @param _minInitPrice Minimum allowed starting price
      */
     constructor(
-        uint256 _initPrice,
         address _paymentToken,
         address _paymentReceiver,
+        uint256 _initPrice,
         uint256 _epochPeriod,
         uint256 _priceMultiplier,
         uint256 _minInitPrice
@@ -84,11 +84,10 @@ contract Auction is ReentrancyGuard {
         if (_priceMultiplier < MIN_PRICE_MULTIPLIER || _priceMultiplier > MAX_PRICE_MULTIPLIER) revert Auction__PriceMultiplierOutOfRange();
         if (_minInitPrice < ABS_MIN_INIT_PRICE || _minInitPrice > ABS_MAX_INIT_PRICE) revert Auction__MinInitPriceOutOfRange();
 
-        initPrice = _initPrice;
-        startTime = block.timestamp;
-
         paymentToken = _paymentToken;
         paymentReceiver = _paymentReceiver;
+        initPrice = _initPrice;
+        startTime = block.timestamp;
         epochPeriod = _epochPeriod;
         priceMultiplier = _priceMultiplier;
         minInitPrice = _minInitPrice;

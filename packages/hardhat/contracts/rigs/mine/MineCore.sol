@@ -43,7 +43,7 @@ contract MineCore is Ownable, ReentrancyGuard {
     address public immutable uniswapV2Factory; // Uniswap V2 factory
     address public immutable uniswapV2Router; // Uniswap V2 router
     address public immutable unitFactory; // factory for deploying Unit tokens
-    address public immutable rigFactory; // factory for deploying MineRigs
+    address public immutable mineRigFactory; // factory for deploying MineRigs
     address public immutable auctionFactory; // factory for deploying Auctions
     address public immutable entropy; // Pyth Entropy contract for randomness
 
@@ -88,24 +88,24 @@ contract MineCore is Ownable, ReentrancyGuard {
 
     /*----------  ERRORS  -----------------------------------------------*/
 
-    error Core__InsufficientUsdc();
-    error Core__ZeroLauncher();
-    error Core__ZeroQuoteToken();
-    error Core__EmptyTokenName();
-    error Core__EmptyTokenSymbol();
-    error Core__EmptyUri();
-    error Core__ZeroUnitAmount();
-    error Core__ZeroAddress();
+    error MineCore__InsufficientUsdc();
+    error MineCore__ZeroLauncher();
+    error MineCore__ZeroQuoteToken();
+    error MineCore__EmptyTokenName();
+    error MineCore__EmptyTokenSymbol();
+    error MineCore__EmptyUri();
+    error MineCore__ZeroUnitAmount();
+    error MineCore__ZeroAddress();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
     event MineCore__Launched(
-        address launcher,
-        address quoteToken,
-        address unit,
-        address rig,
+        address indexed launcher,
+        address indexed rig,
+        address indexed unit,
         address auction,
         address lpToken,
+        address quoteToken,
         string tokenName,
         string tokenSymbol,
         string uri,
@@ -117,6 +117,8 @@ contract MineCore is Ownable, ReentrancyGuard {
         uint256 rigEpochPeriod,
         uint256 rigPriceMultiplier,
         uint256 rigMinInitPrice,
+        uint256[] upsMultipliers,
+        uint256 upsMultiplierDuration,
         uint256 auctionInitPrice,
         uint256 auctionEpochPeriod,
         uint256 auctionPriceMultiplier,
@@ -134,7 +136,7 @@ contract MineCore is Ownable, ReentrancyGuard {
      * @param _uniswapV2Factory Uniswap V2 factory address
      * @param _uniswapV2Router Uniswap V2 router address
      * @param _unitFactory UnitFactory contract address
-     * @param _rigFactory RigFactory contract address
+     * @param _mineRigFactory MineRigFactory contract address
      * @param _auctionFactory AuctionFactory contract address
      * @param _entropy Pyth Entropy contract address
      * @param _protocolFeeAddress Address to receive protocol fees
@@ -146,7 +148,7 @@ contract MineCore is Ownable, ReentrancyGuard {
         address _uniswapV2Factory,
         address _uniswapV2Router,
         address _unitFactory,
-        address _rigFactory,
+        address _mineRigFactory,
         address _auctionFactory,
         address _entropy,
         address _protocolFeeAddress,
@@ -154,10 +156,10 @@ contract MineCore is Ownable, ReentrancyGuard {
     ) {
         if (
             _registry == address(0) || _usdcToken == address(0) || _uniswapV2Factory == address(0)
-                || _uniswapV2Router == address(0) || _unitFactory == address(0) || _rigFactory == address(0)
+                || _uniswapV2Router == address(0) || _unitFactory == address(0) || _mineRigFactory == address(0)
                 || _auctionFactory == address(0) || _entropy == address(0)
         ) {
-            revert Core__ZeroAddress();
+            revert MineCore__ZeroAddress();
         }
 
         registry = _registry;
@@ -165,7 +167,7 @@ contract MineCore is Ownable, ReentrancyGuard {
         uniswapV2Factory = _uniswapV2Factory;
         uniswapV2Router = _uniswapV2Router;
         unitFactory = _unitFactory;
-        rigFactory = _rigFactory;
+        mineRigFactory = _mineRigFactory;
         auctionFactory = _auctionFactory;
         entropy = _entropy;
         protocolFeeAddress = _protocolFeeAddress;
@@ -223,9 +225,9 @@ contract MineCore is Ownable, ReentrancyGuard {
 
         // Deploy Auction with LP as payment token
         auction = IAuctionFactory(auctionFactory).deploy(
-            params.auctionInitPrice,
             lpToken,
             DEAD_ADDRESS,
+            params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,
             params.auctionMinInitPrice
@@ -233,12 +235,13 @@ contract MineCore is Ownable, ReentrancyGuard {
 
         // Deploy MineRig via factory
         // Treasury is the Auction contract (receives 15% of mining fees)
-        rig = IMineRigFactory(rigFactory).deploy(
+        rig = IMineRigFactory(mineRigFactory).deploy(
             unit,
             params.quoteToken,
+            address(this), // core
+            auction, // treasury
+            params.launcher, // team
             entropy,
-            address(this),
-            auction,
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
             params.rigMinInitPrice,
@@ -251,9 +254,6 @@ contract MineCore is Ownable, ReentrancyGuard {
 
         // Transfer Unit minting rights to MineRig (permanently locked since MineRig has no setRig function)
         IUnit(unit).setRig(rig);
-
-        // Default team to launcher
-        IMineRig(rig).setTeam(params.launcher);
 
         // Set initial URI for the rig (required)
         IMineRig(rig).setUri(params.uri);
@@ -273,11 +273,11 @@ contract MineCore is Ownable, ReentrancyGuard {
 
         emit MineCore__Launched(
             params.launcher,
-            params.quoteToken,
-            unit,
             rig,
+            unit,
             auction,
             lpToken,
+            params.quoteToken,
             params.tokenName,
             params.tokenSymbol,
             params.uri,
@@ -289,6 +289,8 @@ contract MineCore is Ownable, ReentrancyGuard {
             params.rigEpochPeriod,
             params.rigPriceMultiplier,
             params.rigMinInitPrice,
+            params.upsMultipliers,
+            params.upsMultiplierDuration,
             params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,
@@ -319,16 +321,6 @@ contract MineCore is Ownable, ReentrancyGuard {
         emit MineCore__MinUsdcForLaunchSet(_minUsdcForLaunch);
     }
 
-    /*----------  VIEW FUNCTIONS  ---------------------------------------*/
-
-    /**
-     * @notice Returns the number of deployed rigs.
-     * @return The length of the rigs array
-     */
-    function rigsLength() external view returns (uint256) {
-        return rigs.length;
-    }
-
     /*----------  INTERNAL FUNCTIONS  -----------------------------------*/
 
     /**
@@ -337,13 +329,23 @@ contract MineCore is Ownable, ReentrancyGuard {
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        if (params.launcher == address(0)) revert Core__ZeroLauncher();
-        if (params.quoteToken == address(0)) revert Core__ZeroQuoteToken();
-        if (params.usdcAmount < minUsdcForLaunch) revert Core__InsufficientUsdc();
-        if (bytes(params.tokenName).length == 0) revert Core__EmptyTokenName();
-        if (bytes(params.tokenSymbol).length == 0) revert Core__EmptyTokenSymbol();
-        if (bytes(params.uri).length == 0) revert Core__EmptyUri();
-        if (params.unitAmount == 0) revert Core__ZeroUnitAmount();
+        if (params.launcher == address(0)) revert MineCore__ZeroLauncher();
+        if (params.quoteToken == address(0)) revert MineCore__ZeroQuoteToken();
+        if (params.usdcAmount < minUsdcForLaunch) revert MineCore__InsufficientUsdc();
+        if (bytes(params.tokenName).length == 0) revert MineCore__EmptyTokenName();
+        if (bytes(params.tokenSymbol).length == 0) revert MineCore__EmptyTokenSymbol();
+        if (bytes(params.uri).length == 0) revert MineCore__EmptyUri();
+        if (params.unitAmount == 0) revert MineCore__ZeroUnitAmount();
+    }
+
+    /*----------  VIEW FUNCTIONS  ---------------------------------------*/
+
+    /**
+     * @notice Returns the number of deployed rigs.
+     * @return The length of the rigs array
+     */
+    function rigsLength() external view returns (uint256) {
+        return rigs.length;
     }
 
 }

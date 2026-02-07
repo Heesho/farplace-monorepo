@@ -20,7 +20,7 @@ interface IFundRig {
     function MIN_DONATION() external view returns (uint256);
 
     // Immutables
-    function paymentToken() external view returns (address);
+    function quote() external view returns (address);
     function unit() external view returns (address);
     function core() external view returns (address);
     function startTime() external view returns (uint256);
@@ -38,7 +38,7 @@ interface IFundRig {
     function uri() external view returns (string memory);
 
     // External functions
-    function fund(address account, uint256 amount) external;
+    function fund(address account, uint256 amount, string calldata _uri) external;
     function claim(address account, uint256 day) external;
 
     // Restricted functions
@@ -52,15 +52,4 @@ interface IFundRig {
     function currentDay() external view returns (uint256);
     function getDayEmission(uint256 day) external view returns (uint256);
     function getPendingReward(uint256 day, address account) external view returns (uint256);
-    function getUserDonation(uint256 day, address account) external view returns (uint256);
-    function getDayTotal(uint256 day) external view returns (uint256);
-
-    // Events
-    event FundRig__Funded(address indexed account, uint256 amount, uint256 day);
-    event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
-    event FundRig__RecipientSet(address indexed recipient);
-    event FundRig__TreasurySet(address indexed treasury);
-    event FundRig__TeamSet(address indexed team);
-    event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);
-    event FundRig__UriSet(string uri);
 }

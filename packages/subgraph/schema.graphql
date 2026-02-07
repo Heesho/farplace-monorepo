@@ -279,6 +279,18 @@ type MineRig @entity(immutable: false) {
   # Relations
   slots: [MineSlot!]! @derivedFrom(field: "mineRig")
   mines: [MineAction!]! @derivedFrom(field: "mineRig")
+  claims: [MineClaim!]! @derivedFrom(field: "mineRig")
+}
+
+# Claim record (when miner claims accumulated fees)
+type MineClaim @entity(immutable: true) {
+  id: ID!                              # {txHash}-{logIndex}
+  mineRig: MineRig!
+  claimer: Account!
+  amount: BigDecimal!                  # Quote token amount claimed
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  txHash: Bytes!
 }
 
 type MineSlot @entity(immutable: false) {
@@ -298,7 +310,7 @@ type MineSlot @entity(immutable: false) {
   lastMined: BigInt!
 }
 
-type MineAction @entity(immutable: true) {
+type MineAction @entity(immutable: false) {
   id: ID!                              # {txHash}-{logIndex}
   mineRig: MineRig!
   slot: MineSlot!
@@ -363,6 +375,7 @@ type Spin @entity(immutable: false) {
 
   epochId: BigInt!
   price: BigDecimal!                   # Spin cost
+  uri: String!                         # Message URI attached to spin
 
   # Result (filled after VRF callback)
   won: Boolean!
@@ -382,8 +395,10 @@ type FundRig @entity(immutable: false) {
   id: ID!
   rig: Rig!
 
-  # Recipient (required at launch, receives 50% of donations)
-  recipient: Bytes!                    # Recipient address
+  # Addresses
+  recipient: Bytes!                    # Recipient address (receives 50% of donations)
+  treasury: Bytes!                     # Treasury address (receives ~45% of donations)
+  team: Bytes!                         # Team address (receives 4%, zero = disabled)
 
   # Emission config
   initialEmission: BigInt!             # Starting daily emission
@@ -403,6 +418,8 @@ type FundRig @entity(immutable: false) {
   donations: [Donation!]! @derivedFrom(field: "fundRig")
   recipients: [FundRecipient!]! @derivedFrom(field: "fundRig")
   dayData: [FundDayData!]! @derivedFrom(field: "fundRig")
+  donorAccounts: [FundDonor!]! @derivedFrom(field: "fundRig")
+  dayDonorAccounts: [FundDayDonor!]! @derivedFrom(field: "fundRig")
 }
 
 # Recipient for FundRig
@@ -437,6 +454,7 @@ type Donation @entity(immutable: true) {
 
   day: BigInt!                         # Day number
   amount: BigDecimal!                  # Donation amount
+  uri: String!                         # Message URI attached to donation
 
   # Fee split (calculated from amount)
   recipientAmount: BigDecimal!         # 50% to recipient (single address set on rig)
@@ -460,6 +478,23 @@ type FundClaim @entity(immutable: true) {
   timestamp: BigInt!
   blockNumber: BigInt!
   txHash: Bytes!
+}
+
+# Unique donor tracker (one per rig + wallet)
+type FundDonor @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{donorAddress}
+  fundRig: FundRig!
+  donor: Account!
+  firstDonationAt: BigInt!
+}
+
+# Unique donor tracker per day (one per rig + day + wallet)
+type FundDayDonor @entity(immutable: false) {
+  id: ID!                              # {rigAddress}-{day}-{donorAddress}
+  fundRig: FundRig!
+  day: BigInt!
+  donor: Account!
+  firstDonationAt: BigInt!
 }
 
 # =============================================================================
@@ -486,4 +521,3 @@ type Account @entity(immutable: false) {
   spins: [Spin!]! @derivedFrom(field: "spinner")
   donations: [Donation!]! @derivedFrom(field: "donor")
 }
-
