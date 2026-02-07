@@ -11,9 +11,9 @@ dataSources:
     name: MineCore
     network: base
     source:
-      address: "0x5d98C870276D270bD876b694444CC8647a331f31"
+      address: "0xcd3325C59C7048903AdA6E3b2C24E6d3aF569F81"
       abi: MineCore
-      startBlock: 41808484
+      startBlock: 41824029
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -30,7 +30,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: MineCore__Launched(address,address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: MineCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[],uint256,uint256,uint256,uint256,uint256)
           handler: handleMineCoreLaunched
       file: ./src/cores/mineCore.ts
 
@@ -41,9 +41,9 @@ dataSources:
     name: SpinCore
     network: base
     source:
-      address: "0x58e3777B0baea6D47F21689B5b70C092A09ae42b"
+      address: "0xAE757D3e55cD32d55AA1e329bfC7Fa63fe5D8660"
       abi: SpinCore
-      startBlock: 41808484
+      startBlock: 41824029
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -62,7 +62,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: SpinCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: SpinCore__Launched(indexed address,indexed address,indexed address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[],uint256,uint256,uint256,uint256)
           handler: handleSpinCoreLaunched
       file: ./src/cores/spinCore.ts
 
@@ -73,9 +73,9 @@ dataSources:
     name: FundCore
     network: base
     source:
-      address: "0xb510499f2239103b9daC96b23657f20EF6F2a110"
+      address: "0xEc5b32a3CB8323606d340CF1824335E67D570DF4"
       abi: FundCore
-      startBlock: 41808484
+      startBlock: 41824029
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -194,7 +194,7 @@ templates:
         - name: SpinRig
           file: ./abis/SpinRig.json
       eventHandlers:
-        - event: SpinRig__Spin(indexed address,indexed address,indexed uint256,uint256,string)
+        - event: SpinRig__Spin(address,indexed address,indexed uint256,uint256,string)
           handler: handleSpin
         - event: SpinRig__Win(indexed address,indexed uint256,uint256,uint256)
           handler: handleWin
@@ -234,7 +234,7 @@ templates:
         - name: FundCore
           file: ./abis/FundCore.json
       eventHandlers:
-        - event: FundRig__Funded(indexed address,uint256,uint256,string)
+        - event: FundRig__Funded(address,indexed address,uint256,uint256,string)
           handler: handleFunded
         - event: FundRig__Claimed(indexed address,uint256,uint256)
           handler: handleFundClaimed

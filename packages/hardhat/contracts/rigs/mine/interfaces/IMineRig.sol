@@ -61,6 +61,8 @@ interface IMineRig {
     function entropyEnabled() external view returns (bool);
     function uri() external view returns (string memory);
     function accountToClaimable(address account) external view returns (uint256);
+    function sequenceToIndex(uint64 sequenceNumber) external view returns (uint256);
+    function sequenceToEpoch(uint64 sequenceNumber) external view returns (uint256);
 
     // External functions
     function mine(

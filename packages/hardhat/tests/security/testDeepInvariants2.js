@@ -587,7 +587,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       await expect(
         registry.connect(attacker).register(
           attacker.address,
-          "mine",
           unitAddress,
           attacker.address
         )
@@ -598,7 +597,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       await expect(
         registry.connect(owner).register(
           owner.address,
-          "mine",
           unitAddress,
           owner.address
         )
@@ -609,7 +607,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       await expect(
         registry.connect(user0).register(
           user0.address,
-          "mine",
           unitAddress,
           user0.address
         )
@@ -629,7 +626,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       await expect(
         registry.connect(attacker).register(
           rigAddress,
-          "mine",
           unitAddress,
           user0.address
         )
@@ -644,7 +640,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       await expect(
         registry.connect(attacker).register(
           user1.address,
-          "mine",
           unitAddress,
           user1.address
         )

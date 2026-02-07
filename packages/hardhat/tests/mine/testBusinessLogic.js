@@ -969,7 +969,7 @@ describe("Business Logic Tests", function () {
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Rig__ZeroInitialUps()");
+      ).to.be.revertedWith("Rig__InitialUpsOutOfRange()");
     });
 
     it("Reverts with zero tailUps", async function () {
@@ -1053,7 +1053,7 @@ describe("Business Logic Tests", function () {
           auctionPriceMultiplier: convert("1.2", 18),
           auctionMinInitPrice: convert("0.001", 18),
         })
-      ).to.be.revertedWith("Rig__ZeroHalvingAmount()");
+      ).to.be.revertedWith("MineRig__HalvingAmountOutOfRange()");
     });
 
     it("Reverts with empty token symbol", async function () {
@@ -1167,7 +1167,7 @@ describe("Business Logic Tests", function () {
     it("getAuction returns correct state", async function () {
       const state = await multicall.getAuction(testRig, user1.address);
 
-      expect(state.paymentToken).to.not.equal(AddressZero);
+      expect(state.lpToken).to.not.equal(AddressZero);
       expect(state.epochId).to.equal(0);
     });
 

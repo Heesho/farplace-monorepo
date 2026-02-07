@@ -71,7 +71,7 @@ export function AuctionModal({
     : "0";
 
   const userLpBalance = auctionState
-    ? formatEther(auctionState.accountPaymentTokenBalance)
+    ? formatEther(auctionState.accountLpTokenBalance)
     : "0";
 
   const treasuryUsdc = auctionState
@@ -79,7 +79,7 @@ export function AuctionModal({
     : "0";
 
   const hasEnoughLp = auctionState
-    ? auctionState.accountPaymentTokenBalance >= auctionState.price
+    ? auctionState.accountLpTokenBalance >= auctionState.price
     : false;
 
   const isAuctionActive = auctionState
@@ -98,7 +98,7 @@ export function AuctionModal({
     // Approve LP token spending for the multicall contract
     calls.push(
       encodeApproveCall(
-        auctionState.paymentToken,
+        auctionState.lpToken,
         multicallAddr,
         auctionState.price
       )
@@ -177,7 +177,7 @@ export function AuctionModal({
                   <span className="text-[11px] text-muted-foreground">{tokenSymbol}-USDC LP</span>
                   {isAuctionActive && auctionState && (
                     <span className="text-[11px] text-muted-foreground tabular-nums">
-                      ~${(Number(lpPriceFormatted) * Number(formatUnits(auctionState.paymentTokenPrice, 18))).toFixed(2)}
+                      ~${(Number(lpPriceFormatted) * Number(formatUnits(auctionState.lpTokenPrice, 18))).toFixed(2)}
                     </span>
                   )}
                 </div>
@@ -201,7 +201,7 @@ export function AuctionModal({
                 <div className="flex items-center justify-end gap-3 py-3 text-[11px] text-muted-foreground">
                   <span className="tabular-nums">
                     {(() => {
-                      const lpCost = Number(lpPriceFormatted) * Number(formatUnits(auctionState.paymentTokenPrice, 18));
+                      const lpCost = Number(lpPriceFormatted) * Number(formatUnits(auctionState.lpTokenPrice, 18));
                       const usdcReceive = Number(treasuryUsdc);
                       const profit = usdcReceive - lpCost;
                       return `${profit >= 0 ? "+" : ""}${profit.toFixed(2)} ${profit >= 0 ? "profit" : "loss"}`;

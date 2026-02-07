@@ -149,9 +149,11 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
       it(`Fuzz iteration ${i + 1}: fee splits sum to price for random mining`, async function () {
         // Ensure slot has a miner first
         let slot = await rigContract.getSlot(0);
-        await weth.connect(user1).approve(rig, convert("100", 18));
+        const setupPrice = await rigContract.getPrice(0);
+        const setupMaxPrice = setupPrice.add(convert("100", 18));
+        await weth.connect(user1).approve(rig, setupMaxPrice);
         await rigContract.connect(user1).mine(
-          user1.address, 0, slot.epochId, 1961439882, convert("100", 18), ""
+          user1.address, 0, slot.epochId, 1961439882, setupMaxPrice, ""
         );
 
         // Wait a bit for price to decay slightly
@@ -223,9 +225,11 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
     for (let i = 0; i < 10; i++) {
       it(`Fuzz iteration ${i + 1}: fee splits sum to price with team=0`, async function () {
         let slot = await rigContract.getSlot(0);
-        await weth.connect(user1).approve(rig, convert("100", 18));
+        const setupPrice = await rigContract.getPrice(0);
+        const setupMaxPrice = setupPrice.add(convert("100", 18));
+        await weth.connect(user1).approve(rig, setupMaxPrice);
         await rigContract.connect(user1).mine(
-          user1.address, 0, slot.epochId, 1961439882, convert("100", 18), ""
+          user1.address, 0, slot.epochId, 1961439882, setupMaxPrice, ""
         );
 
         const epochPeriod = await rigContract.epochPeriod();

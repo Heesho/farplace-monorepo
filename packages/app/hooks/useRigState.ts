@@ -82,19 +82,11 @@ export function useRigInfo(
     },
   });
 
-  // Fund rigs use paymentToken instead of quote
-  const { data: paymentTokenAddress } = useReadContract({
+  // Fund rigs also use quote
+  const { data: fundQuoteAddress } = useReadContract({
     address: rigAddress,
-    abi: [
-      {
-        inputs: [],
-        name: "paymentToken",
-        outputs: [{ internalType: "address", name: "", type: "address" }],
-        stateMutability: "view",
-        type: "function",
-      },
-    ] as const,
-    functionName: "paymentToken",
+    abi: RIG_ABI,
+    functionName: "quote",
     chainId: base.id,
     query: {
       enabled: !!rigAddress && hasRigType && rigType === "fund",
@@ -173,7 +165,7 @@ export function useRigInfo(
           unitAddress: unitAddress as `0x${string}`,
           auctionAddress: auctionAddress as `0x${string}`,
           lpAddress: lpAddress as `0x${string}`,
-          quoteAddress: (paymentTokenAddress as `0x${string}`) ?? (quoteAddress as `0x${string}`) ?? CONTRACT_ADDRESSES.usdc,
+          quoteAddress: (fundQuoteAddress as `0x${string}`) ?? (quoteAddress as `0x${string}`) ?? CONTRACT_ADDRESSES.usdc,
           launcher: launcher as `0x${string}`,
           tokenName: (tokenName as string) ?? "",
           tokenSymbol: (tokenSymbol as string) ?? "",

@@ -269,7 +269,7 @@ contract MineCore is Ownable, ReentrancyGuard {
         rigToAuction[rig] = auction;
 
         // Register with central registry
-        IRegistry(registry).register(rig, RIG_TYPE, unit, params.launcher);
+        IRegistry(registry).register(rig, unit, params.launcher);
 
         emit MineCore__Launched(
             params.launcher,

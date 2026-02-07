@@ -81,7 +81,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     address public team;
     uint256 public capacity = 1;
     uint256 public totalMinted;
-    bool public entropyEnabled;
+    bool public entropyEnabled = true;
     uint256[] public upsMultipliers;
     string public uri;  // Global rig metadata URI
 
@@ -132,11 +132,9 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     error MineRig__EpochPeriodOutOfRange();
     error MineRig__PriceMultiplierOutOfRange();
     error MineRig__MinInitPriceOutOfRange();
-    error MineRig__ZeroInitialUps();
-    error MineRig__InitialUpsExceedsMax();
+    error MineRig__InitialUpsOutOfRange();
     error MineRig__TailUpsOutOfRange();
-    error MineRig__ZeroHalvingAmount();
-    error MineRig__HalvingAmountBelowMin();
+    error MineRig__HalvingAmountOutOfRange();
     error MineRig__NothingToClaim();
 
     /*----------  EVENTS  -----------------------------------------------*/
@@ -151,6 +149,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     );
     event MineRig__UpsMultiplierSet(uint256 indexed index, uint256 indexed epochId, uint256 upsMultiplier);
     event MineRig__EntropyRequested(uint256 indexed index, uint256 indexed epochId, uint64 indexed sequenceNumber);
+    event MineRig__EntropyIgnored(uint256 indexed index, uint256 indexed epochId);
     event MineRig__ProtocolFee(address indexed protocol, uint256 indexed index, uint256 indexed epochId, uint256 amount);
     event MineRig__TreasuryFee(address indexed treasury, uint256 indexed index, uint256 indexed epochId, uint256 amount);
     event MineRig__TeamFee(address indexed team, uint256 indexed index, uint256 indexed epochId, uint256 amount);
@@ -165,6 +164,16 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
 
+    /**
+     * @notice Deploy a new MineRig contract.
+     * @param _unit Unit token address
+     * @param _quote Payment token address (e.g., USDC)
+     * @param _core Core contract address
+     * @param _treasury Treasury address for fee collection
+     * @param _team Team address for fee collection
+     * @param _entropy Pyth Entropy contract address
+     * @param _config Configuration struct with auction and emission parameters
+     */
     constructor(
         address _unit,
         address _quote,
@@ -197,15 +206,15 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         }
 
         // Validate initial UPS
-        if (_config.initialUps == 0) revert MineRig__ZeroInitialUps();
-        if (_config.initialUps > MAX_INITIAL_UPS) revert MineRig__InitialUpsExceedsMax();
+        if (_config.initialUps == 0) revert MineRig__InitialUpsOutOfRange();
+        if (_config.initialUps > MAX_INITIAL_UPS) revert MineRig__InitialUpsOutOfRange();
 
         // Validate tail UPS
         if (_config.tailUps == 0 || _config.tailUps > _config.initialUps) revert MineRig__TailUpsOutOfRange();
 
         // Validate halving amount
-        if (_config.halvingAmount == 0) revert MineRig__ZeroHalvingAmount();
-        if (_config.halvingAmount < MIN_HALVING_AMOUNT) revert MineRig__HalvingAmountBelowMin();
+        if (_config.halvingAmount == 0) revert MineRig__HalvingAmountOutOfRange();
+        if (_config.halvingAmount < MIN_HALVING_AMOUNT) revert MineRig__HalvingAmountOutOfRange();
 
         // Validate upsMultiplierDuration
         if (_config.upsMultiplierDuration < MIN_UPS_MULTIPLIER_DURATION || _config.upsMultiplierDuration > MAX_UPS_MULTIPLIER_DURATION) {
@@ -240,7 +249,6 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         treasury = _treasury;
         team = _team;
         upsMultipliers = _config.upsMultipliers;
-        entropyEnabled = true;
 
         // Initialize slot 0 with the team as the first miner
         indexToSlot[0] = Slot({
@@ -453,7 +461,10 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         delete sequenceToEpoch[sequenceNumber];
 
         Slot memory slotCache = indexToSlot[index];
-        if (slotCache.epochId != epoch || slotCache.miner == address(0)) return;
+        if (slotCache.epochId != epoch || slotCache.miner == address(0)) {
+            emit MineRig__EntropyIgnored(index, epoch);
+            return;
+        }
 
         uint256 upsMultiplier = _drawUpsMultiplier(randomNumber);
         slotCache.upsMultiplier = upsMultiplier;

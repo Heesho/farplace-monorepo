@@ -248,7 +248,7 @@ describe("FundRig Tests", function () {
           recipient.address,
           [INITIAL_EMISSION, MIN_EMISSION, 6] // Config: halvingPeriod too low (min is 7)
         )
-      ).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
+      ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
     });
 
     it("Should revert deployment with halving period too high", async function () {
@@ -263,7 +263,7 @@ describe("FundRig Tests", function () {
           recipient.address,
           [INITIAL_EMISSION, MIN_EMISSION, 366] // Config: halvingPeriod too high (max is 365)
         )
-      ).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
+      ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
     });
 
     it("Should correctly split donations (50/45/4/1)", async function () {
@@ -314,7 +314,7 @@ describe("FundRig Tests", function () {
 
       await expect(rig.connect(user1).fund(user1.address, donationAmount, ""))
         .to.emit(rig, "FundRig__Funded")
-        .withArgs(user1.address, donationAmount, currentDay, "");
+        .withArgs(user1.address, user1.address, donationAmount, currentDay, "");
     });
 
     it("Should track daily donations correctly", async function () {

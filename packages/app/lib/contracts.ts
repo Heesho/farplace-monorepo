@@ -1,15 +1,15 @@
 export const CONTRACT_ADDRESSES = {
   // Per-rig-type Core contracts
-  mineCore: "0x5d98C870276D270bD876b694444CC8647a331f31",
-  spinCore: "0x58e3777B0baea6D47F21689B5b70C092A09ae42b",
-  fundCore: "0xb510499f2239103b9daC96b23657f20EF6F2a110",
+  mineCore: "0xcd3325C59C7048903AdA6E3b2C24E6d3aF569F81",
+  spinCore: "0xAE757D3e55cD32d55AA1e329bfC7Fa63fe5D8660",
+  fundCore: "0xEc5b32a3CB8323606d340CF1824335E67D570DF4",
   // Per-rig-type Multicall contracts
-  mineMulticall: "0x9ca9D1D06b6027F358CEe08aA32FEa316664480d",
-  spinMulticall: "0x11ba1C6609f7718db40e2fCcDe9adf4703DF0CC6",
-  fundMulticall: "0x655cE15715fd3FadA60eCcb1FD46b91F2B80b956",
+  mineMulticall: "0x69694f8124b32Cba6878f3b36a4f5264b1B8E15e",
+  spinMulticall: "0x10233932219250117eB080FbDF6552ebAA6Bf05D",
+  fundMulticall: "0xA31B7B4d143866864B46DBcbfeaBcfC6bFfd82BA",
   // Legacy aliases (point to mine variants for backwards compat)
-  core: "0x5d98C870276D270bD876b694444CC8647a331f31",
-  multicall: "0x9ca9D1D06b6027F358CEe08aA32FEa316664480d",
+  core: "0xcd3325C59C7048903AdA6E3b2C24E6d3aF569F81",
+  multicall: "0x69694f8124b32Cba6878f3b36a4f5264b1B8E15e",
   // Token addresses (Mock tokens for staging)
   usdc: "0xe90495BE187d434e23A9B1FeC0B6Ce039700870e", // Mock USDC
   // Uniswap V2 on Base
@@ -269,12 +269,12 @@ export const MULTICALL_ABI = [
           { internalType: "uint256", name: "epochId", type: "uint256" },
           { internalType: "uint256", name: "initPrice", type: "uint256" },
           { internalType: "uint256", name: "startTime", type: "uint256" },
-          { internalType: "address", name: "paymentToken", type: "address" },
+          { internalType: "address", name: "lpToken", type: "address" },
           { internalType: "uint256", name: "price", type: "uint256" },
-          { internalType: "uint256", name: "paymentTokenPrice", type: "uint256" },
+          { internalType: "uint256", name: "lpTokenPrice", type: "uint256" },
           { internalType: "uint256", name: "quoteAccumulated", type: "uint256" },
           { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
-          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountLpTokenBalance", type: "uint256" },
         ],
         internalType: "struct Multicall.AuctionState",
         name: "state",
@@ -386,12 +386,12 @@ export const SPIN_MULTICALL_ABI = [
           { internalType: "uint256", name: "epochId", type: "uint256" },
           { internalType: "uint256", name: "initPrice", type: "uint256" },
           { internalType: "uint256", name: "startTime", type: "uint256" },
-          { internalType: "address", name: "paymentToken", type: "address" },
+          { internalType: "address", name: "lpToken", type: "address" },
           { internalType: "uint256", name: "price", type: "uint256" },
-          { internalType: "uint256", name: "paymentTokenPrice", type: "uint256" },
+          { internalType: "uint256", name: "lpTokenPrice", type: "uint256" },
           { internalType: "uint256", name: "quoteAccumulated", type: "uint256" },
           { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
-          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountLpTokenBalance", type: "uint256" },
         ],
         internalType: "struct SpinMulticall.AuctionState",
         name: "state",
@@ -471,11 +471,12 @@ export const FUND_MULTICALL_ABI = [
           { internalType: "uint256", name: "todayEmission", type: "uint256" },
           { internalType: "uint256", name: "todayTotalDonated", type: "uint256" },
           { internalType: "uint256", name: "startTime", type: "uint256" },
+          { internalType: "address", name: "recipient", type: "address" },
           { internalType: "address", name: "treasury", type: "address" },
           { internalType: "address", name: "team", type: "address" },
           { internalType: "uint256", name: "unitPrice", type: "uint256" },
           { internalType: "string", name: "rigUri", type: "string" },
-          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
           { internalType: "uint256", name: "accountUsdcBalance", type: "uint256" },
           { internalType: "uint256", name: "accountUnitBalance", type: "uint256" },
           { internalType: "uint256", name: "accountTodayDonation", type: "uint256" },
@@ -579,12 +580,12 @@ export const FUND_MULTICALL_ABI = [
           { internalType: "uint256", name: "epochId", type: "uint256" },
           { internalType: "uint256", name: "initPrice", type: "uint256" },
           { internalType: "uint256", name: "startTime", type: "uint256" },
-          { internalType: "address", name: "paymentToken", type: "address" },
+          { internalType: "address", name: "lpToken", type: "address" },
           { internalType: "uint256", name: "price", type: "uint256" },
-          { internalType: "uint256", name: "paymentTokenPrice", type: "uint256" },
+          { internalType: "uint256", name: "lpTokenPrice", type: "uint256" },
           { internalType: "uint256", name: "quoteAccumulated", type: "uint256" },
           { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
-          { internalType: "uint256", name: "accountPaymentTokenBalance", type: "uint256" },
+          { internalType: "uint256", name: "accountLpTokenBalance", type: "uint256" },
         ],
         internalType: "struct FundMulticall.AuctionState",
         name: "state",
@@ -1009,12 +1010,12 @@ export type AuctionState = {
   epochId: bigint;
   initPrice: bigint;
   startTime: bigint;
-  paymentToken: `0x${string}`;
+  lpToken: `0x${string}`;
   price: bigint;
-  paymentTokenPrice: bigint;
+  lpTokenPrice: bigint;
   quoteAccumulated: bigint;
   accountQuoteBalance: bigint;
-  accountPaymentTokenBalance: bigint;
+  accountLpTokenBalance: bigint;
 };
 
 export type RigType = "mine" | "spin" | "fund";
@@ -1040,11 +1041,12 @@ export type FundRigState = {
   todayEmission: bigint;
   todayTotalDonated: bigint;
   startTime: bigint;
+  recipient: `0x${string}`;
   treasury: `0x${string}`;
   team: `0x${string}`;
   unitPrice: bigint;
   rigUri: string;
-  accountPaymentTokenBalance: bigint;
+  accountQuoteBalance: bigint;
   accountUsdcBalance: bigint;
   accountUnitBalance: bigint;
   accountTodayDonation: bigint;

@@ -900,7 +900,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(mineCore.address, params.usdcAmount);
-        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__ZeroInitialUps()");
+        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__InitialUpsOutOfRange()");
       });
 
       it("Should revert with initialUps exceeding MAX (1e24)", async function () {
@@ -916,7 +916,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(mineCore.address, params.usdcAmount);
-        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__InitialUpsExceedsMax()");
+        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__InitialUpsOutOfRange()");
       });
 
       it("Should revert with tailUps > initialUps", async function () {
@@ -948,7 +948,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(mineCore.address, params.usdcAmount);
-        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__HalvingAmountBelowMin()");
+        await expect(mineCore.connect(user0).launch(params)).to.be.revertedWith("Rig__HalvingAmountOutOfRange()");
       });
 
       it("Should revert with minInitPrice below ABS_MIN_INIT_PRICE", async function () {
@@ -1114,7 +1114,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(fundCore.address, params.usdcAmount);
-        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
+        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
       });
 
       it("Should revert with halvingPeriod above maximum (365)", async function () {
@@ -1128,7 +1128,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(fundCore.address, params.usdcAmount);
-        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__InvalidHalvingPeriod()");
+        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
       });
 
       it("Should revert with initialEmission below minimum (1e18)", async function () {
@@ -1143,7 +1143,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(fundCore.address, params.usdcAmount);
-        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__InvalidEmission()");
+        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__EmissionOutOfRange()");
       });
 
       it("Should revert with minEmission > initialEmission", async function () {
@@ -1157,7 +1157,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(fundCore.address, params.usdcAmount);
-        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__InvalidEmission()");
+        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundRig__EmissionOutOfRange()");
       });
 
       it("Should revert with zero recipient", async function () {
@@ -1544,7 +1544,7 @@ describe("Edge Case Security Audit Tests", function () {
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
         rigContract.connect(user1).spin(user1.address, epochId, 1, convert("1", 18), "", { value: fee })
-      ).to.be.revertedWith("SpinRig__Expired()");
+      ).to.be.revertedWith("SpinRig__DeadlinePassed()");
     });
 
     it("SpinRig: spin with insufficient entropy fee should revert", async function () {

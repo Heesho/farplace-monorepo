@@ -62,6 +62,7 @@ contract FundCore is Ownable, ReentrancyGuard {
 
     /**
      * @notice Parameters for launching a new FundRig.
+     * @dev quoteToken must be a standard ERC20 (no rebasing or fee-on-transfer tokens).
      */
     struct LaunchParams {
         address launcher; // address to receive ownership
@@ -255,7 +256,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         rigToAuction[rig] = auction;
 
         // Register with central registry
-        IRegistry(registry).register(rig, RIG_TYPE, unit, params.launcher);
+        IRegistry(registry).register(rig, unit, params.launcher);
 
         emit FundCore__Launched(
             params.launcher,

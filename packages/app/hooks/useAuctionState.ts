@@ -71,11 +71,11 @@ export function useAllAuctionStates(
       if (!state) return null;
 
       // Calculate profit/loss
-      // LP cost = price * paymentTokenPrice (LP token value in underlying)
+      // LP cost = price * lpTokenPrice (LP token value in underlying)
       // Quote value = quoteAccumulated (in USDC, 6 decimals)
       // For simplicity, compare quote accumulated vs LP price * LP value
       const lpCostInQuote =
-        (state.price * state.paymentTokenPrice) / BigInt(1e18);
+        (state.price * state.lpTokenPrice) / BigInt(1e18);
       // Convert LP cost to same decimals as quote (6 decimals)
       // LP price is in 18 decimals, quote is in 6 decimals
       const lpCostScaled = lpCostInQuote / BigInt(1e12);

@@ -85,8 +85,8 @@ export function handleFunded(event: FundedEvent): void {
   let unit = Unit.load(rig.unit)
   if (unit === null) return
 
-  // Event params: account (indexed), amount, day
-  let donorAddress = event.params.account
+  // Event params: sender, funder (indexed), amount, day
+  let donorAddress = event.params.funder
   let amount = convertTokenToDecimal(event.params.amount, BI_6)
   let day = event.params.day
 

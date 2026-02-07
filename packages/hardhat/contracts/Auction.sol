@@ -25,7 +25,7 @@ contract Auction is ReentrancyGuard {
     uint256 public constant MAX_PRICE_MULTIPLIER = 3e18; // 3x maximum
     uint256 public constant ABS_MIN_INIT_PRICE = 1e6;
     uint256 public constant ABS_MAX_INIT_PRICE = type(uint192).max;
-    uint256 public constant PRICE_MULTIPLIER_SCALE = 1e18;
+    uint256 public constant PRECISION = 1e18;
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
@@ -133,7 +133,7 @@ contract Auction is ReentrancyGuard {
         }
 
         // Calculate next epoch's starting price
-        uint256 newInitPrice = paymentAmount * priceMultiplier / PRICE_MULTIPLIER_SCALE;
+        uint256 newInitPrice = paymentAmount * priceMultiplier / PRECISION;
         if (newInitPrice > ABS_MAX_INIT_PRICE) {
             newInitPrice = ABS_MAX_INIT_PRICE;
         } else if (newInitPrice < minInitPrice) {

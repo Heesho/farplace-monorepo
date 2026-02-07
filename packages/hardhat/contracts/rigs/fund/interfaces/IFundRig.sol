@@ -20,8 +20,8 @@ interface IFundRig {
     function MIN_DONATION() external view returns (uint256);
 
     // Immutables
-    function quote() external view returns (address);
     function unit() external view returns (address);
+    function quote() external view returns (address);
     function core() external view returns (address);
     function startTime() external view returns (uint256);
     function initialEmission() external view returns (uint256);

@@ -29,18 +29,18 @@ const MULTISIG_ADDRESS = "0xeE0CB49D2805DA6bC0A979ddAd87bb793fbB765E";
 const MIN_USDC_FOR_LAUNCH = convert("1", 6); // 1 USDC minimum
 
 // Deployed Contract Addresses
-const REGISTRY = "0xcc22C0F71680582B1a57C45f1Ca3086740259F72";
-const UNIT_FACTORY = "0xd373Cd29324556D08B9eCb407502276e91bF119B";
-const MINE_RIG_FACTORY = "0x710E05b28dCcb50a535C6F5697d7B6ed45151847";
-const SPIN_RIG_FACTORY = "0x6470A6F7AEBb24729ACa175C069e0147AbB4b9CB";
-const FUND_RIG_FACTORY = "0x7f65eB168365a9f031eEf61CB268264A8642c231";
-const AUCTION_FACTORY = "0x6fc111E144dDa3e060c60c9c125B60bEEA2ee749";
-const MINE_CORE = "0x5d98C870276D270bD876b694444CC8647a331f31";
-const SPIN_CORE = "0x58e3777B0baea6D47F21689B5b70C092A09ae42b";
-const FUND_CORE = "0xb510499f2239103b9daC96b23657f20EF6F2a110";
-const MINE_MULTICALL = "0x9ca9D1D06b6027F358CEe08aA32FEa316664480d";
-const SPIN_MULTICALL = "0x11ba1C6609f7718db40e2fCcDe9adf4703DF0CC6";
-const FUND_MULTICALL = "0x655cE15715fd3FadA60eCcb1FD46b91F2B80b956";
+const REGISTRY = "0xe602DE0023cc1e699816578850b0B1E90Aa30D40";
+const UNIT_FACTORY = "0x1e531AE78F44f92c6803a3A0Df96966a8fdE6000";
+const MINE_RIG_FACTORY = "0x9eC82181B2cfdFEfAe1900366FCE54b5861Cb58d";
+const SPIN_RIG_FACTORY = "0xE59a08F270ABc9f7C77C515CA38c0164fF40eD18";
+const FUND_RIG_FACTORY = "0x7c4438181DA6C5A420DB691dB1d5b54c3f0AF40E";
+const AUCTION_FACTORY = "0xcAED395E5aA42Ea064Cfc15D3c0909CD2DA14e18";
+const MINE_CORE = "0xcd3325C59C7048903AdA6E3b2C24E6d3aF569F81";
+const SPIN_CORE = "0xAE757D3e55cD32d55AA1e329bfC7Fa63fe5D8660";
+const FUND_CORE = "0xEc5b32a3CB8323606d340CF1824335E67D570DF4";
+const MINE_MULTICALL = "0x69694f8124b32Cba6878f3b36a4f5264b1B8E15e";
+const SPIN_MULTICALL = "0x10233932219250117eB080FbDF6552ebAA6Bf05D";
+const FUND_MULTICALL = "0xA31B7B4d143866864B46DBcbfeaBcfC6bFfd82BA";
 
 // Contract Variables
 let usdc,
@@ -991,23 +991,23 @@ async function verifyFundRigByAddress(rigAddress) {
     rigAddress
   );
 
-  const paymentToken = await rig.paymentToken();
   const unitAddress = await rig.unit();
-  const recipient = await rig.recipient();
+  const quoteToken = await rig.quote();
+  const coreAddress = await rig.core();
   const treasury = await rig.treasury();
   const team = await rig.team();
-  const coreAddress = await rig.core();
+  const recipient = await rig.recipient();
   const initialEmission = await rig.initialEmission();
   const minEmission = await rig.minEmission();
   const halvingPeriod = await rig.halvingPeriod();
 
   console.log("Starting FundRig Verification for:", rigAddress);
-  console.log("  Payment Token:", paymentToken);
   console.log("  Unit:", unitAddress);
-  console.log("  Recipient:", recipient);
+  console.log("  Quote:", quoteToken);
+  console.log("  Core:", coreAddress);
   console.log("  Treasury:", treasury);
   console.log("  Team:", team);
-  console.log("  Core:", coreAddress);
+  console.log("  Recipient:", recipient);
   console.log("  Initial Emission:", initialEmission.toString());
   console.log("  Min Emission:", minEmission.toString());
   console.log("  Halving Period:", halvingPeriod.toString());
@@ -1016,15 +1016,17 @@ async function verifyFundRigByAddress(rigAddress) {
     address: rigAddress,
     contract: "contracts/rigs/fund/FundRig.sol:FundRig",
     constructorArguments: [
-      paymentToken,
       unitAddress,
-      recipient,
+      quoteToken,
+      coreAddress,
       treasury,
       team,
-      coreAddress,
-      initialEmission,
-      minEmission,
-      halvingPeriod,
+      recipient,
+      {
+        initialEmission: initialEmission,
+        minEmission: minEmission,
+        halvingPeriod: halvingPeriod,
+      },
     ],
   });
   console.log("FundRig Verified:", rigAddress);
@@ -1251,28 +1253,28 @@ async function main() {
   //===================================================================
 
   // --- Shared infrastructure ---
-  // console.log("Starting Deployment...");
-  // await deployRegistry();
-  // await deployUnitFactory();
-  // await deployAuctionFactory();
+  console.log("Starting Deployment...");
+  await deployRegistry();
+  await deployUnitFactory();
+  await deployAuctionFactory();
 
   // --- MineCore ---
-  // await deployMineRigFactory();
-  // await deployMineCore();
-  // await approveMineCore();
-  // await deployMineMulticall();
+  await deployMineRigFactory();
+  await deployMineCore();
+  await approveMineCore();
+  await deployMineMulticall();
 
   // --- SpinCore ---
-  // await deploySpinRigFactory();
-  // await deploySpinCore();
-  // await approveSpinCore();
-  // await deploySpinMulticall();
+  await deploySpinRigFactory();
+  await deploySpinCore();
+  await approveSpinCore();
+  await deploySpinMulticall();
 
   // --- FundCore ---
-  // await deployFundRigFactory();
-  // await deployFundCore();
-  // await approveFundCore();
-  // await deployFundMulticall();
+  await deployFundRigFactory();
+  await deployFundCore();
+  await approveFundCore();
+  await deployFundMulticall();
 
   //===================================================================
   // 2. Verify Contracts

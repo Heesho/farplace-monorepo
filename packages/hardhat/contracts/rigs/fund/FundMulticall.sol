@@ -21,7 +21,7 @@ contract FundMulticall {
 
     error FundMulticall__ZeroAddress();
     error FundMulticall__InvalidRig();
-    error FundMulticall__ArrayLengthMismatch();
+    error FundMulticall__EmptyArray();
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
@@ -46,7 +46,7 @@ contract FundMulticall {
         uint256 unitPrice;
         string rigUri;
         // User balances
-        uint256 accountPaymentTokenBalance;
+        uint256 accountQuoteBalance;
         uint256 accountUsdcBalance;
         uint256 accountUnitBalance;
         uint256 accountTodayDonation;
@@ -69,12 +69,12 @@ contract FundMulticall {
         uint256 epochId;
         uint256 initPrice;
         uint256 startTime;
-        address paymentToken;
+        address lpToken;
         uint256 price;
-        uint256 paymentTokenPrice;
+        uint256 lpTokenPrice;
         uint256 quoteAccumulated;
         uint256 accountQuoteBalance;
-        uint256 accountPaymentTokenBalance;
+        uint256 accountLpTokenBalance;
     }
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
@@ -135,7 +135,7 @@ contract FundMulticall {
     function claimMultiple(address rig, address account, uint256[] calldata dayIds) external {
         if (!IFundCore(core).rigToIsRig(rig)) revert FundMulticall__InvalidRig();
         uint256 length = dayIds.length;
-        if (length == 0) revert FundMulticall__ArrayLengthMismatch();
+        if (length == 0) revert FundMulticall__EmptyArray();
 
         uint256 currentDay = IFundRig(rig).currentDay();
         for (uint256 i = 0; i < length;) {
@@ -248,7 +248,7 @@ contract FundMulticall {
 
         // User balances
         address quoteToken = IFundRig(rig).quote();
-        state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
+        state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
         state.accountUsdcBalance = account == address(0) ? 0 : IERC20(usdc).balanceOf(account);
         state.accountUnitBalance = account == address(0) ? 0 : IERC20(unitToken).balanceOf(account);
         state.accountTodayDonation = account == address(0) ? 0 : IFundRig(rig).dayAccountToDonation(day, account);
@@ -378,19 +378,19 @@ contract FundMulticall {
         state.epochId = IAuction(auction).epochId();
         state.initPrice = IAuction(auction).initPrice();
         state.startTime = IAuction(auction).startTime();
-        state.paymentToken = IAuction(auction).paymentToken();
+        state.lpToken = IAuction(auction).paymentToken();
         state.price = IAuction(auction).getPrice();
 
         // LP price in USDC = (USDC in LP * 2) / LP total supply
         // USDC has 6 decimals, LP has 18. Multiply by 2e30 (= 2 * 1e12 normalization * 1e18 precision)
-        uint256 lpTotalSupply = IERC20(state.paymentToken).totalSupply();
-        state.paymentTokenPrice =
-            lpTotalSupply == 0 ? 0 : IERC20(usdc).balanceOf(state.paymentToken) * 2e30 / lpTotalSupply;
+        uint256 lpTotalSupply = IERC20(state.lpToken).totalSupply();
+        state.lpTokenPrice =
+            lpTotalSupply == 0 ? 0 : IERC20(usdc).balanceOf(state.lpToken) * 2e30 / lpTotalSupply;
 
         address quoteToken = IFundRig(rig).quote();
         state.quoteAccumulated = IERC20(quoteToken).balanceOf(auction);
         state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
-        state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(state.paymentToken).balanceOf(account);
+        state.accountLpTokenBalance = account == address(0) ? 0 : IERC20(state.lpToken).balanceOf(account);
 
         return state;
     }

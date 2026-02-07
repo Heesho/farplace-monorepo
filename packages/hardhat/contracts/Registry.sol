@@ -32,15 +32,13 @@ contract Registry is Ownable {
     error Registry__NotApprovedFactory();
     error Registry__AlreadyRegistered();
     error Registry__ZeroAddress();
-    error Registry__EmptyRigType();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
     event Registry__RigRegistered(
         address indexed rig,
-        string indexed rigType,
         address indexed unit,
-        address launcher,
+        address indexed launcher,
         address factory
     );
 
@@ -52,27 +50,24 @@ contract Registry is Ownable {
      * @notice Register a newly deployed rig.
      * @dev Only callable by approved factories.
      * @param rig Address of the deployed rig contract
-     * @param rigType Type identifier (e.g., "mine", "spin", "fund")
      * @param unit Address of the rig's token
      * @param launcher Address that initiated the launch
      */
     function register(
         address rig,
-        string calldata rigType,
         address unit,
         address launcher
     ) external {
         if (!approvedFactories[msg.sender]) revert Registry__NotApprovedFactory();
         if (rig == address(0)) revert Registry__ZeroAddress();
         if (isRegistered[rig]) revert Registry__AlreadyRegistered();
-        if (bytes(rigType).length == 0) revert Registry__EmptyRigType();
 
         isRegistered[rig] = true;
 
-        emit Registry__RigRegistered(rig, rigType, unit, launcher, msg.sender);
+        emit Registry__RigRegistered(rig, unit, launcher, msg.sender);
     }
 
-    /*----------  OWNER FUNCTIONS  --------------------------------------*/
+    /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
 
     /**
      * @notice Approve or revoke a factory's permission to register rigs.

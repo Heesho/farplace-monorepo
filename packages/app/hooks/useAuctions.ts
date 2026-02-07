@@ -24,7 +24,7 @@ export type AuctionItem = {
   // Auction state
   lpPrice: bigint; // Current LP cost (18 dec)
   quoteAccumulated: bigint; // USDC in auction (6 dec)
-  paymentTokenPrice: bigint; // LP value in USDC (18 dec)
+  lpTokenPrice: bigint; // LP value in USDC (18 dec)
   epochId: bigint;
   // Derived display values
   lpCostUsd: number; // LP cost in USD-ish
@@ -99,7 +99,7 @@ export function useAuctions() {
         const { rigAddress, rigType, unit } = indexToRig[index];
 
         // Calculate profit/loss (same math as useAuctionState.ts)
-        const lpCostInQuote = (state.price * state.paymentTokenPrice) / BigInt(1e18);
+        const lpCostInQuote = (state.price * state.lpTokenPrice) / BigInt(1e18);
         const lpCostScaled = lpCostInQuote / BigInt(1e12); // normalize to 6 decimals
 
         const rewardUsd = Number(formatUnits(state.quoteAccumulated, QUOTE_TOKEN_DECIMALS));
@@ -116,7 +116,7 @@ export function useAuctions() {
           rigUri: unit.rig.uri,
           lpPrice: state.price,
           quoteAccumulated: state.quoteAccumulated,
-          paymentTokenPrice: state.paymentTokenPrice,
+          lpTokenPrice: state.lpTokenPrice,
           epochId: state.epochId,
           lpCostUsd,
           rewardUsd,

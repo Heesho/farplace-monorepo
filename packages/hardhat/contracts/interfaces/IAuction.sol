@@ -22,11 +22,11 @@ interface IAuction {
     // External functions
     function buy(
         address[] calldata assets,
-        address recipient,
+        address assetsReceiver,
         uint256 epochId,
         uint256 deadline,
         uint256 maxPaymentTokenAmount
-    ) external;
+    ) external returns (uint256);
 
     // View functions
     function getPrice() external view returns (uint256);

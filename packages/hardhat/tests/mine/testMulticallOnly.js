@@ -648,14 +648,14 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             expect(state.epochId).to.equal(await auction.epochId());
             expect(state.initPrice).to.equal(await auction.initPrice());
             expect(state.startTime).to.equal(await auction.startTime());
-            expect(state.paymentToken).to.equal(await auction.paymentToken());
+            expect(state.lpToken).to.equal(await auction.paymentToken());
         });
 
         it("getAuction returns correct user balances", async function () {
             const state = await multicall.getAuction(rig.address, user1.address);
 
             expect(state.accountQuoteBalance).to.equal(await weth.balanceOf(user1.address));
-            expect(state.accountPaymentTokenBalance).to.equal(await lpToken.balanceOf(user1.address));
+            expect(state.accountLpTokenBalance).to.equal(await lpToken.balanceOf(user1.address));
         });
 
         it("getAuction quoteAccumulated increases after mining", async function () {
@@ -701,16 +701,16 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             }
         });
 
-        it("getAuction paymentTokenPrice calculated correctly", async function () {
+        it("getAuction lpTokenPrice calculated correctly", async function () {
             const state = await multicall.getAuction(rig.address, user1.address);
 
-            // paymentTokenPrice = usdcInLP * 2e30 / lpTotalSupply
+            // lpTokenPrice = usdcInLP * 2e30 / lpTotalSupply
             const usdcInLP = await usdc.balanceOf(lpToken.address);
             const lpTotalSupply = await lpToken.totalSupply();
 
             if (lpTotalSupply.gt(0)) {
                 const expectedPrice = usdcInLP.mul(2).mul(convert("1", 30)).div(lpTotalSupply);
-                expect(state.paymentTokenPrice).to.be.closeTo(expectedPrice, expectedPrice.div(100));
+                expect(state.lpTokenPrice).to.be.closeTo(expectedPrice, expectedPrice.div(100));
             }
         });
     });

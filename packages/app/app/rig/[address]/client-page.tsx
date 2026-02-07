@@ -515,7 +515,7 @@ export default function RigDetailPage() {
 
   const accountQuoteBalance = rigType === "mine" ? rigState?.accountQuoteBalance
     : rigType === "spin" ? spinState?.accountQuoteBalance
-    : rigType === "fund" ? fundState?.accountPaymentTokenBalance
+    : rigType === "fund" ? fundState?.accountQuoteBalance
     : rigState?.accountQuoteBalance;
 
   const accountUsdcBalance = rigType === "mine" ? rigState?.accountUsdcBalance

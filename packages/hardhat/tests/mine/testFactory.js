@@ -409,7 +409,7 @@ describe("Core Tests", function () {
     console.log("Epoch ID:", state.epochId.toString());
     console.log("Init Price:", divDec(state.initPrice));
     console.log("Current Price:", divDec(state.price));
-    console.log("Payment Token:", state.paymentToken);
+    console.log("Payment Token:", state.lpToken);
     console.log("Quote Accumulated:", divDec(state.quoteAccumulated));
   });
 });

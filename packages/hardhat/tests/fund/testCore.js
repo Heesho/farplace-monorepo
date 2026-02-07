@@ -371,7 +371,7 @@ describe("FundCore Launch Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "FundRig__InvalidEmission()"
+      "FundRig__EmissionOutOfRange()"
     );
     console.log("Launch correctly reverted with invalid emission");
   });

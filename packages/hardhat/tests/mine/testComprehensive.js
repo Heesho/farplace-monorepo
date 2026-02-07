@@ -429,7 +429,7 @@ describe("Comprehensive Security Tests", function () {
 
             expect(state.epochId).to.equal(await auction.epochId());
             expect(state.initPrice).to.equal(await auction.initPrice());
-            expect(state.paymentToken).to.equal(await auction.paymentToken());
+            expect(state.lpToken).to.equal(await auction.paymentToken());
             expect(state.accountQuoteBalance).to.equal(await WETH.balanceOf(user1.address));
         });
 

@@ -361,7 +361,7 @@ describe("SpinRig Tests", function () {
 
       await expect(
         rig.connect(user0).spin(user0.address, epochId, 1, convert("1000", 6), "", { value: fee })
-      ).to.be.revertedWith("SpinRig__Expired()");
+      ).to.be.revertedWith("SpinRig__DeadlinePassed()");
     });
 
     it("Should prevent slot with wrong epoch ID", async function () {

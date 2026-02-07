@@ -62,12 +62,12 @@ contract SpinMulticall {
         uint256 epochId;
         uint256 initPrice;
         uint256 startTime;
-        address paymentToken;
+        address lpToken;
         uint256 price;
-        uint256 paymentTokenPrice;
+        uint256 lpTokenPrice;
         uint256 quoteAccumulated;
         uint256 accountQuoteBalance;
-        uint256 accountPaymentTokenBalance;
+        uint256 accountLpTokenBalance;
     }
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
@@ -137,14 +137,14 @@ contract SpinMulticall {
     function buy(address rig, uint256 epochId, uint256 deadline, uint256 maxPaymentTokenAmount) external {
         if (!ISpinCore(core).rigToIsRig(rig)) revert SpinMulticall__InvalidRig();
         address auction = ISpinCore(core).rigToAuction(rig);
-        address paymentToken = IAuction(auction).paymentToken();
+        address lpToken = IAuction(auction).paymentToken();
         uint256 price = IAuction(auction).getPrice();
         address[] memory assets = new address[](1);
         assets[0] = ISpinRig(rig).quote();
 
-        IERC20(paymentToken).safeTransferFrom(msg.sender, address(this), price);
-        IERC20(paymentToken).safeApprove(auction, 0);
-        IERC20(paymentToken).safeApprove(auction, price);
+        IERC20(lpToken).safeTransferFrom(msg.sender, address(this), price);
+        IERC20(lpToken).safeApprove(auction, 0);
+        IERC20(lpToken).safeApprove(auction, price);
         IAuction(auction).buy(assets, msg.sender, epochId, deadline, maxPaymentTokenAmount);
     }
 
@@ -244,19 +244,19 @@ contract SpinMulticall {
         state.epochId = IAuction(auction).epochId();
         state.initPrice = IAuction(auction).initPrice();
         state.startTime = IAuction(auction).startTime();
-        state.paymentToken = IAuction(auction).paymentToken();
+        state.lpToken = IAuction(auction).paymentToken();
         state.price = IAuction(auction).getPrice();
 
         // LP price in USDC = (USDC in LP * 2) / LP total supply
         // USDC has 6 decimals, LP has 18. Multiply by 2e30 (= 2 * 1e12 normalization * 1e18 precision)
-        uint256 lpTotalSupply = IERC20(state.paymentToken).totalSupply();
-        state.paymentTokenPrice =
-            lpTotalSupply == 0 ? 0 : IERC20(usdc).balanceOf(state.paymentToken) * 2e30 / lpTotalSupply;
+        uint256 lpTotalSupply = IERC20(state.lpToken).totalSupply();
+        state.lpTokenPrice =
+            lpTotalSupply == 0 ? 0 : IERC20(usdc).balanceOf(state.lpToken) * 2e30 / lpTotalSupply;
 
         address quoteToken = ISpinRig(rig).quote();
         state.quoteAccumulated = IERC20(quoteToken).balanceOf(auction);
         state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
-        state.accountPaymentTokenBalance = account == address(0) ? 0 : IERC20(state.paymentToken).balanceOf(account);
+        state.accountLpTokenBalance = account == address(0) ? 0 : IERC20(state.lpToken).balanceOf(account);
 
         return state;
     }

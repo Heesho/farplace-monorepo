@@ -199,17 +199,17 @@ describe("Rigorous Tests", function () {
       expect(state.accountUsdcBalance).to.equal(actualUsdcBalance);
     });
 
-    it("getAuction returns paymentTokenPrice in USDC terms", async function () {
+    it("getAuction returns lpTokenPrice in USDC terms", async function () {
       const state = await multicall.getAuction(testRig, user1.address);
 
-      // paymentTokenPrice = (USDC in LP * 2) / LP total supply
+      // lpTokenPrice = (USDC in LP * 2) / LP total supply
       const lpContract = await ethers.getContractAt("IERC20", testLpToken);
       const usdcInLP = await usdc.balanceOf(testLpToken);
       const lpTotalSupply = await lpContract.totalSupply();
 
       if (lpTotalSupply.gt(0)) {
         const expectedPrice = usdcInLP.mul(2).mul(convert("1", 30)).div(lpTotalSupply);
-        expect(state.paymentTokenPrice).to.be.closeTo(expectedPrice, expectedPrice.div(100));
+        expect(state.lpTokenPrice).to.be.closeTo(expectedPrice, expectedPrice.div(100));
       }
     });
 
@@ -221,7 +221,7 @@ describe("Rigorous Tests", function () {
       const lpContract = await ethers.getContractAt("IERC20", lpToken);
       const actualLpBalance = await lpContract.balanceOf(user1.address);
 
-      expect(state.accountPaymentTokenBalance).to.equal(actualLpBalance);
+      expect(state.accountLpTokenBalance).to.equal(actualLpBalance);
     });
 
     it("Pricing updates after mining activity", async function () {
@@ -255,7 +255,7 @@ describe("Rigorous Tests", function () {
       const state = await multicall.getAuction(testRig, AddressZero);
 
       expect(state.accountQuoteBalance).to.equal(0);
-      expect(state.accountPaymentTokenBalance).to.equal(0);
+      expect(state.accountLpTokenBalance).to.equal(0);
     });
   });
 

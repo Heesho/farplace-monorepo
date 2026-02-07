@@ -52,8 +52,8 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 
-    address public immutable quote;
     address public immutable unit;
+    address public immutable quote;
     address public immutable core;
     uint256 public immutable startTime;
     uint256 public immutable initialEmission;
@@ -89,17 +89,19 @@ contract FundRig is ReentrancyGuard, Ownable {
     error FundRig__NoDonation();
     error FundRig__ZeroAddress();
     error FundRig__RecipientNotSet();
-    error FundRig__InvalidEmission();
+    error FundRig__EmissionOutOfRange();
     error FundRig__BelowMinDonation();
-    error FundRig__InvalidHalvingPeriod();
+    error FundRig__HalvingPeriodOutOfRange();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event FundRig__Funded(address indexed account, uint256 amount, uint256 day, string uri);
+    event FundRig__Funded(address sender, address indexed funder, uint256 amount, uint256 day, string uri);
     event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
     event FundRig__RecipientSet(address indexed recipient);
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
+    event FundRig__TreasuryFee(address indexed treasury, uint256 amount, uint256 day);
+    event FundRig__TeamFee(address indexed team, uint256 amount, uint256 day);
     event FundRig__ProtocolFee(address indexed protocol, uint256 amount, uint256 day);
     event FundRig__UriSet(string uri);
 
@@ -130,11 +132,11 @@ contract FundRig is ReentrancyGuard, Ownable {
         if (_treasury == address(0)) revert FundRig__ZeroAddress();
         if (_recipient == address(0)) revert FundRig__ZeroAddress();
         if (_config.initialEmission < MIN_INITIAL_EMISSION || _config.initialEmission > MAX_INITIAL_EMISSION) {
-            revert FundRig__InvalidEmission();
+            revert FundRig__EmissionOutOfRange();
         }
-        if (_config.minEmission == 0 || _config.minEmission > _config.initialEmission) revert FundRig__InvalidEmission();
+        if (_config.minEmission == 0 || _config.minEmission > _config.initialEmission) revert FundRig__EmissionOutOfRange();
         if (_config.halvingPeriod < MIN_HALVING_PERIOD || _config.halvingPeriod > MAX_HALVING_PERIOD) {
-            revert FundRig__InvalidHalvingPeriod();
+            revert FundRig__HalvingPeriodOutOfRange();
         }
 
         unit = _unit;
@@ -178,8 +180,10 @@ contract FundRig is ReentrancyGuard, Ownable {
         // Distribute funds
         IERC20(quote).safeTransfer(recipient, recipientAmount);
         IERC20(quote).safeTransfer(treasury, treasuryAmount);
+        emit FundRig__TreasuryFee(treasury, treasuryAmount, day);
         if (teamAmount > 0) {
             IERC20(quote).safeTransfer(team, teamAmount);
+            emit FundRig__TeamFee(team, teamAmount, day);
         }
         if (protocolAmount > 0) {
             IERC20(quote).safeTransfer(protocol, protocolAmount);
@@ -190,7 +194,7 @@ contract FundRig is ReentrancyGuard, Ownable {
         dayToTotalDonated[day] += amount;
         dayAccountToDonation[day][account] += amount;
 
-        emit FundRig__Funded(account, amount, day, _uri);
+        emit FundRig__Funded(msg.sender, account, amount, day, _uri);
     }
 
     /**

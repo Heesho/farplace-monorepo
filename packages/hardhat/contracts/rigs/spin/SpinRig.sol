@@ -118,8 +118,9 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     error SpinRig__ZeroSpinner();
     error SpinRig__EpochIdMismatch();
     error SpinRig__MaxPriceExceeded();
-    error SpinRig__Expired();
+    error SpinRig__DeadlinePassed();
     error SpinRig__InsufficientFee();
+    error SpinRig__NoEntropyRequired();
     error SpinRig__InvalidOdds();
     error SpinRig__OddsTooLow();
     error SpinRig__EpochPeriodOutOfRange();
@@ -132,7 +133,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     /*----------  EVENTS  -----------------------------------------------*/
 
     event SpinRig__Spin(
-        address indexed sender,
+        address sender,
         address indexed spinner,
         uint256 indexed epochId,
         uint256 price,
@@ -243,7 +244,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         string calldata _uri
     ) external payable nonReentrant returns (uint256 price) {
         if (spinner == address(0)) revert SpinRig__ZeroSpinner();
-        if (block.timestamp > deadline) revert SpinRig__Expired();
+        if (block.timestamp > deadline) revert SpinRig__DeadlinePassed();
         if (_epochId != epochId) revert SpinRig__EpochIdMismatch();
 
         price = getPrice();
@@ -302,7 +303,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
             sequenceToEpoch[seq] = currentEpochId;
             emit SpinRig__EntropyRequested(currentEpochId, seq);
         } else {
-            if (msg.value > 0) revert SpinRig__InsufficientFee();
+            if (msg.value > 0) revert SpinRig__NoEntropyRequired();
             // Fallback: use odds[0] as deterministic payout
             uint256 oddsBps = odds[0];
             uint256 pool = IERC20(unit).balanceOf(address(this));
@@ -449,9 +450,10 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 length = _odds.length;
         if (length == 0) revert SpinRig__InvalidOdds();
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length;) {
             if (_odds[i] < MIN_ODDS_BPS) revert SpinRig__OddsTooLow();
             if (_odds[i] > MAX_ODDS_BPS) revert SpinRig__InvalidOdds();
+            unchecked { ++i; }
         }
 
         odds = _odds;

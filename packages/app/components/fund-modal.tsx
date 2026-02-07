@@ -177,7 +177,7 @@ export function FundModal({
 
   // User balance (USDC)
   const userBalance = fundState
-    ? Number(formatUnits(fundState.accountPaymentTokenBalance, QUOTE_TOKEN_DECIMALS))
+    ? Number(formatUnits(fundState.accountQuoteBalance, QUOTE_TOKEN_DECIMALS))
     : 0;
 
   // User's today donation

@@ -266,7 +266,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
         rigToAuction[rig] = auction;
 
         // Register with central registry
-        IRegistry(registry).register(rig, RIG_TYPE, unit, params.launcher);
+        IRegistry(registry).register(rig, unit, params.launcher);
 
         emit SpinCore__Launched(
             params.launcher,
@@ -343,4 +343,5 @@ contract SpinCore is Ownable, ReentrancyGuard {
     function rigsLength() external view returns (uint256) {
         return rigs.length;
     }
+
 }
