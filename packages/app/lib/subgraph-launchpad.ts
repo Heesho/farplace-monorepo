@@ -571,6 +571,25 @@ export const GET_BATCH_UNIT_HOUR_DATA_QUERY = gql`
   }
 `;
 
+// Get minute candle data for multiple units (for sparklines on new tokens)
+export const GET_BATCH_UNIT_MINUTE_DATA_QUERY = gql`
+  query GetBatchUnitMinuteData($unitAddresses: [String!]!, $since: BigInt!) {
+    unitMinuteDatas(
+      where: { unit_in: $unitAddresses, timestamp_gte: $since }
+      orderBy: timestamp
+      orderDirection: asc
+      first: 1000
+    ) {
+      id
+      unit {
+        id
+      }
+      timestamp
+      close
+    }
+  }
+`;
+
 // =============================================================================
 // Unit listing queries (for explore page)
 // =============================================================================
@@ -944,7 +963,7 @@ export async function getBatchSparklineData(
 ): Promise<SparklineMap> {
   if (unitAddresses.length === 0) return new Map();
 
-  const since = Math.floor(Date.now() / 1000) - 7 * 86400; // Last 7 days
+  const since = Math.floor(Date.now() / 1000) - 86400; // Last 24 hours
 
   try {
     const data = await client.request<{
@@ -974,6 +993,45 @@ export async function getBatchSparklineData(
     return result;
   } catch (error) {
     console.error("[getBatchSparklineData] Error:", error);
+    return new Map();
+  }
+}
+
+// Batch fetch minute-level sparkline data (last 4h, for new tokens without hourly candles)
+export async function getBatchSparklineMinuteData(
+  unitAddresses: string[]
+): Promise<SparklineMap> {
+  if (unitAddresses.length === 0) return new Map();
+
+  const since = Math.floor(Date.now() / 1000) - 4 * 3600; // Last 4 hours
+
+  try {
+    const data = await client.request<{
+      unitMinuteDatas: Array<{
+        unit: { id: string };
+        timestamp: string;
+        close: string;
+      }>;
+    }>(GET_BATCH_UNIT_MINUTE_DATA_QUERY, {
+      unitAddresses: unitAddresses.map((a) => a.toLowerCase()),
+      since: since.toString(),
+    });
+
+    const result: SparklineMap = new Map();
+    for (const candle of data.unitMinuteDatas ?? []) {
+      const unitId = candle.unit.id.toLowerCase();
+      if (!result.has(unitId)) {
+        result.set(unitId, []);
+      }
+      result.get(unitId)!.push({
+        timestamp: parseInt(candle.timestamp),
+        price: parseFloat(candle.close),
+      });
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[getBatchSparklineMinuteData] Error:", error);
     return new Map();
   }
 }

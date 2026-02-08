@@ -248,19 +248,6 @@ export function SpinModal({
     }
   }, [isOpen, resetTx]);
 
-  if (!isOpen) return null;
-
-  // Format spin history for SpinHistoryItem
-  const formattedSpins = spinHistory.map((spin, index) => ({
-    id: spin.txHash || index.toString(),
-    spinner: spin.spinner,
-    uri: spin.uri,
-    price: spin.price,
-    payoutPercent: Number(spin.oddsBps) / 100,
-    won: spin.winAmount,
-    timestamp: Number(spin.timestamp),
-  }));
-
   // Populate leaderboard entries with Farcaster profiles
   const formattedLeaderboard = useMemo(() => {
     if (!leaderboardEntries) return [];
@@ -274,6 +261,19 @@ export function SpinModal({
       };
     });
   }, [leaderboardEntries, getProfile]);
+
+  if (!isOpen) return null;
+
+  // Format spin history for SpinHistoryItem
+  const formattedSpins = spinHistory.map((spin, index) => ({
+    id: spin.txHash || index.toString(),
+    spinner: spin.spinner,
+    uri: spin.uri,
+    price: spin.price,
+    payoutPercent: Number(spin.oddsBps) / 100,
+    won: spin.winAmount,
+    timestamp: Number(spin.timestamp),
+  }));
 
   return (
     <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
