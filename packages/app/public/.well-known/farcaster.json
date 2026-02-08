@@ -1,8 +1,8 @@
 {
   "accountAssociation": {
-    "header": "TODO_REGENERATE_FOR_FARPLACE_IO",
-    "payload": "TODO_REGENERATE_FOR_FARPLACE_IO",
-    "signature": "TODO_REGENERATE_FOR_FARPLACE_IO"
+    "header": "eyJmaWQiOjI3MjEwOSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDQ5REI1QTFjOWZlRjBFMkY5OTVCNDZiMEI3MWJFQmJEOTEyQkYwZTMifQ",
+    "payload": "eyJkb21haW4iOiJmYXJwbGFjZS5pbyJ9",
+    "signature": "/dC/Oe85TEm45j0j4apqrTRKXGvX1Cf7lsBTmm6qHN8af34C/TsVpMtBdevyVMYU91wD2ITrvG6AlugdbKtmXRs="
   },
   "miniapp": {
     "version": "1",
