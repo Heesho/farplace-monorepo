@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther, parseUnits } from "viem";
 import { useFarcaster } from "@/hooks/useFarcaster";
@@ -72,6 +72,10 @@ export function FundModal({
   const [selectedPreset, setSelectedPreset] = useState<number | null>(1);
   const [isCustom, setIsCustom] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Track donation count to highlight new entries after tx
+  const prevDonationCount = useRef(0);
+  const [highlightCount, setHighlightCount] = useState(0);
 
   // Day countdown ticker
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
@@ -146,8 +150,8 @@ export function FundModal({
   const dayEndTime = startTime > 0 ? startTime + (currentDay + 1) * 86400 : 0;
   const dayEndsIn = Math.max(0, dayEndTime - now);
 
-  // Recipient (treasury)
-  const recipientAddress = fundState?.treasury ?? null;
+  // Recipient address (gets 50% of donations)
+  const recipientAddress = fundState?.recipient ?? null;
 
   // Parsed amount from input
   const parsedAmount = parseFloat(fundAmount) || 0;
@@ -177,6 +181,13 @@ export function FundModal({
     }
   }, [isOpen, resetTx]);
 
+  // Snapshot donation count when tx starts so we can detect new entries
+  useEffect(() => {
+    if (txStatus === "pending") {
+      prevDonationCount.current = donations.length;
+    }
+  }, [txStatus, donations.length]);
+
   // Auto-refetch after successful tx, auto-reset after error
   useEffect(() => {
     if (txStatus === "success") {
@@ -191,6 +202,17 @@ export function FundModal({
       return () => clearTimeout(timer);
     }
   }, [txStatus, refetchFund, resetTx]);
+
+  // Highlight new donations that appeared after a tx
+  useEffect(() => {
+    if (donations.length > prevDonationCount.current && prevDonationCount.current > 0) {
+      const newCount = donations.length - prevDonationCount.current;
+      setHighlightCount(newCount);
+      prevDonationCount.current = donations.length;
+      const timer = setTimeout(() => setHighlightCount(0), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [donations.length]);
 
   // ---------- Handlers ----------
 
@@ -451,9 +473,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Estimated</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
-                        {tokenSymbol.charAt(0)}
-                      </span>
+                      <TokenLogo name={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
                       {todayTotalDonated > 0
                         ? ((userTodayDonation / todayTotalDonated) * todayEmission / 1000).toFixed(1)
                         : "0"}K
@@ -472,9 +492,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Mined</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
-                        {tokenSymbol.charAt(0)}
-                      </span>
+                      <TokenLogo name={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
                       {(userUnitBalance + pendingTokens) >= 1000
                         ? `${((userUnitBalance + pendingTokens) / 1000).toFixed(1)}K`
                         : (userUnitBalance + pendingTokens).toFixed(0)}
@@ -489,9 +507,7 @@ export function FundModal({
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-1">Claimed</div>
                     <div className="font-semibold text-[15px] tabular-nums flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-gradient-to-br from-zinc-500 to-zinc-700 flex items-center justify-center text-[10px] text-white font-semibold">
-                        {tokenSymbol.charAt(0)}
-                      </span>
+                      <TokenLogo name={tokenSymbol} logoUrl={tokenLogoUrl} size="sm" />
                       {userUnitBalance >= 1000
                         ? `${(userUnitBalance / 1000).toFixed(1)}K`
                         : userUnitBalance.toFixed(0)}
@@ -534,6 +550,7 @@ export function FundModal({
                         }}
                         timeAgo={timeAgo}
                         tokenSymbol={tokenSymbol}
+                        isNew={index < highlightCount}
                       />
                     ))}
                   </div>

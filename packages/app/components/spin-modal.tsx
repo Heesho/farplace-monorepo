@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther } from "viem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Leaderboard } from "@/components/leaderboard";
 import { SpinHistoryItem } from "@/components/spin-history-item";
 import { useFarcaster } from "@/hooks/useFarcaster";
+import { useBatchProfiles } from "@/hooks/useBatchProfiles";
 import { useSpinRigState } from "@/hooks/useSpinRigState";
 import { useSpinHistory } from "@/hooks/useSpinHistory";
 import { useSpinLeaderboard } from "@/hooks/useSpinLeaderboard";
@@ -23,7 +24,7 @@ import {
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
 import { DEADLINE_BUFFER_SECONDS } from "@/lib/constants";
-import { truncateAddress, timeAgo } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import { TokenLogo } from "@/components/token-logo";
 
 type SpinModalProps = {
@@ -52,6 +53,18 @@ export function SpinModal({
   refetchHistoryRef.current = refetchHistoryFn;
   const { entries: leaderboardEntries, userRank, isLoading: isLeaderboardLoading } = useSpinLeaderboard(rigAddress, account, 10);
   const { execute, status: txStatus, txHash, error: txError, reset: resetTx } = useBatchedTransaction();
+
+  // Batch fetch Farcaster profiles for spinners + leaderboard
+  const profileAddresses = useMemo(() => {
+    const addrs: string[] = [];
+    if (account) addrs.push(account);
+    for (const s of spinHistory) addrs.push(s.spinner);
+    if (leaderboardEntries) {
+      for (const e of leaderboardEntries) addrs.push(e.address);
+    }
+    return addrs;
+  }, [account, spinHistory, leaderboardEntries]);
+  const { getProfile, getDisplayName, getAvatarUrl } = useBatchProfiles(profileAddresses);
 
   // UI state
   const [miningState, setMiningState] = useState<"idle" | "mining" | "revealing" | "complete">("idle");
@@ -108,8 +121,8 @@ export function SpinModal({
   // Last mine result (from spin history)
   const lastSpin = spinHistory[0];
   const lastMine = lastSpin ? {
-    name: truncateAddress(lastSpin.spinner),
-    avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${lastSpin.spinner.toLowerCase()}`,
+    name: getDisplayName(lastSpin.spinner),
+    avatar: getAvatarUrl(lastSpin.spinner),
     amount: Number(formatEther(lastSpin.winAmount)),
     payoutPercent: Number(lastSpin.oddsBps) / 100,
   } : {
@@ -198,7 +211,7 @@ export function SpinModal({
   // After tx succeeds, poll subgraph for VRF callback result
   useEffect(() => {
     if (txStatus === "success" && miningState === "mining") {
-      const interval = setInterval(() => { refetchHistoryRef.current(); refetchSpin(); }, 3000);
+      const interval = setInterval(() => { refetchHistoryRef.current(); refetchSpin(); }, 1500);
       return () => clearInterval(interval);
     }
   }, [txStatus, miningState, refetchSpin]);
@@ -247,6 +260,20 @@ export function SpinModal({
     won: spin.winAmount,
     timestamp: Number(spin.timestamp),
   }));
+
+  // Populate leaderboard entries with Farcaster profiles
+  const formattedLeaderboard = useMemo(() => {
+    if (!leaderboardEntries) return [];
+    return leaderboardEntries.map((entry) => {
+      const profile = getProfile(entry.address);
+      return {
+        ...entry,
+        profile: profile
+          ? { displayName: profile.displayName, username: profile.username, pfpUrl: profile.pfpUrl }
+          : null,
+      };
+    });
+  }, [leaderboardEntries, getProfile]);
 
   return (
     <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
@@ -314,10 +341,10 @@ export function SpinModal({
               <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={account ? `https://api.dicebear.com/7.x/shapes/svg?seed=${account.toLowerCase()}` : undefined} alt="You" />
+                    <AvatarImage src={account ? getAvatarUrl(account) : undefined} alt="You" />
                     <AvatarFallback className="bg-zinc-700 text-[10px]">{account ? account.slice(2, 4).toUpperCase() : "??"}</AvatarFallback>
                   </Avatar>
-                  <div className="text-[14px] font-medium truncate">{account ? truncateAddress(account) : "You"}</div>
+                  <div className="text-[14px] font-medium truncate">{account ? getDisplayName(account) : "You"}</div>
                 </div>
                 <div className="text-xl font-bold text-center text-transparent">
                   --%
@@ -338,10 +365,10 @@ export function SpinModal({
               <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={account ? `https://api.dicebear.com/7.x/shapes/svg?seed=${account.toLowerCase()}` : undefined} alt="You" />
+                    <AvatarImage src={account ? getAvatarUrl(account) : undefined} alt="You" />
                     <AvatarFallback className="bg-zinc-700 text-[10px]">{account ? account.slice(2, 4).toUpperCase() : "??"}</AvatarFallback>
                   </Avatar>
-                  <div className="text-[14px] font-medium truncate">{account ? truncateAddress(account) : "You"}</div>
+                  <div className="text-[14px] font-medium truncate">{account ? getDisplayName(account) : "You"}</div>
                 </div>
                 <div className="text-xl font-bold text-center text-transparent">
                   --%
@@ -364,10 +391,10 @@ export function SpinModal({
               <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={account ? `https://api.dicebear.com/7.x/shapes/svg?seed=${account.toLowerCase()}` : undefined} alt="You" />
+                    <AvatarImage src={account ? getAvatarUrl(account) : undefined} alt="You" />
                     <AvatarFallback className="bg-zinc-700 text-[10px]">{account ? account.slice(2, 4).toUpperCase() : "??"}</AvatarFallback>
                   </Avatar>
-                  <div className="text-[14px] font-medium truncate">{account ? truncateAddress(account) : "You"}</div>
+                  <div className="text-[14px] font-medium truncate">{account ? getDisplayName(account) : "You"}</div>
                 </div>
                 <div className="text-xl font-bold text-center">
                   {minedPayoutPercent}%
@@ -387,7 +414,11 @@ export function SpinModal({
             )}
 
             {miningState === "idle" && (
-              <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
+              <div>
+                {lastSpin && (
+                  <div className="text-[12px] text-zinc-500 mb-1">Last Mine</div>
+                )}
+                <div className="grid grid-cols-[1fr_60px_120px] items-center gap-2">
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarImage src={lastMine.avatar} alt={lastMine.name} />
@@ -413,6 +444,7 @@ export function SpinModal({
                       : "\u00A0"}
                   </div>
                 </div>
+              </div>
               </div>
             )}
           </div>
@@ -480,7 +512,7 @@ export function SpinModal({
 
           {/* Leaderboard */}
           <Leaderboard
-            entries={leaderboardEntries ?? []}
+            entries={formattedLeaderboard}
             userRank={userRank ?? null}
             tokenSymbol={tokenSymbol}
             tokenName={tokenName}

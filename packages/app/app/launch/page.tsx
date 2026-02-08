@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Upload, ChevronDown, ChevronUp, ChevronLeft, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Upload, ChevronDown, ChevronUp, X, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
 import { parseUnits, formatUnits, parseEventLogs } from "viem";
 import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
@@ -37,7 +38,6 @@ function UsdcIcon({ size = 20 }: { size?: number }) {
     </div>
   );
 }
-import { NavBar } from "@/components/nav-bar";
 
 // Rig types
 type RigType = "mine" | "spin" | "fund" | null;
@@ -94,7 +94,7 @@ const DEFAULTS = {
     tailUps: 0.01, // 0.01 token/sec floor
     halvingPeriod: 30 * 24 * 3600, // 30 days (time-based)
     rigEpochPeriod: 3600, // 1 hour
-    rigPriceMultiplier: 2, // 2x
+    rigPriceMultiplier: 1.2, // 1.2x
     rigMinInitPrice: 1, // $1
     auctionEpochPeriod: 86400, // 1 day
     auctionPriceMultiplier: 1.2, // 1.2x
@@ -762,6 +762,7 @@ const LAUNCHED_EVENT_ABIS = [
 ] as const;
 
 export default function LaunchPage() {
+  const router = useRouter();
   const { address: account, isConnected, isConnecting, connect } = useFarcaster();
   const { execute, status: txStatus, txHash, batchReceipts, error: txError, reset: resetTx } = useBatchedTransaction();
 
@@ -945,6 +946,40 @@ export default function LaunchPage() {
       setRigMinInitPrice(defaults.rigMinInitPrice);
       setSpinOddsRows(arrayToDistributionRows(defaults.odds));
     } else if (type === "fund") {
+      const defaults = DEFAULTS.fund;
+      setUsdcAmount(defaults.usdcAmount);
+      setUnitAmount(defaults.unitAmount);
+      setInitialUps(defaults.initialUps);
+      setTailUps(defaults.tailUps);
+      setHalvingPeriod(defaults.halvingPeriod);
+    }
+  };
+
+  const resetAdvancedToDefaults = () => {
+    if (rigType === "mine") {
+      const defaults = DEFAULTS.mine;
+      setUsdcAmount(defaults.usdcAmount);
+      setUnitAmount(defaults.unitAmount);
+      setInitialUps(defaults.initialUps);
+      setTailUps(defaults.tailUps);
+      setHalvingAmount(defaults.halvingAmount);
+      setRigEpochPeriod(defaults.rigEpochPeriod);
+      setRigPriceMultiplier(defaults.rigPriceMultiplier);
+      setRigMinInitPrice(defaults.rigMinInitPrice);
+      setMineMultiplierRows(arrayToDistributionRows(defaults.upsMultipliers));
+      setUpsMultiplierDuration(defaults.upsMultiplierDuration);
+    } else if (rigType === "spin") {
+      const defaults = DEFAULTS.spin;
+      setUsdcAmount(defaults.usdcAmount);
+      setUnitAmount(defaults.unitAmount);
+      setInitialUps(defaults.initialUps);
+      setTailUps(defaults.tailUps);
+      setHalvingPeriod(defaults.halvingPeriod);
+      setRigEpochPeriod(defaults.rigEpochPeriod);
+      setRigPriceMultiplier(defaults.rigPriceMultiplier);
+      setRigMinInitPrice(defaults.rigMinInitPrice);
+      setSpinOddsRows(arrayToDistributionRows(defaults.odds));
+    } else if (rigType === "fund") {
       const defaults = DEFAULTS.fund;
       setUsdcAmount(defaults.usdcAmount);
       setUnitAmount(defaults.unitAmount);
@@ -1202,33 +1237,26 @@ export default function LaunchPage() {
   };
 
   return (
-    <main className="flex h-screen w-screen justify-center bg-zinc-800">
+    <main className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
       <div
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 130px)",
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)",
         }}
       >
         {/* Header */}
-        <div className="px-4 pb-4">
-          {rigType === null ? (
-            <div className="flex items-center">
-              <h1 className="text-2xl font-semibold tracking-tight">Launch</h1>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleBack}
-                className="p-1 -ml-1 text-zinc-400 hover:text-white transition-colors"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Launch a {RIG_INFO[rigType].name} Rig
-              </h1>
-            </div>
-          )}
+        <div className="flex items-center justify-between px-4 pb-2">
+          <button
+            onClick={() => rigType ? handleBack() : router.back()}
+            className="p-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <span className="text-base font-semibold">
+            {rigType ? `Launch ${RIG_INFO[rigType].name} Rig` : "Launch"}
+          </span>
+          <div className="w-9" />
         </div>
 
         {/* Content */}
@@ -1380,6 +1408,15 @@ export default function LaunchPage() {
               {/* Advanced Settings */}
               {showAdvanced && (
                 <div className="space-y-6 pb-4">
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={resetAdvancedToDefaults}
+                      className="text-[12px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      Reset to defaults
+                    </button>
+                  </div>
                   {/* Liquidity Section */}
                   <div>
                     <h3 className="text-[13px] font-semibold text-foreground mb-1">Launch Liquidity</h3>
@@ -1939,8 +1976,8 @@ export default function LaunchPage() {
         {/* Bottom Action Bar (only show when rig type selected) */}
         {rigType !== null && (
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 60px)" }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
           >
             <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3 bg-background">
               <div className="flex items-center gap-5">
@@ -2040,7 +2077,6 @@ export default function LaunchPage() {
         </div>
       )}
 
-      <NavBar />
     </main>
   );
 }

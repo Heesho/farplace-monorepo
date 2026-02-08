@@ -18,12 +18,14 @@ type DonationHistoryItemProps = {
   };
   timeAgo: (ts: number) => string;
   tokenSymbol?: string;
+  isNew?: boolean;
 };
 
 export const DonationHistoryItem = memo(function DonationHistoryItem({
   donation,
   timeAgo,
   tokenSymbol = "TOKEN",
+  isNew,
 }: DonationHistoryItemProps) {
   const { displayName, avatarUrl, fid } = useProfile(donation.donor);
 
@@ -36,7 +38,9 @@ export const DonationHistoryItem = memo(function DonationHistoryItem({
 
   return (
     <div
-      className="flex items-center gap-3 py-3"
+      className={`flex items-center gap-3 py-3 rounded-lg transition-colors duration-1000 ${
+        isNew ? "bg-zinc-700/50 px-2 -mx-2" : ""
+      }`}
     >
       <button
         onClick={handleProfileClick}
