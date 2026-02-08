@@ -491,7 +491,7 @@ export function SpinModal({
 
         {/* Bottom Action Bar */}
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-800 flex justify-center"
+          className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
         >
           <div className="w-full max-w-[520px] px-4 pt-2 pb-2 bg-background">
