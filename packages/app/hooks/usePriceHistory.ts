@@ -114,7 +114,8 @@ function fillChartData(
   // Other timeframes start at their sinceTimestamp (shows baseline for pre-creation period)
   let startTimestamp: number;
   if (timeframe === "ALL" && createdAt) {
-    startTimestamp = Math.floor(createdAt / config.intervalSeconds) * config.intervalSeconds;
+    // Round UP so the first generated point is never before createdAt
+    startTimestamp = Math.ceil(createdAt / config.intervalSeconds) * config.intervalSeconds;
   } else {
     startTimestamp = Math.floor(config.sinceTimestamp / config.intervalSeconds) * config.intervalSeconds;
   }
