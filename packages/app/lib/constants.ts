@@ -1,7 +1,6 @@
 import { base } from "wagmi/chains";
 
 // Timing constants
-export const SDK_READY_TIMEOUT_MS = 1200;
 export const PRICE_CACHE_TTL_MS = 60_000; // 1 minute
 export const PRICE_REFETCH_INTERVAL_MS = 60_000; // 1 minute
 

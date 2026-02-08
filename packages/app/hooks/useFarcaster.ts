@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { sdk } from "@farcaster/miniapp-sdk";
 import { useAccount, useConnect } from "wagmi";
 import { base } from "wagmi/chains";
-import { SDK_READY_TIMEOUT_MS } from "@/lib/constants";
 
 export type FarcasterUser = {
   fid: number;
@@ -24,7 +23,6 @@ const AUTO_CONNECT_KEY = "farcaster_auto_connect_attempted";
  * Hook to manage Farcaster Mini App context, SDK ready state, and wallet auto-connection
  */
 export function useFarcaster() {
-  const readyRef = useRef(false);
   const [context, setContext] = useState<FarcasterContext | null>(null);
   const [isInFrame, setIsInFrame] = useState<boolean | null>(null); // null = still detecting
 
@@ -61,17 +59,6 @@ export function useFarcaster() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // SDK ready
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!readyRef.current) {
-        readyRef.current = true;
-        sdk.actions.ready().catch(() => {});
-      }
-    }, SDK_READY_TIMEOUT_MS);
-    return () => clearTimeout(timeout);
   }, []);
 
   // Auto-connect wallet (only once per session, only in Farcaster frame)

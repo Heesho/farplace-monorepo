@@ -1,23 +1,23 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjI3MjEwOSwidHlwZSI6ImF1dGgiLCJrZXkiOiIweDQ5REI1QTFjOWZlRjBFMkY5OTVCNDZiMEI3MWJFQmJEOTEyQkYwZTMifQ",
-    "payload": "eyJkb21haW4iOiJnbGF6ZWNvcnAtZnJhbmNoaXNlLnZlcmNlbC5hcHAifQ",
-    "signature": "xbg2S57sD4n6xuGo6aKrPEzIOowav+EocAlx5S17WFcnDLcjtrEoR+fpQT8p4Hp38gwF0N0fVgYc/HC39DNW0Rw="
+    "header": "TODO_REGENERATE_FOR_FARPLACE_IO",
+    "payload": "TODO_REGENERATE_FOR_FARPLACE_IO",
+    "signature": "TODO_REGENERATE_FOR_FARPLACE_IO"
   },
   "miniapp": {
     "version": "1",
     "name": "Farplace",
-    "tagline": "Launch tokens through games",
-    "description": "Launch and distribute tokens through mining, spinning, and donations on Base.",
-    "iconUrl": "https://farplace.vercel.app/media/icon.png",
-    "homeUrl": "https://farplace.vercel.app/",
-    "splashImageUrl": "https://farplace.vercel.app/media/splash.png",
+    "tagline": "Mine coins, not buy them",
+    "description": "A fair-launch coin launchpad on Base. Coins are distributed through mining games — not sales. No presales, no bundlers, no dev dumps.",
+    "iconUrl": "https://farplace.io/media/icon.png",
+    "homeUrl": "https://farplace.io/",
+    "splashImageUrl": "https://farplace.io/media/splash.png",
     "splashBackgroundColor": "#000000",
-    "heroImageUrl": "https://farplace.vercel.app/media/hero.png",
-    "buttonTitle": "Launch a coin",
+    "heroImageUrl": "https://farplace.io/media/hero.png",
+    "buttonTitle": "Start mining",
     "ogTitle": "Farplace",
-    "ogDescription": "Launch and distribute tokens through games on Base.",
-    "ogImageUrl": "https://farplace.vercel.app/media/hero.png",
+    "ogDescription": "A fair-launch coin launchpad on Base. Mine coins, not buy them.",
+    "ogImageUrl": "https://farplace.io/media/hero.png",
     "requiredChains": [
       "eip155:8453"
     ],
