@@ -115,6 +115,7 @@ templates:
       language: wasm/assemblyscript
       entities:
         - Unit
+        - UnitMinuteData
         - UnitHourData
         - UnitDayData
         - Swap

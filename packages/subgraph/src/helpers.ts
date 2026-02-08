@@ -1,11 +1,12 @@
 import { BigInt, BigDecimal, Address, ethereum } from '@graphprotocol/graph-ts'
-import { Protocol, Unit, Rig, Account, UnitHourData, UnitDayData } from '../generated/schema'
+import { Protocol, Unit, Rig, Account, UnitMinuteData, UnitHourData, UnitDayData } from '../generated/schema'
 import {
   ZERO_BI,
   ONE_BI,
   ZERO_BD,
   PROTOCOL_ID,
   ADDRESS_ZERO,
+  SECONDS_PER_MINUTE,
   SECONDS_PER_HOUR,
   SECONDS_PER_DAY,
 } from './constants'
@@ -137,6 +138,10 @@ export function createUnit(
 // HOUR / DAY DATA HELPERS
 // ============================================================================
 
+export function getMinuteIndex(timestamp: BigInt): i32 {
+  return timestamp.toI32() / SECONDS_PER_MINUTE
+}
+
 export function getHourIndex(timestamp: BigInt): i32 {
   return timestamp.toI32() / SECONDS_PER_HOUR
 }
@@ -145,12 +150,45 @@ export function getDayIndex(timestamp: BigInt): i32 {
   return timestamp.toI32() / SECONDS_PER_DAY
 }
 
+export function getMinuteStartTimestamp(minuteIndex: i32): BigInt {
+  return BigInt.fromI32(minuteIndex * SECONDS_PER_MINUTE)
+}
+
 export function getHourStartTimestamp(hourIndex: i32): BigInt {
   return BigInt.fromI32(hourIndex * SECONDS_PER_HOUR)
 }
 
 export function getDayStartTimestamp(dayIndex: i32): BigInt {
   return BigInt.fromI32(dayIndex * SECONDS_PER_DAY)
+}
+
+export function getOrCreateUnitMinuteData(unit: Unit, event: ethereum.Event): UnitMinuteData {
+  let minuteIndex = getMinuteIndex(event.block.timestamp)
+  let id = unit.id.concat('-').concat(minuteIndex.toString())
+
+  let minuteData = UnitMinuteData.load(id)
+  if (minuteData === null) {
+    minuteData = new UnitMinuteData(id)
+    minuteData.unit = unit.id
+    minuteData.timestamp = getMinuteStartTimestamp(minuteIndex)
+    minuteData.minuteIndex = minuteIndex
+
+    // Initialize OHLC with current price
+    minuteData.open = unit.price
+    minuteData.high = unit.price
+    minuteData.low = unit.price
+    minuteData.close = unit.price
+
+    // Volume
+    minuteData.volumeUnit = ZERO_BD
+    minuteData.volumeUsdc = ZERO_BD
+    minuteData.txCount = ZERO_BI
+
+    // Liquidity
+    minuteData.liquidity = unit.liquidity
+  }
+
+  return minuteData
 }
 
 export function getOrCreateUnitHourData(unit: Unit, event: ethereum.Event): UnitHourData {

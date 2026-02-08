@@ -30,6 +30,7 @@ export const BI_6 = BigInt.fromI32(6)
 // TIME CONSTANTS
 // ============================================================================
 
+export const SECONDS_PER_MINUTE = 60
 export const SECONDS_PER_HOUR = 3600
 export const SECONDS_PER_DAY = 86400
 

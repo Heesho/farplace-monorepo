@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getUnitHourData, getUnitDayData, type SubgraphUnitCandle } from "@/lib/subgraph-launchpad";
+import { getUnitMinuteData, getUnitHourData, getUnitDayData, type SubgraphUnitCandle } from "@/lib/subgraph-launchpad";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,19 +21,21 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
   switch (timeframe) {
     case "1H":
       return {
-        sinceTimestamp: now - 6 * 3600, // Fetch 6 hours of hourly candles
-        refetchInterval: 30_000,
-        intervalSeconds: 3600, // Match hourly candle granularity
+        sinceTimestamp: now - 3600,
+        refetchInterval: 15_000,
+        intervalSeconds: 60,
         timeframeSeconds: 3600,
-        useHourly: true,
+        useMinute: true,
+        useHourly: false,
       };
     case "1D":
       return {
         sinceTimestamp: now - 86400,
         refetchInterval: 30_000,
-        intervalSeconds: 3600,
+        intervalSeconds: 900, // 15-min buckets from minute candles
         timeframeSeconds: 86400,
-        useHourly: true,
+        useMinute: true,
+        useHourly: false,
       };
     case "1W":
       return {
@@ -42,6 +44,7 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
         // Finer intervals for new tokens so trading data isn't collapsed
         intervalSeconds: tokenAge < 86400 ? 3600 : 21600,
         timeframeSeconds: 7 * 86400,
+        useMinute: false,
         useHourly: true,
       };
     case "1M":
@@ -51,26 +54,33 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
         // Finer intervals for new tokens so trading data isn't collapsed
         intervalSeconds: tokenAge < 86400 ? 3600 : tokenAge < 7 * 86400 ? 21600 : 86400,
         timeframeSeconds: 30 * 86400,
+        useMinute: false,
         useHourly: tokenAge < 7 * 86400,
       };
     case "ALL": {
       // Dynamic interval based on token age
       let intervalSeconds: number;
+      let useMinute: boolean;
       let useHourly: boolean;
       if (tokenAge < 3600) {
-        intervalSeconds = 180;
-        useHourly = true;
+        intervalSeconds = 60;
+        useMinute = true;
+        useHourly = false;
       } else if (tokenAge < 86400) {
         intervalSeconds = 900;
-        useHourly = true;
+        useMinute = true;
+        useHourly = false;
       } else if (tokenAge < 7 * 86400) {
         intervalSeconds = 3600;
+        useMinute = false;
         useHourly = true;
       } else if (tokenAge < 30 * 86400) {
         intervalSeconds = 21600;
+        useMinute = false;
         useHourly = false;
       } else {
         intervalSeconds = 86400;
+        useMinute = false;
         useHourly = false;
       }
       return {
@@ -78,6 +88,7 @@ function getTimeframeConfig(timeframe: Timeframe, createdAt?: number) {
         refetchInterval: 60_000,
         intervalSeconds,
         timeframeSeconds: Infinity,
+        useMinute,
         useHourly,
       };
     }
@@ -174,9 +185,14 @@ async function fetchCandlePriceHistory(
 ): Promise<ChartDataPoint[]> {
   const config = getTimeframeConfig(timeframe, createdAt);
 
-  const candles = config.useHourly
-    ? await getUnitHourData(unitAddress, config.sinceTimestamp)
-    : await getUnitDayData(unitAddress, config.sinceTimestamp);
+  let candles: SubgraphUnitCandle[];
+  if (config.useMinute) {
+    candles = await getUnitMinuteData(unitAddress, config.sinceTimestamp);
+  } else if (config.useHourly) {
+    candles = await getUnitHourData(unitAddress, config.sinceTimestamp);
+  } else {
+    candles = await getUnitDayData(unitAddress, config.sinceTimestamp);
+  }
 
   if (!candles || candles.length === 0) return [];
 

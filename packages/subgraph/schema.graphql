@@ -127,6 +127,7 @@ type Unit @entity(immutable: false) {
 
   rig: Rig!                            # The rig that mints this token
   swaps: [Swap!]! @derivedFrom(field: "unit")
+  minuteData: [UnitMinuteData!]! @derivedFrom(field: "unit")
   hourData: [UnitHourData!]! @derivedFrom(field: "unit")
   dayData: [UnitDayData!]! @derivedFrom(field: "unit")
 }
@@ -134,6 +135,30 @@ type Unit @entity(immutable: false) {
 # =============================================================================
 # PRICE CHART DATA
 # =============================================================================
+
+# Minute OHLCV candles (for fine-grained charts on new tokens)
+type UnitMinuteData @entity(immutable: false) {
+  id: ID!                              # {unitAddress}-{minuteIndex}
+  unit: Unit!
+
+  # Time
+  timestamp: BigInt!                   # Minute start (unix)
+  minuteIndex: Int!                    # Minutes since epoch
+
+  # OHLC (in USDC)
+  open: BigDecimal!
+  high: BigDecimal!
+  low: BigDecimal!
+  close: BigDecimal!
+
+  # Volume
+  volumeUnit: BigDecimal!              # Unit volume this minute
+  volumeUsdc: BigDecimal!             # USDC volume this minute
+  txCount: BigInt!                     # Swaps this minute
+
+  # Liquidity snapshot
+  liquidity: BigDecimal!               # USDC in LP at minute end
+}
 
 # Hourly OHLCV candles
 type UnitHourData @entity(immutable: false) {

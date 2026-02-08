@@ -486,6 +486,28 @@ export const GET_DONATIONS_QUERY = gql`
   }
 `;
 
+// Get minute candle data for a unit token
+export const GET_UNIT_MINUTE_DATA_QUERY = gql`
+  query GetUnitMinuteData($unitAddress: String!, $since: BigInt!) {
+    unitMinuteDatas(
+      where: { unit: $unitAddress, timestamp_gte: $since }
+      orderBy: timestamp
+      orderDirection: asc
+      first: 1000
+    ) {
+      id
+      timestamp
+      open
+      high
+      low
+      close
+      volumeUnit
+      volumeUsdc
+      txCount
+    }
+  }
+`;
+
 // Get hourly candle data for a unit token
 export const GET_UNIT_HOUR_DATA_QUERY = gql`
   query GetUnitHourData($unitAddress: String!, $since: BigInt!) {
@@ -849,6 +871,26 @@ export async function getDonations(
     return data.donations ?? [];
   } catch (error) {
     console.error("[getDonations] Error:", error);
+    return [];
+  }
+}
+
+// Get minute candle data for a unit token
+export async function getUnitMinuteData(
+  unitAddress: string,
+  since: number
+): Promise<SubgraphUnitCandle[]> {
+  try {
+    const data = await client.request<{ unitMinuteDatas: SubgraphUnitCandle[] }>(
+      GET_UNIT_MINUTE_DATA_QUERY,
+      {
+        unitAddress: unitAddress.toLowerCase(),
+        since: since.toString(),
+      }
+    );
+    return data.unitMinuteDatas ?? [];
+  } catch (error) {
+    console.error("[getUnitMinuteData] Error:", error);
     return [];
   }
 }

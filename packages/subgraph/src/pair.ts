@@ -6,6 +6,7 @@ import {
 } from '../generated/templates/UniswapV2Pair/UniswapV2Pair'
 import {
   Unit,
+  UnitMinuteData,
   UnitHourData,
   UnitDayData,
   Swap,
@@ -24,6 +25,7 @@ import {
   convertTokenToDecimal,
   getOrCreateProtocol,
   getOrCreateAccount,
+  getOrCreateUnitMinuteData,
   getOrCreateUnitHourData,
   getOrCreateUnitDayData,
   updateUnitPrice,
@@ -103,7 +105,18 @@ export function handleSync(event: SyncEvent): void {
   unit.liquidity = reserveUsdc
   unit.liquidityUSD = reserveUsdc
 
-  // Update hour/day data OHLC
+  // Update minute/hour/day data OHLC
+  let minuteData = getOrCreateUnitMinuteData(unit, event)
+  minuteData.close = newPrice
+  if (newPrice.gt(minuteData.high)) {
+    minuteData.high = newPrice
+  }
+  if (newPrice.lt(minuteData.low) || minuteData.low.equals(ZERO_BD)) {
+    minuteData.low = newPrice
+  }
+  minuteData.liquidity = reserveUsdc
+  minuteData.save()
+
   let hourData = getOrCreateUnitHourData(unit, event)
   hourData.close = newPrice
   if (newPrice.gt(hourData.high)) {
@@ -215,6 +228,13 @@ export function handleSwap(event: SwapEvent): void {
   unit.lastSwapAt = event.block.timestamp
   unit.lastActivityAt = event.block.timestamp
   unit.save()
+
+  // Update minute data
+  let minuteData = getOrCreateUnitMinuteData(unit, event)
+  minuteData.volumeUnit = minuteData.volumeUnit.plus(amountUnit)
+  minuteData.volumeUsdc = minuteData.volumeUsdc.plus(amountUsdc)
+  minuteData.txCount = minuteData.txCount.plus(ONE_BI)
+  minuteData.save()
 
   // Update hour data
   let hourData = getOrCreateUnitHourData(unit, event)
