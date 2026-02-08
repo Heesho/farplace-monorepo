@@ -480,7 +480,7 @@ export function TradeModal({
           {/* Number pad */}
           <div
             className="pb-4"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
           >
             <div className="grid grid-cols-3 gap-2">
               {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "backspace"].map(

@@ -382,7 +382,7 @@ export function AdminModal({
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)",
         }}
       >
         {/* Header */}

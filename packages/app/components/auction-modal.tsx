@@ -220,7 +220,7 @@ export function AuctionModal({
               {/* Action button */}
               <div
                 className="pb-4"
-                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+                style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
               >
                 <button
                   onClick={handleBuy}
