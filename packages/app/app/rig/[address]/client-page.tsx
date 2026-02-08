@@ -259,6 +259,15 @@ export default function RigDetailPage() {
     queryFn: () => getRig(address),
     enabled: !!address,
     staleTime: 30_000,
+    // Short refetch until type-specific data arrives (spinRig/mineRig/fundRig)
+    refetchInterval: (query) => {
+      const rig = query.state.data;
+      if (!rig) return 3000;
+      if (rig.rigType === "mine" && !rig.mineRig) return 3000;
+      if (rig.rigType === "spin" && !rig.spinRig) return 3000;
+      if (rig.rigType === "fund" && !rig.fundRig) return 3000;
+      return false;
+    },
   });
 
   // Detect rig type dynamically from on-chain
@@ -893,6 +902,16 @@ export default function RigDetailPage() {
                   </div>
                 </>
               )}
+              {rigType === "spin" && !subgraphRig?.spinRig && (
+                <>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i}>
+                      <div className="w-20 h-3 bg-secondary rounded animate-pulse mb-1" />
+                      <div className="w-16 h-5 bg-secondary rounded animate-pulse" />
+                    </div>
+                  ))}
+                </>
+              )}
               {rigType === "spin" && subgraphRig?.spinRig && (
                 <>
                   <div>
@@ -954,6 +973,16 @@ export default function RigDetailPage() {
                       </div>
                     </div>
                   )}
+                </>
+              )}
+              {rigType === "fund" && !subgraphRig?.fundRig && (
+                <>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i}>
+                      <div className="w-20 h-3 bg-secondary rounded animate-pulse mb-1" />
+                      <div className="w-16 h-5 bg-secondary rounded animate-pulse" />
+                    </div>
+                  ))}
                 </>
               )}
               {rigType === "fund" && subgraphRig?.fundRig && (
