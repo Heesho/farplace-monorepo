@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Upload, ChevronDown, ChevronUp, X, Pickaxe, Dices, Heart, Plus, Minus } from "lucide-react";
+import { NavBar } from "@/components/nav-bar";
 import { parseUnits, formatUnits, parseEventLogs } from "viem";
 import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
@@ -1236,33 +1237,21 @@ export default function LaunchPage() {
     }
   };
 
-  return (
-    <main className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
-      <div
-        className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
-        style={{
-          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)",
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pb-2">
-          <button
-            onClick={() => rigType ? handleBack() : router.back()}
-            className="p-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-          <span className="text-base font-semibold">
-            {rigType ? `Launch ${RIG_INFO[rigType].name} Rig` : "Launch"}
-          </span>
-          <div className="w-9" />
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-2">
-          {rigType === null ? (
-            // Rig Type Selection
+  // Rig type selection — normal page
+  if (rigType === null) {
+    return (
+      <main className="flex h-screen w-screen justify-center bg-zinc-800">
+        <div
+          className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
+          style={{
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+          }}
+        >
+          <div className="px-4 pb-4">
+            <h1 className="text-2xl font-semibold tracking-tight">Launch</h1>
+          </div>
+          <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-2">
             <div className="space-y-4">
               <div className="mb-6">
                 <h2 className="font-semibold text-foreground mb-2">
@@ -1277,8 +1266,40 @@ export default function LaunchPage() {
               <RigTypeCard type="spin" onSelect={() => handleRigTypeSelect("spin")} />
               <RigTypeCard type="fund" onSelect={() => handleRigTypeSelect("fund")} />
             </div>
-          ) : (
-            // Token Details Form
+          </div>
+        </div>
+        <NavBar />
+      </main>
+    );
+  }
+
+  // Rig config form — modal overlay
+  return (
+    <main className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
+      <div
+        className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
+        style={{
+          paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)",
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pb-2">
+          <button
+            onClick={handleBack}
+            className="p-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <span className="text-base font-semibold">
+            Launch {RIG_INFO[rigType].name} Rig
+          </span>
+          <div className="w-9" />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-2">
+          {/* Token Details Form */}
             <div className="space-y-4">
               {/* Logo + Name + Symbol Row */}
               <div className="flex items-start gap-4">
@@ -1970,15 +1991,13 @@ export default function LaunchPage() {
                 </div>
               )}
             </div>
-          )}
         </div>
 
-        {/* Bottom Action Bar (only show when rig type selected) */}
-        {rigType !== null && (
-          <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
-          >
+        {/* Bottom Action Bar */}
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 bg-background flex justify-center"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 32px)" }}
+        >
             <div className="flex items-center justify-between w-full max-w-[520px] px-4 py-3 bg-background">
               <div className="flex items-center gap-5">
                 <div>
@@ -2025,10 +2044,9 @@ export default function LaunchPage() {
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Success Modal - contained within phone screen */}
+      {/* Success */}
       {txStatus === "success" && txHash && (
         <div className="fixed inset-0 z-[100] flex h-screen w-screen justify-center bg-zinc-800">
           <div
