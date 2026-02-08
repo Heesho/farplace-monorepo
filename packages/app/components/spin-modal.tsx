@@ -254,7 +254,7 @@ export function SpinModal({
         className="relative flex h-full w-full max-w-[520px] flex-col bg-background"
         style={{
           paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
-          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+          paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 160px)",
         }}
       >
         {/* Header */}
