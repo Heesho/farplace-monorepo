@@ -267,7 +267,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
 
         // Initialize slot 0 with the team as the first miner
         indexToSlot[0] = Slot({
-            epochId: 1,
+            epochId: 2,
             initPrice: _config.minInitPrice,
             startTime: block.timestamp,
             ups: _config.initialUps,
@@ -276,7 +276,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
             miner: _team,
             uri: ""
         });
-        emit MineRig__Mine(_team, _team, 0, 0, 0, "");
+        emit MineRig__Mine(_team, _team, 0, 1, 0, "");
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/

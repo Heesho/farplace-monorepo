@@ -1160,7 +1160,7 @@ describe("Business Logic Tests", function () {
       const state = await multicall.getRig(testRig, 0, user1.address);
 
       expect(state.miner).to.equal(user1.address);
-      expect(state.epochId).to.equal(2);
+      expect(state.epochId).to.equal(3);
       expect(state.ups).to.be.gt(0);
     });
 
@@ -1572,7 +1572,7 @@ describe("Business Logic Tests", function () {
         await mineRig(result.rig, users[i]);
         const slot = await rigContract.getSlot(0);
         expect(slot.miner).to.equal(users[i].address);
-        expect(slot.epochId).to.equal(i + 2);
+        expect(slot.epochId).to.equal(i + 3);
       }
     });
 
@@ -1626,11 +1626,11 @@ describe("Business Logic Tests", function () {
 
       for (let i = 0; i < 10; i++) {
         const slot = await rigContract.getSlot(0);
-        expect(slot.epochId).to.equal(i + 1);
+        expect(slot.epochId).to.equal(i + 2);
         await mineRig(result.rig, i % 2 === 0 ? user1 : user2);
       }
       const slotFinal = await rigContract.getSlot(0);
-      expect(slotFinal.epochId).to.equal(11);
+      expect(slotFinal.epochId).to.equal(12);
     });
   });
 });

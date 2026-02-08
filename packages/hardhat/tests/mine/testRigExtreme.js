@@ -530,7 +530,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
 
       // Verify state is consistent
       const finalSlot = await result.rig.getSlot(0);
-      expect(finalSlot.epochId).to.equal(6);
+      expect(finalSlot.epochId).to.equal(7);
       expect(finalSlot.startTime).to.be.gt(0);
       expect(finalSlot.ups).to.be.gt(0);
     });
@@ -750,7 +750,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
 
       // Verify final state
       const finalSlot = await result.rig.getSlot(0);
-      expect(finalSlot.epochId).to.equal(101);
+      expect(finalSlot.epochId).to.equal(102);
     });
 
     it("STRESS: Mine all 256 slots (max capacity)", async function () {

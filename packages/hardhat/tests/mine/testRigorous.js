@@ -503,13 +503,13 @@ describe("Rigorous Tests", function () {
       // Verify initial state
       expect(await rigContract.getUps()).to.equal(convert("100", 18));
       let slot = await rigContract.getSlot(0);
-      expect(slot.epochId).to.equal(1);
+      expect(slot.epochId).to.equal(2);
 
       // First mine (displaces the launcher who was initialized as slot 0 miner)
       await mineRig(result.rig, user1);
       slot = await rigContract.getSlot(0);
       expect(slot.miner).to.equal(user1.address);
-      expect(slot.epochId).to.equal(2);
+      expect(slot.epochId).to.equal(3);
 
       // Wait and verify token accrual
       await network.provider.send("evm_increaseTime", [10]);
@@ -583,7 +583,7 @@ describe("Rigorous Tests", function () {
       // State should still be queryable
       const state = await multicall.getRig(result.rig, 0, user1.address);
       expect(state.miner).to.equal(user1.address);
-      expect(state.epochId).to.equal(2);
+      expect(state.epochId).to.equal(3);
 
       // UPS may have changed due to tokens minted to launcher during idle period
       // Just verify state is still queryable
@@ -615,7 +615,7 @@ describe("Rigorous Tests", function () {
       // Protocol should have received 1% of all payments
       expect(totalProtocolFees).to.be.gt(0);
       const slotFinal = await rigContract.getSlot(0);
-      expect(slotFinal.epochId).to.equal(11);
+      expect(slotFinal.epochId).to.equal(12);
     });
   });
 

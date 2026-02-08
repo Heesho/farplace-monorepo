@@ -907,7 +907,7 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
 
             // 2. Read initial state via Multicall
             let state = await multicall.getRig(rigAddr, 0, user1.address);
-            expect(state.epochId).to.equal(1);
+            expect(state.epochId).to.equal(2);
             // Fresh rig's initial miner is the launcher (slot 0 initialized in constructor)
             let slot = await rig.getSlot(0);
             expect(slot.miner).to.equal(user0.address);

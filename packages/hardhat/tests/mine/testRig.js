@@ -980,9 +980,9 @@ describe("Rig Comprehensive Tests", function () {
       const slot1 = await multiRigContract.getSlot(1);
       const slot2 = await multiRigContract.getSlot(2);
 
-      // Slot 0 is at epoch 2 (initialized at 1 by constructor, then mined once)
+      // Slot 0 is at epoch 3 (initialized at 2 by constructor, then mined once)
       // Slots 1 and 2 are at epoch 1 (uninitialized, then mined once)
-      expect(slot0.epochId).to.equal(2);
+      expect(slot0.epochId).to.equal(3);
       expect(slot1.epochId).to.equal(1);
       expect(slot2.epochId).to.equal(1);
     });
