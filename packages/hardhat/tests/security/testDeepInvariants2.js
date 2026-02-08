@@ -65,7 +65,8 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
 
     await unitToken.setRig(rig.address);
@@ -145,7 +146,8 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
         treasury.address,
         AddressZero,           // team == address(0)
         recipient.address,
-        [convert("1000", 18), convert("10", 18), 30] // Config
+        [convert("1000", 18), convert("10", 18), 30], // Config
+        "" // uri
       );
 
       await unitNoTeam.setRig(rigNoTeam.address);
@@ -252,7 +254,8 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
 
     await unitToken.setRig(rig.address);
@@ -492,8 +495,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
     // Deploy factories
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -505,7 +506,6 @@ describe("Section 3: Registry Consistency Invariants", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -520,7 +520,7 @@ describe("Section 3: Registry Consistency Invariants", function () {
   });
 
   describe("INV-REG-1: Every rig launched via Core is registered in Registry", function () {
-    it("isRegistered == true for a rig launched via MineCore", async function () {
+    it("rigToIsRegistered == true for a rig launched via MineCore", async function () {
       const launchParams = {
         launcher: user0.address,
         quoteToken: weth.address,
@@ -552,13 +552,13 @@ describe("Section 3: Registry Consistency Invariants", function () {
       unitAddress = launchEvent.args.unit;
       auctionAddress = launchEvent.args.auction;
 
-      const isRegistered = await registry.isRegistered(rigAddress);
-      expect(isRegistered).to.equal(true);
+      const rigToIsRegistered = await registry.rigToIsRegistered(rigAddress);
+      expect(rigToIsRegistered).to.equal(true);
     });
   });
 
   describe("INV-REG-2: Random addresses that were NOT launched are NOT registered", function () {
-    it("isRegistered == false for arbitrary addresses", async function () {
+    it("rigToIsRegistered == false for arbitrary addresses", async function () {
       // Test several addresses that were never launched as rigs
       const randomAddresses = [
         user0.address,
@@ -574,8 +574,8 @@ describe("Section 3: Registry Consistency Invariants", function () {
       ];
 
       for (const addr of randomAddresses) {
-        const isRegistered = await registry.isRegistered(addr);
-        expect(isRegistered).to.equal(false,
+        const rigToIsRegistered = await registry.rigToIsRegistered(addr);
+        expect(rigToIsRegistered).to.equal(false,
           `Address ${addr} should not be registered`
         );
       }
@@ -679,8 +679,6 @@ describe("Section 4: Randomized Action Sequence Stress Test (MineRig)", function
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -691,7 +689,6 @@ describe("Section 4: Randomized Action Sequence Stress Test (MineRig)", function
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -888,8 +885,6 @@ describe("Section 5: MineRig Claim Accounting Deep Tests", function () {
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -900,7 +895,6 @@ describe("Section 5: MineRig Claim Accounting Deep Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

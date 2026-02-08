@@ -47,8 +47,7 @@ contract Auction is ReentrancyGuard {
     error Auction__EpochIdMismatch();
     error Auction__MaxPaymentAmountExceeded();
     error Auction__EmptyAssets();
-    error Auction__ZeroPaymentToken();
-    error Auction__ZeroPaymentReceiver();
+    error Auction__ZeroAddress();
     error Auction__InitPriceOutOfRange();
     error Auction__EpochPeriodOutOfRange();
     error Auction__PriceMultiplierOutOfRange();
@@ -77,8 +76,8 @@ contract Auction is ReentrancyGuard {
         uint256 _priceMultiplier,
         uint256 _minInitPrice
     ) {
-        if (_paymentToken == address(0)) revert Auction__ZeroPaymentToken();
-        if (_paymentReceiver == address(0)) revert Auction__ZeroPaymentReceiver();
+        if (_paymentToken == address(0)) revert Auction__ZeroAddress();
+        if (_paymentReceiver == address(0)) revert Auction__ZeroAddress();
         if (_initPrice < _minInitPrice || _initPrice > ABS_MAX_INIT_PRICE) revert Auction__InitPriceOutOfRange();
         if (_epochPeriod < MIN_EPOCH_PERIOD || _epochPeriod > MAX_EPOCH_PERIOD) revert Auction__EpochPeriodOutOfRange();
         if (_priceMultiplier < MIN_PRICE_MULTIPLIER || _priceMultiplier > MAX_PRICE_MULTIPLIER) revert Auction__PriceMultiplierOutOfRange();

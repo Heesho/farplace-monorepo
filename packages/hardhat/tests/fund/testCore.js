@@ -9,7 +9,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 let owner, protocol, user0, user1, user2;
 let usdc, registry, core;
 let fundRig, auction, unit, lpToken;
-let unitFactory, fundRigFactory, auctionFactory;
+let unitFactory, auctionFactory;
 let uniswapFactory, uniswapRouter;
 
 describe("FundCore Launch Tests", function () {
@@ -43,10 +43,6 @@ describe("FundCore Launch Tests", function () {
     unitFactory = await unitFactoryArtifact.deploy();
     console.log("- UnitFactory Initialized");
 
-    const fundRigFactoryArtifact = await ethers.getContractFactory("FundRigFactory");
-    fundRigFactory = await fundRigFactoryArtifact.deploy();
-    console.log("- FundRigFactory Initialized");
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
     console.log("- AuctionFactory Initialized");
@@ -59,7 +55,6 @@ describe("FundCore Launch Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      fundRigFactory.address,
       auctionFactory.address,
       protocol.address,
       convert("100", 6) // minUsdcForLaunch
@@ -225,7 +220,7 @@ describe("FundCore Launch Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "FundCore__ZeroLauncher()"
+      "FundCore__ZeroAddress()"
     );
     console.log("Launch correctly reverted with zero launcher address");
   });
@@ -254,7 +249,7 @@ describe("FundCore Launch Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "FundCore__ZeroQuoteToken()"
+      "FundCore__ZeroAddress()"
     );
     console.log("Launch correctly reverted with zero quote token");
   });

@@ -56,8 +56,6 @@ describe("MineRig Invariant Tests", function () {
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
     // Deploy factories
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
     const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -75,7 +73,6 @@ describe("MineRig Invariant Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -687,8 +684,6 @@ describe("MineRig Business Logic Tests", function () {
     const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
     const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -704,7 +699,6 @@ describe("MineRig Business Logic Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

@@ -77,6 +77,11 @@
         "internalType": "struct MineRig.Config",
         "name": "_config",
         "type": "tuple"
+      },
+      {
+        "internalType": "string",
+        "name": "_uri",
+        "type": "string"
       }
     ],
     "stateMutability": "nonpayable",
@@ -175,11 +180,6 @@
   {
     "inputs": [],
     "name": "MineRig__ZeroAddress",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "MineRig__ZeroMiner",
     "type": "error"
   },
   {

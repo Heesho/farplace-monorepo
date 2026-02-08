@@ -38,7 +38,6 @@ interface ISpinCore {
     function uniswapV2Factory() external view returns (address);
     function uniswapV2Router() external view returns (address);
     function unitFactory() external view returns (address);
-    function spinRigFactory() external view returns (address);
     function auctionFactory() external view returns (address);
     function entropy() external view returns (address);
 

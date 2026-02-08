@@ -56,7 +56,8 @@ describe("FundRig Invariant Tests", function () {
       treasury.address,      // treasury
       team.address,          // team
       recipient.address,     // recipient (required)
-      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
 
     // Grant minting rights
@@ -342,7 +343,8 @@ describe("FundRig Business Logic Tests", function () {
       treasury.address,      // treasury
       team.address,          // team
       recipient.address,     // recipient (required)
-      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
 
     await unitToken.setRig(rig.address);
@@ -364,7 +366,8 @@ describe("FundRig Business Logic Tests", function () {
           treasury.address,
           team.address,
           AddressZero, // zero recipient should fail
-          [convert("1000", 18), convert("10", 18), 30] // Config
+          [convert("1000", 18), convert("10", 18), 30], // Config
+          "" // uri
         )
       ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
@@ -404,7 +407,7 @@ describe("FundRig Business Logic Tests", function () {
 
       await expect(
         rig.connect(user0).fund(AddressZero, convert("100", 6), "")
-      ).to.be.revertedWith("FundRig__ZeroFunder()");
+      ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
 
     it("Should allow donating on behalf of another account", async function () {

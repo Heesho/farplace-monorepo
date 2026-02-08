@@ -9,7 +9,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 let owner, protocol, user0, user1, user2;
 let usdc, registry, core;
 let spinRig, auction, unit, lpToken;
-let unitFactory, spinRigFactory, auctionFactory;
+let unitFactory, auctionFactory;
 let uniswapFactory, uniswapRouter;
 let mockEntropy;
 
@@ -49,10 +49,6 @@ describe("SpinCore Launch Tests", function () {
     unitFactory = await unitFactoryArtifact.deploy();
     console.log("- UnitFactory Initialized");
 
-    const spinRigFactoryArtifact = await ethers.getContractFactory("SpinRigFactory");
-    spinRigFactory = await spinRigFactoryArtifact.deploy();
-    console.log("- SpinRigFactory Initialized");
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
     console.log("- AuctionFactory Initialized");
@@ -65,7 +61,6 @@ describe("SpinCore Launch Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      spinRigFactory.address,
       auctionFactory.address,
       mockEntropy.address,
       protocol.address,
@@ -245,7 +240,7 @@ describe("SpinCore Launch Tests", function () {
     await usdc.connect(user0).approve(core.address, launchParams.usdcAmount);
 
     await expect(core.connect(user0).launch(launchParams)).to.be.revertedWith(
-      "SpinCore__ZeroLauncher()"
+      "SpinCore__ZeroAddress()"
     );
     console.log("Launch correctly reverted with zero launcher address");
   });

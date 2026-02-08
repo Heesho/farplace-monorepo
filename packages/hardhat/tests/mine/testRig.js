@@ -9,7 +9,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 let owner, protocol, team, user0, user1, user2, user3;
 let weth, usdc, registry, core, multicall, entropy;
 let rig, rigContract, auction, unit, unitContract, lpToken;
-let rigFactory, auctionFactory;
+let auctionFactory;
 let uniswapFactory, uniswapRouter;
 
 describe("Rig Comprehensive Tests", function () {
@@ -39,9 +39,6 @@ describe("Rig Comprehensive Tests", function () {
     uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
     // Deploy factories
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    rigFactory = await rigFactoryArtifact.deploy();
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
 
@@ -60,7 +57,6 @@ describe("Rig Comprehensive Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -688,7 +684,7 @@ describe("Rig Comprehensive Tests", function () {
         rigContract.connect(user1).mine(
           AddressZero, 0, slot.epochId, 1961439882, convert("1", 18), ""
         )
-      ).to.be.revertedWith("Rig__ZeroMiner()");
+      ).to.be.revertedWith("MineRig__ZeroAddress()");
     });
 
     it("Should allow mining for another address", async function () {

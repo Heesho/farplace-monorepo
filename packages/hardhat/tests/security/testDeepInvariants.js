@@ -68,8 +68,6 @@ describe("Section 1: Cross-Contract Token Accounting (MineRig)", function () {
     // Deploy factories
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -85,7 +83,6 @@ describe("Section 1: Cross-Contract Token Accounting (MineRig)", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -297,8 +294,6 @@ describe("Section 2: MineRig Self-Displacement Invariants", function () {
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -312,7 +307,6 @@ describe("Section 2: MineRig Self-Displacement Invariants", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -524,8 +518,6 @@ describe("Section 3: MineRig Multi-Slot Token Flow Conservation", function () {
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -539,7 +531,6 @@ describe("Section 3: MineRig Multi-Slot Token Flow Conservation", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -722,8 +713,6 @@ describe("Section 4: MineRig Quote Token Conservation", function () {
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -737,7 +726,6 @@ describe("Section 4: MineRig Quote Token Conservation", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -1005,7 +993,8 @@ describe("Section 5: SpinRig Prize Pool Accounting", function () {
       treasury.address,
       AddressZero, // team (set later via setTeam)
       mockEntropy.address,
-      config
+      config,
+      ""
     );
 
     // Grant minting rights

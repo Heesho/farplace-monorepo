@@ -8,7 +8,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 
 let owner, protocol, team, user0, user1, user2, user3, user4;
 let weth, usdc, registry, core, multicall;
-let rigFactory, auctionFactory;
+let auctionFactory;
 let uniswapFactory, uniswapRouter;
 
 // Helper to get a deadline far in the future
@@ -114,9 +114,6 @@ describe("Rigorous Tests", function () {
     uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
     // Deploy factories
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    rigFactory = await rigFactoryArtifact.deploy();
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
 
@@ -140,7 +137,6 @@ describe("Rigorous Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

@@ -22,10 +22,10 @@ contract Registry is Ownable {
     /*----------  STATE  ------------------------------------------------*/
 
     /// @notice Factory address => is approved to register
-    mapping(address => bool) public approvedFactories;
+    mapping(address => bool) public factoryToIsApproved;
 
     /// @notice Rig address => is registered
-    mapping(address => bool) public isRegistered;
+    mapping(address => bool) public rigToIsRegistered;
 
     /*----------  ERRORS  -----------------------------------------------*/
 
@@ -58,11 +58,11 @@ contract Registry is Ownable {
         address unit,
         address launcher
     ) external {
-        if (!approvedFactories[msg.sender]) revert Registry__NotApprovedFactory();
+        if (!factoryToIsApproved[msg.sender]) revert Registry__NotApprovedFactory();
         if (rig == address(0)) revert Registry__ZeroAddress();
-        if (isRegistered[rig]) revert Registry__AlreadyRegistered();
+        if (rigToIsRegistered[rig]) revert Registry__AlreadyRegistered();
 
-        isRegistered[rig] = true;
+        rigToIsRegistered[rig] = true;
 
         emit Registry__RigRegistered(rig, unit, launcher, msg.sender);
     }
@@ -76,7 +76,7 @@ contract Registry is Ownable {
      */
     function setFactoryApproval(address factory, bool approved) external onlyOwner {
         if (factory == address(0)) revert Registry__ZeroAddress();
-        approvedFactories[factory] = approved;
+        factoryToIsApproved[factory] = approved;
         emit Registry__FactoryApproved(factory, approved);
     }
 }

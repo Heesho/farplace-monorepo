@@ -9,7 +9,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 let owner, protocol, team, user0, user1, user2;
 let weth, usdc, registry, core, multicall, entropy;
 let rig, auction, unit, lpToken;
-let rigFactory, auctionFactory;
+let auctionFactory;
 
 // Mock Uniswap V2 contracts for testing
 let uniswapFactory, uniswapRouter;
@@ -46,11 +46,6 @@ describe("Core Tests", function () {
     uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
     console.log("- Uniswap V2 Router Initialized");
 
-    // Deploy MineRigFactory
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    rigFactory = await rigFactoryArtifact.deploy();
-    console.log("- MineRigFactory Initialized");
-
     // Deploy AuctionFactory
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
@@ -74,7 +69,6 @@ describe("Core Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

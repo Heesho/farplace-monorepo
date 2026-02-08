@@ -24,14 +24,14 @@ interface IRegistry {
      * @param factory Address to check
      * @return True if the factory is approved to register rigs
      */
-    function approvedFactories(address factory) external view returns (bool);
+    function factoryToIsApproved(address factory) external view returns (bool);
 
     /**
      * @notice Check if a rig is registered.
      * @param rig Address to check
      * @return True if the rig is registered
      */
-    function isRegistered(address rig) external view returns (bool);
+    function rigToIsRegistered(address rig) external view returns (bool);
 
     /**
      * @notice Approve or revoke a factory's permission to register rigs.

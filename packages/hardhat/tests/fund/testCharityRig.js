@@ -50,7 +50,8 @@ describe("FundRig Tests", function () {
       treasury.address,
       team.address,
       recipient.address, // recipient (required)
-      [INITIAL_EMISSION, MIN_EMISSION, 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [INITIAL_EMISSION, MIN_EMISSION, 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
     console.log("- FundRig Initialized (with recipient)");
 
@@ -231,7 +232,8 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           AddressZero, // zero recipient should fail
-          [INITIAL_EMISSION, MIN_EMISSION, 30] // Config
+          [INITIAL_EMISSION, MIN_EMISSION, 30], // Config
+          "" // uri
         )
       ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
@@ -246,7 +248,8 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           recipient.address,
-          [INITIAL_EMISSION, MIN_EMISSION, 6] // Config: halvingPeriod too low (min is 7)
+          [INITIAL_EMISSION, MIN_EMISSION, 6], // Config: halvingPeriod too low (min is 7)
+          "" // uri
         )
       ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
     });
@@ -261,7 +264,8 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           recipient.address,
-          [INITIAL_EMISSION, MIN_EMISSION, 366] // Config: halvingPeriod too high (max is 365)
+          [INITIAL_EMISSION, MIN_EMISSION, 366], // Config: halvingPeriod too high (max is 365)
+          "" // uri
         )
       ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
     });
@@ -336,7 +340,7 @@ describe("FundRig Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
       await expect(
         rig.connect(user0).fund(AddressZero, convert("100", 6), "")
-      ).to.be.revertedWith("FundRig__ZeroFunder()");
+      ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
 
     it("Should redirect team fees to treasury when team address is zero", async function () {

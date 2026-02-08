@@ -18,7 +18,7 @@ contract Unit is ERC20, ERC20Permit, ERC20Votes {
     bool public rigLocked;
 
     error Unit__NotRig();
-    error Unit__ZeroRig();
+    error Unit__ZeroAddress();
     error Unit__RigLocked();
 
     event Unit__Minted(address account, uint256 amount);
@@ -33,7 +33,7 @@ contract Unit is ERC20, ERC20Permit, ERC20Votes {
      * @param _initialRig Address that will have initial minting rights
      */
     constructor(string memory _name, string memory _symbol, address _initialRig) ERC20(_name, _symbol) ERC20Permit(_name) {
-        if (_initialRig == address(0)) revert Unit__ZeroRig();
+        if (_initialRig == address(0)) revert Unit__ZeroAddress();
         rig = _initialRig;
     }
 
@@ -45,7 +45,7 @@ contract Unit is ERC20, ERC20Permit, ERC20Votes {
     function setRig(address _rig) external {
         if (msg.sender != rig) revert Unit__NotRig();
         if (rigLocked) revert Unit__RigLocked();
-        if (_rig == address(0)) revert Unit__ZeroRig();
+        if (_rig == address(0)) revert Unit__ZeroAddress();
         rig = _rig;
         rigLocked = true;
         emit Unit__RigSet(_rig);

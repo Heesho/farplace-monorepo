@@ -131,7 +131,6 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     /*----------  ERRORS  -----------------------------------------------*/
 
     error MineRig__ZeroAddress();
-    error MineRig__ZeroMiner();
     error MineRig__IndexOutOfBounds();
     error MineRig__EpochIdMismatch();
     error MineRig__MaxPriceExceeded();
@@ -195,7 +194,8 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         address _treasury,
         address _team,
         address _entropy,
-        Config memory _config
+        Config memory _config,
+        string memory _uri
     ) {
         // Validate addresses (protocol is resolved via core)
         if (_unit == address(0)) revert MineRig__ZeroAddress();
@@ -236,15 +236,6 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
             revert MineRig__UpsMultiplierDurationOutOfRange();
         }
 
-        // Validate upsMultipliers (must have at least one)
-        if (_config.upsMultipliers.length == 0) revert MineRig__UpsMultipliersEmpty();
-        for (uint256 i = 0; i < _config.upsMultipliers.length;) {
-            if (_config.upsMultipliers[i] < MIN_UPS_MULTIPLIER || _config.upsMultipliers[i] > MAX_UPS_MULTIPLIER) {
-                revert MineRig__UpsMultiplierOutOfRange();
-            }
-            unchecked { ++i; }
-        }
-
         // Set immutables
         unit = _unit;
         quote = _quote;
@@ -263,7 +254,12 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         // Set initial state
         treasury = _treasury;
         team = _team;
-        upsMultipliers = _config.upsMultipliers;
+
+        // Set URI
+        uri = _uri;
+
+        // Validate and set upsMultipliers from config (immutable after deployment)
+        _validateAndSetUpsMultipliers(_config.upsMultipliers);
 
         // Initialize slot 0 with the team as the first miner
         indexToSlot[0] = Slot({
@@ -299,7 +295,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 maxPrice,
         string calldata _uri
     ) external payable nonReentrant returns (uint256 price) {
-        if (miner == address(0)) revert MineRig__ZeroMiner();
+        if (miner == address(0)) revert MineRig__ZeroAddress();
         if (block.timestamp > deadline) revert MineRig__DeadlinePassed();
         if (index >= capacity) revert MineRig__IndexOutOfBounds();
 
@@ -524,6 +520,25 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         }
 
         return slotCache.initPrice - slotCache.initPrice * timePassed / epochPeriod;
+    }
+
+    /**
+     * @notice Validate and store UPS multipliers array.
+     * @dev Each multiplier must be between MIN_UPS_MULTIPLIER (1x) and MAX_UPS_MULTIPLIER (10x).
+     * @param _upsMultipliers Array of multiplier values to validate and store
+     */
+    function _validateAndSetUpsMultipliers(uint256[] memory _upsMultipliers) internal {
+        uint256 length = _upsMultipliers.length;
+        if (length == 0) revert MineRig__UpsMultipliersEmpty();
+
+        for (uint256 i = 0; i < length;) {
+            if (_upsMultipliers[i] < MIN_UPS_MULTIPLIER || _upsMultipliers[i] > MAX_UPS_MULTIPLIER) {
+                revert MineRig__UpsMultiplierOutOfRange();
+            }
+            unchecked { ++i; }
+        }
+
+        upsMultipliers = _upsMultipliers;
     }
 
     /**

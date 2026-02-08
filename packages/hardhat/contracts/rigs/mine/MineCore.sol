@@ -5,8 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {IMineRig} from "./interfaces/IMineRig.sol";
-import {IMineRigFactory} from "./interfaces/IMineRigFactory.sol";
+import {MineRig} from "./MineRig.sol";
 import {IUnit} from "../../interfaces/IUnit.sol";
 import {IUnitFactory} from "../../interfaces/IUnitFactory.sol";
 import {IAuctionFactory} from "../../interfaces/IAuctionFactory.sol";
@@ -23,7 +22,7 @@ import {IRegistry} from "../../interfaces/IRegistry.sol";
  *         3. Creates a Unit/USDC liquidity pool on Uniswap V2
  *         4. Burns the initial LP tokens
  *         5. Deploys an Auction contract to collect and auction treasury fees
- *         6. Deploys a new MineRig contract via RigFactory
+ *         6. Deploys a new MineRig contract
  *         7. Transfers Unit minting rights to the MineRig (permanently locked)
  *         8. Transfers ownership of the MineRig to the launcher
  *         9. Registers the MineRig with the central Registry
@@ -43,7 +42,6 @@ contract MineCore is Ownable, ReentrancyGuard {
     address public immutable uniswapV2Factory; // Uniswap V2 factory
     address public immutable uniswapV2Router; // Uniswap V2 router
     address public immutable unitFactory; // factory for deploying Unit tokens
-    address public immutable mineRigFactory; // factory for deploying MineRigs
     address public immutable auctionFactory; // factory for deploying Auctions
     address public immutable entropy; // Pyth Entropy contract for randomness
 
@@ -89,8 +87,6 @@ contract MineCore is Ownable, ReentrancyGuard {
     /*----------  ERRORS  -----------------------------------------------*/
 
     error MineCore__InsufficientUsdc();
-    error MineCore__ZeroLauncher();
-    error MineCore__ZeroQuoteToken();
     error MineCore__EmptyTokenName();
     error MineCore__EmptyTokenSymbol();
     error MineCore__EmptyUri();
@@ -136,7 +132,6 @@ contract MineCore is Ownable, ReentrancyGuard {
      * @param _uniswapV2Factory Uniswap V2 factory address
      * @param _uniswapV2Router Uniswap V2 router address
      * @param _unitFactory UnitFactory contract address
-     * @param _mineRigFactory MineRigFactory contract address
      * @param _auctionFactory AuctionFactory contract address
      * @param _entropy Pyth Entropy contract address
      * @param _protocolFeeAddress Address to receive protocol fees
@@ -148,7 +143,6 @@ contract MineCore is Ownable, ReentrancyGuard {
         address _uniswapV2Factory,
         address _uniswapV2Router,
         address _unitFactory,
-        address _mineRigFactory,
         address _auctionFactory,
         address _entropy,
         address _protocolFeeAddress,
@@ -156,7 +150,7 @@ contract MineCore is Ownable, ReentrancyGuard {
     ) {
         if (
             _registry == address(0) || _usdcToken == address(0) || _uniswapV2Factory == address(0)
-                || _uniswapV2Router == address(0) || _unitFactory == address(0) || _mineRigFactory == address(0)
+                || _uniswapV2Router == address(0) || _unitFactory == address(0)
                 || _auctionFactory == address(0) || _entropy == address(0)
         ) {
             revert MineCore__ZeroAddress();
@@ -167,7 +161,6 @@ contract MineCore is Ownable, ReentrancyGuard {
         uniswapV2Factory = _uniswapV2Factory;
         uniswapV2Router = _uniswapV2Router;
         unitFactory = _unitFactory;
-        mineRigFactory = _mineRigFactory;
         auctionFactory = _auctionFactory;
         entropy = _entropy;
         protocolFeeAddress = _protocolFeeAddress;
@@ -233,33 +226,36 @@ contract MineCore is Ownable, ReentrancyGuard {
             params.auctionMinInitPrice
         );
 
-        // Deploy MineRig via factory
+        // Deploy MineRig inline
         // Treasury is the Auction contract (receives 15% of mining fees)
-        rig = IMineRigFactory(mineRigFactory).deploy(
+        MineRig.Config memory rigConfig = MineRig.Config({
+            epochPeriod: params.rigEpochPeriod,
+            priceMultiplier: params.rigPriceMultiplier,
+            minInitPrice: params.rigMinInitPrice,
+            initialUps: params.initialUps,
+            halvingAmount: params.halvingAmount,
+            tailUps: params.tailUps,
+            upsMultipliers: params.upsMultipliers,
+            upsMultiplierDuration: params.upsMultiplierDuration
+        });
+
+        MineRig mineRig = new MineRig(
             unit,
             params.quoteToken,
             address(this), // core
             auction, // treasury
             params.launcher, // team
             entropy,
-            params.rigEpochPeriod,
-            params.rigPriceMultiplier,
-            params.rigMinInitPrice,
-            params.initialUps,
-            params.halvingAmount,
-            params.tailUps,
-            params.upsMultipliers,
-            params.upsMultiplierDuration
+            rigConfig,
+            params.uri
         );
+        rig = address(mineRig);
 
         // Transfer Unit minting rights to MineRig (permanently locked since MineRig has no setRig function)
         IUnit(unit).setRig(rig);
 
-        // Set initial URI for the rig (required)
-        IMineRig(rig).setUri(params.uri);
-
         // Transfer MineRig ownership to launcher
-        IMineRig(rig).transferOwnership(params.launcher);
+        mineRig.transferOwnership(params.launcher);
 
         // Update local registry
         rigToIsRig[rig] = true;
@@ -329,8 +325,8 @@ contract MineCore is Ownable, ReentrancyGuard {
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        if (params.launcher == address(0)) revert MineCore__ZeroLauncher();
-        if (params.quoteToken == address(0)) revert MineCore__ZeroQuoteToken();
+        if (params.launcher == address(0)) revert MineCore__ZeroAddress();
+        if (params.quoteToken == address(0)) revert MineCore__ZeroAddress();
         if (params.usdcAmount < minUsdcForLaunch) revert MineCore__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert MineCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert MineCore__EmptyTokenSymbol();

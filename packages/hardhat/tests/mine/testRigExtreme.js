@@ -104,9 +104,6 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
     const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
 
@@ -124,7 +121,6 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

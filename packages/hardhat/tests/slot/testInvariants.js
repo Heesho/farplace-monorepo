@@ -70,7 +70,8 @@ describe("SpinRig Invariant Tests", function () {
       treasury.address,
       AddressZero, // team (set later via setTeam)
       mockEntropy.address,
-      config
+      config,
+      ""
     );
 
     // Grant minting rights
@@ -374,7 +375,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
@@ -392,7 +393,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -410,7 +411,7 @@ describe("SpinRig Invariant Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(protocol.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
   });
@@ -479,7 +480,8 @@ describe("SpinRig Business Logic Tests", function () {
       treasury.address,
       AddressZero, // team (set later via setTeam)
       mockEntropy.address,
-      config
+      config,
+      ""
     );
 
     await unitToken.setRig(rig.address);
@@ -675,7 +677,7 @@ describe("SpinRig Business Logic Tests", function () {
           "",
           { value: fee }
         )
-      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
+      ).to.be.revertedWith("SpinRig__ZeroAddress()");
     });
   });
 

@@ -115,7 +115,6 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     /*----------  ERRORS  -----------------------------------------------*/
 
     error SpinRig__ZeroAddress();
-    error SpinRig__ZeroSpinner();
     error SpinRig__EpochIdMismatch();
     error SpinRig__MaxPriceExceeded();
     error SpinRig__DeadlinePassed();
@@ -174,7 +173,8 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         address _treasury,
         address _team,
         address _entropy,
-        Config memory _config
+        Config memory _config,
+        string memory _uri
     ) {
         if (_unit == address(0)) revert SpinRig__ZeroAddress();
         if (_quote == address(0)) revert SpinRig__ZeroAddress();
@@ -221,6 +221,9 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         spinStartTime = block.timestamp;
         initPrice = _config.minInitPrice;
 
+        // Set URI
+        uri = _uri;
+
         // Validate and set odds from config (immutable after deployment)
         _validateAndSetOdds(_config.odds);
     }
@@ -243,7 +246,7 @@ contract SpinRig is IEntropyConsumer, ReentrancyGuard, Ownable {
         uint256 maxPrice,
         string calldata _uri
     ) external payable nonReentrant returns (uint256 price) {
-        if (spinner == address(0)) revert SpinRig__ZeroSpinner();
+        if (spinner == address(0)) revert SpinRig__ZeroAddress();
         if (block.timestamp > deadline) revert SpinRig__DeadlinePassed();
         if (_epochId != epochId) revert SpinRig__EpochIdMismatch();
 

@@ -4,7 +4,7 @@ const { ethers, network } = require("hardhat");
 const convert = (amount, decimals = 18) => ethers.utils.parseUnits(amount.toString(), decimals);
 
 describe("Comprehensive Security Tests", function () {
-    let WETH, USDC, registry, uniFactory, uniRouter, rigFactory, auctionFactory, core, multicall;
+    let WETH, USDC, registry, uniFactory, uniRouter, auctionFactory, core, multicall;
     let owner, user0, user1, user2, user3, attacker, treasury, team;
 
     const PRECISION = ethers.BigNumber.from("1000000000000000000");
@@ -52,10 +52,6 @@ describe("Comprehensive Security Tests", function () {
         uniRouter = await UniRouter.deploy(uniFactory.address);
         await uniRouter.deployed();
 
-        const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-        rigFactory = await MineRigFactory.deploy();
-        await rigFactory.deployed();
-
         const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
         auctionFactory = await AuctionFactory.deploy();
         await auctionFactory.deployed();
@@ -81,7 +77,6 @@ describe("Comprehensive Security Tests", function () {
             uniFactory.address,
             uniRouter.address,
             unitFactory.address,
-            rigFactory.address,
             auctionFactory.address,
             entropy.address,
             owner.address,

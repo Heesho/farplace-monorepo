@@ -5,8 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {IFundRig} from "./interfaces/IFundRig.sol";
-import {IFundRigFactory} from "./interfaces/IFundRigFactory.sol";
+import {FundRig} from "./FundRig.sol";
 import {IUnit} from "../../interfaces/IUnit.sol";
 import {IUnitFactory} from "../../interfaces/IUnitFactory.sol";
 import {IAuctionFactory} from "../../interfaces/IAuctionFactory.sol";
@@ -24,7 +23,7 @@ import {IRegistry} from "../../interfaces/IRegistry.sol";
  *         3. Creates a Unit/USDC liquidity pool on Uniswap V2
  *         4. Burns the initial LP tokens
  *         5. Deploys an Auction contract to collect and auction treasury fees
- *         6. Deploys a FundRig contract via FundRigFactory
+ *         6. Deploys a FundRig contract
  *         7. Transfers Unit minting rights to the FundRig (permanently locked)
  *         8. Transfers ownership of the FundRig to the launcher
  *         9. Registers the FundRig with the central Registry
@@ -44,7 +43,6 @@ contract FundCore is Ownable, ReentrancyGuard {
     address public immutable uniswapV2Factory; // Uniswap V2 factory
     address public immutable uniswapV2Router; // Uniswap V2 router
     address public immutable unitFactory; // factory for deploying Unit tokens
-    address public immutable fundRigFactory; // factory for deploying FundRigs
     address public immutable auctionFactory; // factory for deploying Auctions
 
     /*----------  STATE  ------------------------------------------------*/
@@ -85,9 +83,6 @@ contract FundCore is Ownable, ReentrancyGuard {
     /*----------  ERRORS  -----------------------------------------------*/
 
     error FundCore__InsufficientUsdc();
-    error FundCore__ZeroLauncher();
-    error FundCore__ZeroQuoteToken();
-    error FundCore__ZeroRecipient();
     error FundCore__EmptyTokenName();
     error FundCore__EmptyTokenSymbol();
     error FundCore__EmptyUri();
@@ -129,7 +124,6 @@ contract FundCore is Ownable, ReentrancyGuard {
      * @param _uniswapV2Factory Uniswap V2 factory address
      * @param _uniswapV2Router Uniswap V2 router address
      * @param _unitFactory UnitFactory contract address
-     * @param _fundRigFactory FundRigFactory contract address
      * @param _auctionFactory AuctionFactory contract address
      * @param _protocolFeeAddress Address to receive protocol fees
      * @param _minUsdcForLaunch Minimum USDC required to launch
@@ -140,14 +134,13 @@ contract FundCore is Ownable, ReentrancyGuard {
         address _uniswapV2Factory,
         address _uniswapV2Router,
         address _unitFactory,
-        address _fundRigFactory,
         address _auctionFactory,
         address _protocolFeeAddress,
         uint256 _minUsdcForLaunch
     ) {
         if (
             _registry == address(0) || _usdcToken == address(0) || _uniswapV2Factory == address(0)
-                || _uniswapV2Router == address(0) || _unitFactory == address(0) || _fundRigFactory == address(0)
+                || _uniswapV2Router == address(0) || _unitFactory == address(0)
                 || _auctionFactory == address(0)
         ) {
             revert FundCore__ZeroAddress();
@@ -158,7 +151,6 @@ contract FundCore is Ownable, ReentrancyGuard {
         uniswapV2Factory = _uniswapV2Factory;
         uniswapV2Router = _uniswapV2Router;
         unitFactory = _unitFactory;
-        fundRigFactory = _fundRigFactory;
         auctionFactory = _auctionFactory;
         protocolFeeAddress = _protocolFeeAddress;
         minUsdcForLaunch = _minUsdcForLaunch;
@@ -223,30 +215,33 @@ contract FundCore is Ownable, ReentrancyGuard {
             params.auctionMinInitPrice
         );
 
-        // Deploy FundRig via factory
+        // Deploy FundRig inline
         // Recipient receives 50% of donations
         // Treasury is the Auction contract (receives 45% of donations)
         // Team is the launcher (receives 4% of donations)
-        rig = IFundRigFactory(fundRigFactory).deploy(
+        FundRig.Config memory rigConfig = FundRig.Config({
+            initialEmission: params.initialEmission,
+            minEmission: params.minEmission,
+            halvingPeriod: params.halvingPeriod
+        });
+
+        FundRig fundRig = new FundRig(
             unit,
             params.quoteToken,
             address(this), // core
             auction, // treasury (45%)
             params.launcher, // team (4%)
             params.recipient, // recipient (50%)
-            params.initialEmission,
-            params.minEmission,
-            params.halvingPeriod
+            rigConfig,
+            params.uri
         );
+        rig = address(fundRig);
 
         // Transfer Unit minting rights to FundRig (permanently locked)
         IUnit(unit).setRig(rig);
 
-        // Set initial URI for the rig (required)
-        IFundRig(rig).setUri(params.uri);
-
         // Transfer FundRig ownership to launcher
-        IFundRig(rig).transferOwnership(params.launcher);
+        fundRig.transferOwnership(params.launcher);
 
         // Update local registry
         rigToIsRig[rig] = true;
@@ -312,9 +307,9 @@ contract FundCore is Ownable, ReentrancyGuard {
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        if (params.launcher == address(0)) revert FundCore__ZeroLauncher();
-        if (params.quoteToken == address(0)) revert FundCore__ZeroQuoteToken();
-        if (params.recipient == address(0)) revert FundCore__ZeroRecipient();
+        if (params.launcher == address(0)) revert FundCore__ZeroAddress();
+        if (params.quoteToken == address(0)) revert FundCore__ZeroAddress();
+        if (params.recipient == address(0)) revert FundCore__ZeroAddress();
         if (params.usdcAmount < minUsdcForLaunch) revert FundCore__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert FundCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert FundCore__EmptyTokenSymbol();

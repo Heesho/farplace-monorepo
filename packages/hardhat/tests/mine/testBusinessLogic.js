@@ -9,7 +9,7 @@ const AddressDead = "0x000000000000000000000000000000000000dEaD";
 let owner, protocol, team, user0, user1, user2, user3, user4;
 let weth, usdc, registry, core, multicall;
 let rig, auction, unit, lpToken;
-let rigFactory, auctionFactory;
+let auctionFactory;
 let uniswapFactory, uniswapRouter;
 
 // Helper to ensure user has enough USDC
@@ -114,9 +114,6 @@ describe("Business Logic Tests", function () {
     uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
     // Deploy factories
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    rigFactory = await rigFactoryArtifact.deploy();
-
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await auctionFactoryArtifact.deploy();
 
@@ -140,7 +137,6 @@ describe("Business Logic Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -570,7 +566,7 @@ describe("Business Logic Tests", function () {
         rigContract
           .connect(user1)
           .mine(AddressZero, 0, epochId, deadline, price, "")
-      ).to.be.revertedWith("Rig__ZeroMiner()");
+      ).to.be.revertedWith("MineRig__ZeroAddress()");
     });
   });
 
@@ -880,7 +876,7 @@ describe("Business Logic Tests", function () {
 
       // Cannot set rig to zero address
       await expect(freshUnit.connect(user0).setRig(ethers.constants.AddressZero)).to.be.revertedWith(
-        "Unit__ZeroRig()"
+        "Unit__ZeroAddress()"
       );
     });
 

@@ -71,8 +71,6 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
     const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
     const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -88,7 +86,6 @@ describe("FUZZ Category 1: Random Prices - Fee Split Correctness", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -317,8 +314,6 @@ describe("FUZZ Category 2: Random totalMinted - Halving UPS Correctness", functi
     const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
     const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -334,7 +329,6 @@ describe("FUZZ Category 2: Random totalMinted - Halving UPS Correctness", functi
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -502,7 +496,8 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
         treasury.address,
         AddressZero, // team
         mockEntropy.address,
-        config
+        config,
+        ""
       );
 
       await unitToken.setRig(rig.address);
@@ -576,7 +571,8 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
         treasury.address,
         team.address,
         recipient.address,
-        [INITIAL_EMISSION, MIN_EMISSION, HALVING_PERIOD_DAYS] // Config
+        [INITIAL_EMISSION, MIN_EMISSION, HALVING_PERIOD_DAYS], // Config
+        "" // uri
       );
 
       await unitToken.setRig(rig.address);
@@ -656,8 +652,6 @@ describe("FUZZ Category 4: Random Time Points - Dutch Auction Price Decay", func
       const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
       const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-      const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-      const rigFactory = await rigFactoryArtifact.deploy();
       const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
       const auctionFactory = await auctionFactoryArtifact.deploy();
       const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -673,7 +667,6 @@ describe("FUZZ Category 4: Random Time Points - Dutch Auction Price Decay", func
         uniswapFactory.address,
         uniswapRouter.address,
         unitFactory.address,
-        rigFactory.address,
         auctionFactory.address,
         entropy.address,
         protocol.address,
@@ -806,7 +799,8 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
       treasury.address,
       team.address,
       recipient.address,
-      [INITIAL_EMISSION, MIN_EMISSION, 30] // Config
+      [INITIAL_EMISSION, MIN_EMISSION, 30], // Config
+      "" // uri
     );
 
     await unitToken.setRig(rig.address);
@@ -940,7 +934,8 @@ describe("FUZZ Category 6: Random bytes32 - Odds Drawing (SpinRig)", function ()
           treasury.address,
           AddressZero, // team (set later via setTeam)
           mockEntropy.address,
-          config
+          config,
+          ""
         );
 
         await unitToken.setRig(rig.address);
@@ -1030,8 +1025,6 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
     const mockUniswapRouterArtifact = await ethers.getContractFactory("MockUniswapV2Router");
     const uniswapRouter = await mockUniswapRouterArtifact.deploy(uniswapFactory.address);
 
-    const rigFactoryArtifact = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await rigFactoryArtifact.deploy();
     const auctionFactoryArtifact = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await auctionFactoryArtifact.deploy();
     const unitFactoryArtifact = await ethers.getContractFactory("UnitFactory");
@@ -1047,7 +1040,6 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,

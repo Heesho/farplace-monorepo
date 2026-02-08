@@ -5,8 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {ISpinRig} from "./interfaces/ISpinRig.sol";
-import {ISpinRigFactory} from "./interfaces/ISpinRigFactory.sol";
+import {SpinRig} from "./SpinRig.sol";
 import {IUnit} from "../../interfaces/IUnit.sol";
 import {IUnitFactory} from "../../interfaces/IUnitFactory.sol";
 import {IAuctionFactory} from "../../interfaces/IAuctionFactory.sol";
@@ -23,7 +22,7 @@ import {IRegistry} from "../../interfaces/IRegistry.sol";
  *         3. Creates a Unit/USDC liquidity pool on Uniswap V2
  *         4. Burns the initial LP tokens
  *         5. Deploys an Auction contract to collect and auction treasury fees
- *         6. Deploys a new SpinRig contract via SpinRigFactory
+ *         6. Deploys a new SpinRig contract
  *         7. Transfers Unit minting rights to the SpinRig (permanently locked)
  *         8. Transfers ownership of the SpinRig to the launcher
  *         9. Registers the SpinRig with the central Registry
@@ -43,7 +42,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
     address public immutable uniswapV2Factory; // Uniswap V2 factory
     address public immutable uniswapV2Router; // Uniswap V2 router
     address public immutable unitFactory; // factory for deploying Unit tokens
-    address public immutable spinRigFactory; // factory for deploying SpinRigs
     address public immutable auctionFactory; // factory for deploying Auctions
     address public immutable entropy; // Pyth Entropy contract for randomness
 
@@ -88,8 +86,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
     /*----------  ERRORS  -----------------------------------------------*/
 
     error SpinCore__InsufficientUsdc();
-    error SpinCore__ZeroLauncher();
-    error SpinCore__ZeroQuoteToken();
     error SpinCore__EmptyTokenName();
     error SpinCore__EmptyTokenSymbol();
     error SpinCore__EmptyUri();
@@ -134,7 +130,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
      * @param _uniswapV2Factory Uniswap V2 factory address
      * @param _uniswapV2Router Uniswap V2 router address
      * @param _unitFactory UnitFactory contract address
-     * @param _spinRigFactory SpinRigFactory contract address
      * @param _auctionFactory AuctionFactory contract address
      * @param _entropy Pyth Entropy contract address
      * @param _protocolFeeAddress Address to receive protocol fees
@@ -146,7 +141,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
         address _uniswapV2Factory,
         address _uniswapV2Router,
         address _unitFactory,
-        address _spinRigFactory,
         address _auctionFactory,
         address _entropy,
         address _protocolFeeAddress,
@@ -154,7 +148,7 @@ contract SpinCore is Ownable, ReentrancyGuard {
     ) {
         if (
             _registry == address(0) || _usdcToken == address(0) || _uniswapV2Factory == address(0)
-                || _uniswapV2Router == address(0) || _unitFactory == address(0) || _spinRigFactory == address(0)
+                || _uniswapV2Router == address(0) || _unitFactory == address(0)
                 || _auctionFactory == address(0) || _entropy == address(0)
         ) {
             revert SpinCore__ZeroAddress();
@@ -165,7 +159,6 @@ contract SpinCore is Ownable, ReentrancyGuard {
         uniswapV2Factory = _uniswapV2Factory;
         uniswapV2Router = _uniswapV2Router;
         unitFactory = _unitFactory;
-        spinRigFactory = _spinRigFactory;
         auctionFactory = _auctionFactory;
         entropy = _entropy;
         protocolFeeAddress = _protocolFeeAddress;
@@ -231,32 +224,35 @@ contract SpinCore is Ownable, ReentrancyGuard {
             params.auctionMinInitPrice
         );
 
-        // Deploy SpinRig via factory
+        // Deploy SpinRig inline
         // Treasury is the Auction contract (receives 95% of spin fees)
-        rig = ISpinRigFactory(spinRigFactory).deploy(
+        SpinRig.Config memory rigConfig = SpinRig.Config({
+            epochPeriod: params.rigEpochPeriod,
+            priceMultiplier: params.rigPriceMultiplier,
+            minInitPrice: params.rigMinInitPrice,
+            initialUps: params.initialUps,
+            halvingPeriod: params.halvingPeriod,
+            tailUps: params.tailUps,
+            odds: params.odds
+        });
+
+        SpinRig spinRig = new SpinRig(
             unit,
             params.quoteToken,
             address(this), // core
             auction, // treasury
             params.launcher, // team
             entropy,
-            params.rigEpochPeriod,
-            params.rigPriceMultiplier,
-            params.rigMinInitPrice,
-            params.initialUps,
-            params.halvingPeriod,
-            params.tailUps,
-            params.odds
+            rigConfig,
+            params.uri
         );
+        rig = address(spinRig);
 
         // Transfer Unit minting rights to SpinRig (permanently locked)
         IUnit(unit).setRig(rig);
 
-        // Set initial URI for the rig (required)
-        ISpinRig(rig).setUri(params.uri);
-
         // Transfer SpinRig ownership to launcher
-        ISpinRig(rig).transferOwnership(params.launcher);
+        spinRig.transferOwnership(params.launcher);
 
         // Update local registry
         rigToIsRig[rig] = true;
@@ -325,8 +321,8 @@ contract SpinCore is Ownable, ReentrancyGuard {
      * @param params Launch parameters to validate
      */
     function _validateLaunchParams(LaunchParams calldata params) internal view {
-        if (params.launcher == address(0)) revert SpinCore__ZeroLauncher();
-        if (params.quoteToken == address(0)) revert SpinCore__ZeroQuoteToken();
+        if (params.launcher == address(0)) revert SpinCore__ZeroAddress();
+        if (params.quoteToken == address(0)) revert SpinCore__ZeroAddress();
         if (params.usdcAmount < minUsdcForLaunch) revert SpinCore__InsufficientUsdc();
         if (bytes(params.tokenName).length == 0) revert SpinCore__EmptyTokenName();
         if (bytes(params.tokenSymbol).length == 0) revert SpinCore__EmptyTokenSymbol();

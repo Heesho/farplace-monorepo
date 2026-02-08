@@ -64,7 +64,8 @@ describe("SpinRig Tests", function () {
       treasury.address,
       AddressZero, // team (set later via setTeam)
       mockEntropy.address,
-      config
+      config,
+      ""
     );
     console.log("- SpinRig Initialized");
 
@@ -134,7 +135,8 @@ describe("SpinRig Tests", function () {
         treasury.address,
         AddressZero,
         mockEntropy.address,
-        multiOddsConfig
+        multiOddsConfig,
+        ""
       );
       const odds = await rig2.getOdds();
       expect(odds.length).to.equal(4);
@@ -158,7 +160,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__OddsTooLow()");
     });
 
@@ -176,7 +178,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -194,7 +196,7 @@ describe("SpinRig Tests", function () {
       const mockCoreArtifact2 = await ethers.getContractFactory("MockCore");
       const mockCore2 = await mockCoreArtifact2.deploy(user0.address);
       await expect(
-        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig)
+        rigArtifact.deploy(unitToken.address, paymentToken.address, mockCore2.address, treasury.address, AddressZero, mockEntropy.address, badConfig, "")
       ).to.be.revertedWith("SpinRig__InvalidOdds()");
     });
 
@@ -406,7 +408,7 @@ describe("SpinRig Tests", function () {
 
       await expect(
         rig.connect(user0).spin(AddressZero, epochId, Date.now() + 3600, convert("1000", 6), "", { value: fee })
-      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
+      ).to.be.revertedWith("SpinRig__ZeroAddress()");
     });
   });
 

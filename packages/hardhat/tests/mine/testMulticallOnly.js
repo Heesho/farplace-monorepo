@@ -8,7 +8,7 @@ const AddressZero = "0x0000000000000000000000000000000000000000";
 
 describe("Multicall-Only Tests (Frontend Simulation)", function () {
     let weth, usdc, registry, core, multicall;
-    let rigFactory, auctionFactory, unitFactory;
+    let auctionFactory, unitFactory;
     let uniswapFactory, uniswapRouter;
     let owner, protocol, team, user0, user1, user2, user3;
 
@@ -57,9 +57,6 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
         uniswapRouter = await MockRouter.deploy(uniswapFactory.address);
 
         // Deploy factories
-        const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-        rigFactory = await MineRigFactory.deploy();
-
         const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
         auctionFactory = await AuctionFactory.deploy();
 
@@ -82,7 +79,6 @@ describe("Multicall-Only Tests (Frontend Simulation)", function () {
             uniswapFactory.address,
             uniswapRouter.address,
             unitFactory.address,
-            rigFactory.address,
             auctionFactory.address,
             entropy.address,
             protocol.address,

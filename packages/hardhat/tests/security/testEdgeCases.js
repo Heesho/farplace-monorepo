@@ -41,7 +41,7 @@ describe("Edge Case Security Audit Tests", function () {
   let weth, usdc, entropy, registry;
   let mineCore, spinCore, fundCore;
   let uniswapFactory, uniswapRouter;
-  let unitFactory, mineRigFactory, spinRigFactory, fundRigFactory, auctionFactory;
+  let unitFactory, auctionFactory;
 
   // Counter for unique token names
   let launchCounter = 0;
@@ -79,15 +79,6 @@ describe("Edge Case Security Audit Tests", function () {
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     unitFactory = await UnitFactory.deploy();
 
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    mineRigFactory = await MineRigFactory.deploy();
-
-    const SpinRigFactory = await ethers.getContractFactory("SpinRigFactory");
-    spinRigFactory = await SpinRigFactory.deploy();
-
-    const FundRigFactory = await ethers.getContractFactory("FundRigFactory");
-    fundRigFactory = await FundRigFactory.deploy();
-
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     auctionFactory = await AuctionFactory.deploy();
 
@@ -99,7 +90,6 @@ describe("Edge Case Security Audit Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      mineRigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -114,7 +104,6 @@ describe("Edge Case Security Audit Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      spinRigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -129,7 +118,6 @@ describe("Edge Case Security Audit Tests", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      fundRigFactory.address,
       auctionFactory.address,
       protocol.address,
       convert("100", 6)
@@ -1171,7 +1159,7 @@ describe("Edge Case Security Audit Tests", function () {
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
         await usdc.connect(user0).approve(fundCore.address, params.usdcAmount);
-        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundCore__ZeroRecipient()");
+        await expect(fundCore.connect(user0).launch(params)).to.be.revertedWith("FundCore__ZeroAddress()");
       });
     });
 
@@ -1242,7 +1230,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("MineCore__ZeroLauncher()");
+        })).to.be.revertedWith("MineCore__ZeroAddress()");
 
         // SpinCore
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
@@ -1256,7 +1244,7 @@ describe("Edge Case Security Audit Tests", function () {
           odds: [10],
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("SpinCore__ZeroLauncher()");
+        })).to.be.revertedWith("SpinCore__ZeroAddress()");
 
         // FundCore
         await usdc.connect(user0).approve(fundCore.address, convert("100", 6));
@@ -1268,7 +1256,7 @@ describe("Edge Case Security Audit Tests", function () {
           halvingPeriod: 30,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("FundCore__ZeroLauncher()");
+        })).to.be.revertedWith("FundCore__ZeroAddress()");
       });
 
       it("Should revert with zero quote token for all core types", async function () {
@@ -1283,7 +1271,7 @@ describe("Edge Case Security Audit Tests", function () {
           upsMultipliers: [convert("1", 18)], upsMultiplierDuration: ONE_DAY,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("MineCore__ZeroQuoteToken()");
+        })).to.be.revertedWith("MineCore__ZeroAddress()");
 
         await usdc.connect(user0).approve(spinCore.address, convert("100", 6));
         await expect(spinCore.connect(user0).launch({
@@ -1296,7 +1284,7 @@ describe("Edge Case Security Audit Tests", function () {
           odds: [10],
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("SpinCore__ZeroQuoteToken()");
+        })).to.be.revertedWith("SpinCore__ZeroAddress()");
 
         await usdc.connect(user0).approve(fundCore.address, convert("100", 6));
         await expect(fundCore.connect(user0).launch({
@@ -1307,7 +1295,7 @@ describe("Edge Case Security Audit Tests", function () {
           halvingPeriod: 30,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
-        })).to.be.revertedWith("FundCore__ZeroQuoteToken()");
+        })).to.be.revertedWith("FundCore__ZeroAddress()");
       });
 
       it("Should revert with empty token name and symbol", async function () {
@@ -1520,7 +1508,7 @@ describe("Edge Case Security Audit Tests", function () {
       await weth.connect(user1).approve(rig, convert("1", 18));
       await expect(
         rigContract.connect(user1).spin(AddressZero, epochId, dl, convert("1", 18), "", { value: fee })
-      ).to.be.revertedWith("SpinRig__ZeroSpinner()");
+      ).to.be.revertedWith("SpinRig__ZeroAddress()");
     });
 
     it("SpinRig: spin with wrong epochId should revert", async function () {
@@ -1567,7 +1555,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await expect(
         rigContract.connect(user1).mine(AddressZero, 0, slot.epochId, dl, convert("1", 18), "")
-      ).to.be.revertedWith("Rig__ZeroMiner()");
+      ).to.be.revertedWith("MineRig__ZeroAddress()");
     });
 
     it("MineRig: mine with expired deadline should revert", async function () {
@@ -1599,7 +1587,7 @@ describe("Edge Case Security Audit Tests", function () {
       await usdc.connect(user1).approve(rig, convert("100", 6));
       await expect(
         rigContract.connect(user1).fund(AddressZero, convert("100", 6), "")
-      ).to.be.revertedWith("FundRig__ZeroFunder()");
+      ).to.be.revertedWith("FundRig__ZeroAddress()");
     });
 
     it("FundRig: claim to zero address should revert", async function () {

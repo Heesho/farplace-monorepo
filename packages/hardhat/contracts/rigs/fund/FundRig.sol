@@ -83,11 +83,10 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  ERRORS  -----------------------------------------------*/
 
-    error FundRig__ZeroFunder();
+    error FundRig__ZeroAddress();
     error FundRig__DayNotEnded();
     error FundRig__AlreadyClaimed();
     error FundRig__NoDonation();
-    error FundRig__ZeroAddress();
     error FundRig__RecipientNotSet();
     error FundRig__EmissionOutOfRange();
     error FundRig__BelowMinDonation();
@@ -124,7 +123,8 @@ contract FundRig is ReentrancyGuard, Ownable {
         address _treasury,
         address _team,
         address _recipient,
-        Config memory _config
+        Config memory _config,
+        string memory _uri
     ) {
         if (_unit == address(0)) revert FundRig__ZeroAddress();
         if (_quote == address(0)) revert FundRig__ZeroAddress();
@@ -149,6 +149,9 @@ contract FundRig is ReentrancyGuard, Ownable {
         minEmission = _config.minEmission;
         halvingPeriod = _config.halvingPeriod;
         startTime = block.timestamp;
+
+        // Set URI
+        uri = _uri;
     }
 
     /*----------  EXTERNAL FUNCTIONS  -----------------------------------*/
@@ -161,7 +164,7 @@ contract FundRig is ReentrancyGuard, Ownable {
      * @param amount The amount of payment tokens to fund
      */
     function fund(address account, uint256 amount, string calldata _uri) external nonReentrant {
-        if (account == address(0)) revert FundRig__ZeroFunder();
+        if (account == address(0)) revert FundRig__ZeroAddress();
         if (amount < MIN_DONATION) revert FundRig__BelowMinDonation();
         if (recipient == address(0)) revert FundRig__RecipientNotSet();
 

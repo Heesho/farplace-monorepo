@@ -80,8 +80,8 @@ The Registry is the single source of truth for discovering all rigs deployed acr
 |---|---|---|
 | `register(rig, unit, launcher)` | Approved factories only | Register a new rig |
 | `setFactoryApproval(factory, approved)` | Owner only | Approve or revoke a factory |
-| `isRegistered(rig)` | Public (view) | Check if an address is a registered rig |
-| `approvedFactories(factory)` | Public (view) | Check if an address is an approved factory |
+| `rigToIsRegistered(rig)` | Public (view) | Check if an address is a registered rig |
+| `factoryToIsApproved(factory)` | Public (view) | Check if an address is an approved factory |
 
 ### Core Contracts (MineCore, SpinCore, FundCore)
 

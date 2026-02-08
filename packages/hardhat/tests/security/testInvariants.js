@@ -73,8 +73,6 @@ describe("Unit Invariants", function () {
     // Deploy factories
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -86,7 +84,6 @@ describe("Unit Invariants", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -253,8 +250,6 @@ describe("MineRig Invariants", function () {
 
     const UnitFactory = await ethers.getContractFactory("UnitFactory");
     const unitFactory = await UnitFactory.deploy();
-    const MineRigFactory = await ethers.getContractFactory("MineRigFactory");
-    const rigFactory = await MineRigFactory.deploy();
     const AuctionFactory = await ethers.getContractFactory("AuctionFactory");
     const auctionFactory = await AuctionFactory.deploy();
 
@@ -265,7 +260,6 @@ describe("MineRig Invariants", function () {
       uniswapFactory.address,
       uniswapRouter.address,
       unitFactory.address,
-      rigFactory.address,
       auctionFactory.address,
       entropy.address,
       protocol.address,
@@ -561,7 +555,8 @@ describe("SpinRig Invariants", function () {
       owner.address, // treasury
       AddressZero, // team (set later via setTeam)
       mockEntropy.address,
-      config
+      config,
+      ""
     );
 
     // Grant minting rights
@@ -788,7 +783,8 @@ describe("FundRig Invariants", function () {
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30] // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      "" // uri
     );
 
     // Grant minting rights

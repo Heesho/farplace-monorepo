@@ -6,6 +6,12 @@ const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 const convert = (amount, decimals) => ethers.utils.parseUnits(amount, decimals);
 const divDec = (amount, decimals = 18) => amount / 10 ** decimals;
 
+// Get the next pending nonce fresh from the node each time
+async function getNextNonce() {
+  const [wallet] = await ethers.getSigners();
+  return await wallet.getTransactionCount("pending");
+}
+
 // =============================================================================
 // CONFIGURATION - UPDATE THESE FOR YOUR DEPLOYMENT
 // =============================================================================
@@ -29,26 +35,20 @@ const MULTISIG_ADDRESS = "0xeE0CB49D2805DA6bC0A979ddAd87bb793fbB765E";
 const MIN_USDC_FOR_LAUNCH = convert("1", 6); // 1 USDC minimum
 
 // Deployed Contract Addresses
-const REGISTRY = "0x96de83c05d9e81184116b19209A32Bbe62d0B00F";
-const UNIT_FACTORY = "0x902f839A8e5eE38D53256fdBFe97B3EcA4448c5A";
-const MINE_RIG_FACTORY = "0x4c3fAf7649C63EAA4B547bCB401346C1B06421D3";
-const SPIN_RIG_FACTORY = "0xa882E773a30d5D1fBFB861099Dc9A84AB624E011";
-const FUND_RIG_FACTORY = "0x585A8C81e1959De57B983536f37c497631E77D7a";
-const AUCTION_FACTORY = "0x88465eF4e34CB792877d9AA77Dae0216Cd36E4a3";
-const MINE_CORE = "0x27335F466cDAC83Fea8a37EEA233C0Bc479E75E4";
-const SPIN_CORE = "0xa7Eb63eA72f67816e46E74A0B60E1186c910fE28";
-const FUND_CORE = "0x3DB1179bb648dC5e64C90deA805C61DEA7189De5";
-const MINE_MULTICALL = "0xD35bC08073708cb15D571C0d46883aACECC7D24E";
-const SPIN_MULTICALL = "0xF0cAaC74FEe1721e4004BF12C494A02b6410c6CE";
-const FUND_MULTICALL = "0x0F8f6ed55E73bACf8efD6570A36fFaA1Ce13a99C";
+const REGISTRY = "0x5BA6CBD2d504a0e20Bae733ecb076dF49FB641CF";
+const UNIT_FACTORY = "0x1044760729b70a5A0639E82E3dc1937d0885ED20";
+const AUCTION_FACTORY = "0xFC4B86BbD12a7599C90ced220d1A64dd36EbA3AE";
+const MINE_CORE = "0x2744aD23F0Eb637a60eeEBeC9904BC68c899e057";
+const SPIN_CORE = "0xa0293945C1b4D44debBD1d65cfa26E9B9e290328";
+const FUND_CORE = "0x256565839afe074cD7998f707895dD14692F5a2c";
+const MINE_MULTICALL = "0xF6D9cDF2B073cDcE04eDCaCc703e62a8A897e9D4";
+const SPIN_MULTICALL = "0x7aA9D0709774BF2d6CBf264e873b011da36A6408";
+const FUND_MULTICALL = "0xfFecd05f08A87ac4A3e655fF523e0452E469cD96";
 
 // Contract Variables
 let usdc,
   registry,
   unitFactory,
-  mineRigFactory,
-  spinRigFactory,
-  fundRigFactory,
   auctionFactory,
   mineCore,
   spinCore,
@@ -78,27 +78,6 @@ async function getContracts() {
     unitFactory = await ethers.getContractAt(
       "contracts/UnitFactory.sol:UnitFactory",
       UNIT_FACTORY
-    );
-  }
-
-  if (MINE_RIG_FACTORY) {
-    mineRigFactory = await ethers.getContractAt(
-      "contracts/rigs/mine/MineRigFactory.sol:MineRigFactory",
-      MINE_RIG_FACTORY
-    );
-  }
-
-  if (SPIN_RIG_FACTORY) {
-    spinRigFactory = await ethers.getContractAt(
-      "contracts/rigs/spin/SpinRigFactory.sol:SpinRigFactory",
-      SPIN_RIG_FACTORY
-    );
-  }
-
-  if (FUND_RIG_FACTORY) {
-    fundRigFactory = await ethers.getContractAt(
-      "contracts/rigs/fund/FundRigFactory.sol:FundRigFactory",
-      FUND_RIG_FACTORY
     );
   }
 
@@ -161,7 +140,7 @@ async function getContracts() {
 async function deployRegistry() {
   console.log("Starting Registry Deployment");
   const artifact = await ethers.getContractFactory("Registry");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
+  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice, nonce: await getNextNonce() });
   registry = await contract.deployed();
   await sleep(5000);
   console.log("Registry Deployed at:", registry.address);
@@ -170,43 +149,16 @@ async function deployRegistry() {
 async function deployUnitFactory() {
   console.log("Starting UnitFactory Deployment");
   const artifact = await ethers.getContractFactory("UnitFactory");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
+  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice, nonce: await getNextNonce() });
   unitFactory = await contract.deployed();
   await sleep(5000);
   console.log("UnitFactory Deployed at:", unitFactory.address);
 }
 
-async function deployMineRigFactory() {
-  console.log("Starting MineRigFactory Deployment");
-  const artifact = await ethers.getContractFactory("MineRigFactory");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
-  mineRigFactory = await contract.deployed();
-  await sleep(5000);
-  console.log("MineRigFactory Deployed at:", mineRigFactory.address);
-}
-
-async function deploySpinRigFactory() {
-  console.log("Starting SpinRigFactory Deployment");
-  const artifact = await ethers.getContractFactory("SpinRigFactory");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
-  spinRigFactory = await contract.deployed();
-  await sleep(5000);
-  console.log("SpinRigFactory Deployed at:", spinRigFactory.address);
-}
-
-async function deployFundRigFactory() {
-  console.log("Starting FundRigFactory Deployment");
-  const artifact = await ethers.getContractFactory("FundRigFactory");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
-  fundRigFactory = await contract.deployed();
-  await sleep(5000);
-  console.log("FundRigFactory Deployed at:", fundRigFactory.address);
-}
-
 async function deployAuctionFactory() {
   console.log("Starting AuctionFactory Deployment");
   const artifact = await ethers.getContractFactory("AuctionFactory");
-  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice });
+  const contract = await artifact.deploy({ gasPrice: ethers.gasPrice, nonce: await getNextNonce() });
   auctionFactory = await contract.deployed();
   await sleep(5000);
   console.log("AuctionFactory Deployed at:", auctionFactory.address);
@@ -234,12 +186,11 @@ async function deployMineCore() {
     UNISWAP_V2_FACTORY,
     UNISWAP_V2_ROUTER,
     unitFactory.address,
-    mineRigFactory.address,
     auctionFactory.address,
     ENTROPY_ADDRESS,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice }
+    { gasPrice: ethers.gasPrice, nonce: await getNextNonce() }
   );
   mineCore = await contract.deployed();
   await sleep(5000);
@@ -268,12 +219,11 @@ async function deploySpinCore() {
     UNISWAP_V2_FACTORY,
     UNISWAP_V2_ROUTER,
     unitFactory.address,
-    spinRigFactory.address,
     auctionFactory.address,
     ENTROPY_ADDRESS,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice }
+    { gasPrice: ethers.gasPrice, nonce: await getNextNonce() }
   );
   spinCore = await contract.deployed();
   await sleep(5000);
@@ -302,11 +252,10 @@ async function deployFundCore() {
     UNISWAP_V2_FACTORY,
     UNISWAP_V2_ROUTER,
     unitFactory.address,
-    fundRigFactory.address,
     auctionFactory.address,
     PROTOCOL_FEE_ADDRESS,
     MIN_USDC_FOR_LAUNCH,
-    { gasPrice: ethers.gasPrice }
+    { gasPrice: ethers.gasPrice, nonce: await getNextNonce() }
   );
   fundCore = await contract.deployed();
   await sleep(5000);
@@ -316,7 +265,7 @@ async function deployFundCore() {
 async function approveMineCore() {
   console.log("Approving MineCore as factory in Registry...");
   const coreAddress = mineCore?.address || MINE_CORE;
-  const tx = await registry.setFactoryApproval(coreAddress, true);
+  const tx = await registry.setFactoryApproval(coreAddress, true, { nonce: await getNextNonce() });
   await tx.wait();
   console.log("MineCore approved in Registry");
 }
@@ -324,7 +273,7 @@ async function approveMineCore() {
 async function approveSpinCore() {
   console.log("Approving SpinCore as factory in Registry...");
   const coreAddress = spinCore?.address || SPIN_CORE;
-  const tx = await registry.setFactoryApproval(coreAddress, true);
+  const tx = await registry.setFactoryApproval(coreAddress, true, { nonce: await getNextNonce() });
   await tx.wait();
   console.log("SpinCore approved in Registry");
 }
@@ -332,7 +281,7 @@ async function approveSpinCore() {
 async function approveFundCore() {
   console.log("Approving FundCore as factory in Registry...");
   const coreAddress = fundCore?.address || FUND_CORE;
-  const tx = await registry.setFactoryApproval(coreAddress, true);
+  const tx = await registry.setFactoryApproval(coreAddress, true, { nonce: await getNextNonce() });
   await tx.wait();
   console.log("FundCore approved in Registry");
 }
@@ -394,36 +343,6 @@ async function verifyUnitFactory() {
   console.log("UnitFactory Verified");
 }
 
-async function verifyMineRigFactory() {
-  console.log("Starting MineRigFactory Verification");
-  await hre.run("verify:verify", {
-    address: mineRigFactory?.address || MINE_RIG_FACTORY,
-    contract: "contracts/rigs/mine/MineRigFactory.sol:MineRigFactory",
-    constructorArguments: [],
-  });
-  console.log("MineRigFactory Verified");
-}
-
-async function verifySpinRigFactory() {
-  console.log("Starting SpinRigFactory Verification");
-  await hre.run("verify:verify", {
-    address: spinRigFactory?.address || SPIN_RIG_FACTORY,
-    contract: "contracts/rigs/spin/SpinRigFactory.sol:SpinRigFactory",
-    constructorArguments: [],
-  });
-  console.log("SpinRigFactory Verified");
-}
-
-async function verifyFundRigFactory() {
-  console.log("Starting FundRigFactory Verification");
-  await hre.run("verify:verify", {
-    address: fundRigFactory?.address || FUND_RIG_FACTORY,
-    contract: "contracts/rigs/fund/FundRigFactory.sol:FundRigFactory",
-    constructorArguments: [],
-  });
-  console.log("FundRigFactory Verified");
-}
-
 async function verifyAuctionFactory() {
   console.log("Starting AuctionFactory Verification");
   await hre.run("verify:verify", {
@@ -445,7 +364,6 @@ async function verifyMineCore() {
       UNISWAP_V2_FACTORY,
       UNISWAP_V2_ROUTER,
       unitFactory?.address || UNIT_FACTORY,
-      mineRigFactory?.address || MINE_RIG_FACTORY,
       auctionFactory?.address || AUCTION_FACTORY,
       ENTROPY_ADDRESS,
       PROTOCOL_FEE_ADDRESS,
@@ -466,7 +384,6 @@ async function verifySpinCore() {
       UNISWAP_V2_FACTORY,
       UNISWAP_V2_ROUTER,
       unitFactory?.address || UNIT_FACTORY,
-      spinRigFactory?.address || SPIN_RIG_FACTORY,
       auctionFactory?.address || AUCTION_FACTORY,
       ENTROPY_ADDRESS,
       PROTOCOL_FEE_ADDRESS,
@@ -487,7 +404,6 @@ async function verifyFundCore() {
       UNISWAP_V2_FACTORY,
       UNISWAP_V2_ROUTER,
       unitFactory?.address || UNIT_FACTORY,
-      fundRigFactory?.address || FUND_RIG_FACTORY,
       auctionFactory?.address || AUCTION_FACTORY,
       PROTOCOL_FEE_ADDRESS,
       MIN_USDC_FOR_LAUNCH,
@@ -1145,18 +1061,6 @@ async function printDeployment() {
     unitFactory?.address || UNIT_FACTORY || "NOT DEPLOYED"
   );
   console.log(
-    "MineRigFactory:      ",
-    mineRigFactory?.address || MINE_RIG_FACTORY || "NOT DEPLOYED"
-  );
-  console.log(
-    "SpinRigFactory:      ",
-    spinRigFactory?.address || SPIN_RIG_FACTORY || "NOT DEPLOYED"
-  );
-  console.log(
-    "FundRigFactory:      ",
-    fundRigFactory?.address || FUND_RIG_FACTORY || "NOT DEPLOYED"
-  );
-  console.log(
     "AuctionFactory:      ",
     auctionFactory?.address || AUCTION_FACTORY || "NOT DEPLOYED"
   );
@@ -1259,19 +1163,16 @@ async function main() {
   await deployAuctionFactory();
 
   // --- MineCore ---
-  await deployMineRigFactory();
   await deployMineCore();
   await approveMineCore();
   await deployMineMulticall();
 
   // --- SpinCore ---
-  await deploySpinRigFactory();
   await deploySpinCore();
   await approveSpinCore();
   await deploySpinMulticall();
 
   // --- FundCore ---
-  await deployFundRigFactory();
   await deployFundCore();
   await approveFundCore();
   await deployFundMulticall();
@@ -1290,24 +1191,18 @@ async function main() {
   // await sleep(5000);
 
   // // --- MineCore ---
-  // await verifyMineRigFactory();
-  // await sleep(5000);
   // await verifyMineCore();
   // await sleep(5000);
   // await verifyMineMulticall();
   // await sleep(5000);
 
   // // --- SpinCore ---
-  // await verifySpinRigFactory();
-  // await sleep(5000);
   // await verifySpinCore();
   // await sleep(5000);
   // await verifySpinMulticall();
   // await sleep(5000);
 
   // // --- FundCore ---
-  // await verifyFundRigFactory();
-  // await sleep(5000);
   // await verifyFundCore();
   // await sleep(5000);
   // await verifyFundMulticall();
