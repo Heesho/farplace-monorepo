@@ -56,7 +56,7 @@ describe("FundRig Invariant Tests", function () {
       treasury.address,      // treasury
       team.address,          // team
       recipient.address,     // recipient (required)
-      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30, ONE_DAY], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
 
@@ -75,7 +75,7 @@ describe("FundRig Invariant Tests", function () {
    */
   describe("INVARIANT: Donation Sums", function () {
     it("Day total should equal sum of individual donations", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
       const donationAmount = convert("100", 6);
 
       // Multiple users donate
@@ -88,23 +88,23 @@ describe("FundRig Invariant Tests", function () {
       await paymentToken.connect(user2).approve(rig.address, donationAmount);
       await rig.connect(user2).fund(user2.address, donationAmount, "");
 
-      const dayTotal = await rig.dayToTotalDonated(currentDay);
-      const user0Donation = await rig.dayAccountToDonation(currentDay, user0.address);
-      const user1Donation = await rig.dayAccountToDonation(currentDay, user1.address);
-      const user2Donation = await rig.dayAccountToDonation(currentDay, user2.address);
+      const dayTotal = await rig.epochToTotalDonated(currentDay);
+      const user0Donation = await rig.epochAccountToDonation(currentDay, user0.address);
+      const user1Donation = await rig.epochAccountToDonation(currentDay, user1.address);
+      const user2Donation = await rig.epochAccountToDonation(currentDay, user2.address);
 
       expect(dayTotal).to.equal(user0Donation.add(user1Donation).add(user2Donation));
     });
 
     it("Multiple donations from same user should accumulate", async function () {
-      const currentDay = await rig.currentDay();
-      const donationBefore = await rig.dayAccountToDonation(currentDay, user0.address);
+      const currentDay = await rig.currentEpoch();
+      const donationBefore = await rig.epochAccountToDonation(currentDay, user0.address);
 
       const additionalDonation = convert("50", 6);
       await paymentToken.connect(user0).approve(rig.address, additionalDonation);
       await rig.connect(user0).fund(user0.address, additionalDonation, "");
 
-      const donationAfter = await rig.dayAccountToDonation(currentDay, user0.address);
+      const donationAfter = await rig.epochAccountToDonation(currentDay, user0.address);
       expect(donationAfter).to.equal(donationBefore.add(additionalDonation));
     });
   });
@@ -177,7 +177,7 @@ describe("FundRig Invariant Tests", function () {
       // Move to a fresh day and make donations
       await increaseTime(ONE_DAY);
 
-      claimDay = await rig.currentDay();
+      claimDay = await rig.currentEpoch();
 
       // User0 donates 75%
       await paymentToken.connect(user0).approve(rig.address, convert("750", 6));
@@ -192,10 +192,10 @@ describe("FundRig Invariant Tests", function () {
     });
 
     it("User reward should be proportional to their donation share", async function () {
-      const dayEmission = await rig.getDayEmission(claimDay);
-      const user0Donation = await rig.dayAccountToDonation(claimDay, user0.address);
-      const user1Donation = await rig.dayAccountToDonation(claimDay, user1.address);
-      const dayTotal = await rig.dayToTotalDonated(claimDay);
+      const dayEmission = await rig.getEpochEmission(claimDay);
+      const user0Donation = await rig.epochAccountToDonation(claimDay, user0.address);
+      const user1Donation = await rig.epochAccountToDonation(claimDay, user1.address);
+      const dayTotal = await rig.epochToTotalDonated(claimDay);
 
       const user0BalBefore = await unitToken.balanceOf(user0.address);
       await rig.claim(user0.address, claimDay);
@@ -227,7 +227,7 @@ describe("FundRig Invariant Tests", function () {
 
     before(async function () {
       await increaseTime(ONE_DAY);
-      testDay = await rig.currentDay();
+      testDay = await rig.currentEpoch();
 
       await paymentToken.connect(user2).approve(rig.address, convert("100", 6));
       await rig.connect(user2).fund(user2.address, convert("100", 6), "");
@@ -236,12 +236,12 @@ describe("FundRig Invariant Tests", function () {
     });
 
     it("Should mark account as claimed after claiming", async function () {
-      const hasClaimedBefore = await rig.dayAccountToHasClaimed(testDay, user2.address);
+      const hasClaimedBefore = await rig.epochAccountToHasClaimed(testDay, user2.address);
       expect(hasClaimedBefore).to.equal(false);
 
       await rig.claim(user2.address, testDay);
 
-      const hasClaimedAfter = await rig.dayAccountToHasClaimed(testDay, user2.address);
+      const hasClaimedAfter = await rig.epochAccountToHasClaimed(testDay, user2.address);
       expect(hasClaimedAfter).to.equal(true);
     });
 
@@ -257,19 +257,19 @@ describe("FundRig Invariant Tests", function () {
    */
   describe("INVARIANT: Claim Timing", function () {
     it("Should revert when claiming current day", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
 
       await expect(
         rig.claim(user0.address, currentDay)
-      ).to.be.revertedWith("FundRig__DayNotEnded()");
+      ).to.be.revertedWith("FundRig__EpochNotEnded()");
     });
 
     it("Should revert when claiming future day", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
 
       await expect(
         rig.claim(user0.address, currentDay.add(10))
-      ).to.be.revertedWith("FundRig__DayNotEnded()");
+      ).to.be.revertedWith("FundRig__EpochNotEnded()");
     });
   });
 
@@ -286,8 +286,8 @@ describe("FundRig Invariant Tests", function () {
       const halvings = Math.floor(elapsed / THIRTY_DAYS);
 
       // Get emission for a past day
-      const currentDay = await rig.currentDay();
-      const emission = await rig.getDayEmission(currentDay.sub(1));
+      const currentDay = await rig.currentEpoch();
+      const emission = await rig.getEpochEmission(currentDay.sub(1));
 
       if (halvings > 0) {
         const expectedEmission = initialEmission.div(ethers.BigNumber.from(2).pow(halvings));
@@ -303,14 +303,14 @@ describe("FundRig Invariant Tests", function () {
 
     it("Emission should never go below minEmission", async function () {
       // Fast forward many halving periods
-      const dayFarFuture = (await rig.currentDay()).add(1000);
+      const dayFarFuture = (await rig.currentEpoch()).add(1000);
 
       // We can't directly test future days, but we can verify the formula
       const minEmission = await rig.minEmission();
 
       // For any day, emission >= minEmission
-      const currentDay = await rig.currentDay();
-      const emission = await rig.getDayEmission(currentDay.sub(1));
+      const currentDay = await rig.currentEpoch();
+      const emission = await rig.getEpochEmission(currentDay.sub(1));
       expect(emission).to.be.gte(minEmission);
     });
   });
@@ -343,7 +343,7 @@ describe("FundRig Business Logic Tests", function () {
       treasury.address,      // treasury
       team.address,          // team
       recipient.address,     // recipient (required)
-      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30, ONE_DAY], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
 
@@ -366,7 +366,7 @@ describe("FundRig Business Logic Tests", function () {
           treasury.address,
           team.address,
           AddressZero, // zero recipient should fail
-          [convert("1000", 18), convert("10", 18), 30], // Config
+          [convert("1000", 18), convert("10", 18), 30, ONE_DAY], // Config
           "" // uri
         )
       ).to.be.revertedWith("FundRig__ZeroAddress()");
@@ -380,6 +380,7 @@ describe("FundRig Business Logic Tests", function () {
 
       // Reset for other tests
       await rig.connect(owner).setRecipient(recipient.address);
+      expect(await rig.recipient()).to.equal(recipient.address);
     });
 
     it("Should prevent setting zero address as recipient", async function () {
@@ -416,12 +417,12 @@ describe("FundRig Business Logic Tests", function () {
       await paymentToken.connect(user0).approve(rig.address, donationAmount);
 
       // user0 pays, but user1 gets the donation credit
-      const currentDay = await rig.currentDay();
-      const user1DonationBefore = await rig.dayAccountToDonation(currentDay, user1.address);
+      const currentDay = await rig.currentEpoch();
+      const user1DonationBefore = await rig.epochAccountToDonation(currentDay, user1.address);
 
       await rig.connect(user0).fund(user1.address, donationAmount, "");
 
-      const user1DonationAfter = await rig.dayAccountToDonation(currentDay, user1.address);
+      const user1DonationAfter = await rig.epochAccountToDonation(currentDay, user1.address);
       expect(user1DonationAfter).to.equal(user1DonationBefore.add(donationAmount));
     });
   });
@@ -431,7 +432,7 @@ describe("FundRig Business Logic Tests", function () {
 
     before(async function () {
       await increaseTime(ONE_DAY);
-      donationDay = await rig.currentDay();
+      donationDay = await rig.currentEpoch();
 
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
       await rig.connect(user0).fund(user0.address, convert("100", 6), "");
@@ -465,21 +466,21 @@ describe("FundRig Business Logic Tests", function () {
 
   describe("Day Isolation", function () {
     it("Donations on different days should be isolated", async function () {
-      const day1 = await rig.currentDay();
+      const day1 = await rig.currentEpoch();
 
       await paymentToken.connect(user1).approve(rig.address, convert("300", 6));
       await rig.connect(user1).fund(user1.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY);
-      const day2 = await rig.currentDay();
+      const day2 = await rig.currentEpoch();
 
       // Different amount to show isolation
       await rig.connect(user1).fund(user1.address, convert("200", 6), "");
 
-      const day1Donation = await rig.dayAccountToDonation(day1, user1.address);
-      const day2Donation = await rig.dayAccountToDonation(day2, user1.address);
-      const day1Total = await rig.dayToTotalDonated(day1);
-      const day2Total = await rig.dayToTotalDonated(day2);
+      const day1Donation = await rig.epochAccountToDonation(day1, user1.address);
+      const day2Donation = await rig.epochAccountToDonation(day2, user1.address);
+      const day1Total = await rig.epochToTotalDonated(day1);
+      const day2Total = await rig.epochToTotalDonated(day2);
 
       // Verify donations are tracked per day
       expect(day1Donation).to.equal(convert("100", 6));
@@ -492,13 +493,13 @@ describe("FundRig Business Logic Tests", function () {
     it("Claims for different days should be independent", async function () {
       await increaseTime(ONE_DAY);
 
-      const day1 = (await rig.currentDay()).sub(2);
-      const day2 = (await rig.currentDay()).sub(1);
+      const day1 = (await rig.currentEpoch()).sub(2);
+      const day2 = (await rig.currentEpoch()).sub(1);
 
       // Should be able to claim day1 but day2 separately
       // (if user1 had donations on both)
-      const hasClaimed1 = await rig.dayAccountToHasClaimed(day1, user1.address);
-      const hasClaimed2 = await rig.dayAccountToHasClaimed(day2, user1.address);
+      const hasClaimed1 = await rig.epochAccountToHasClaimed(day1, user1.address);
+      const hasClaimed2 = await rig.epochAccountToHasClaimed(day2, user1.address);
 
       // These should be independent
       expect(hasClaimed1).to.not.equal(undefined);
@@ -509,7 +510,7 @@ describe("FundRig Business Logic Tests", function () {
   describe("Edge Cases", function () {
     it("Should handle single donor getting 100% of daily emission", async function () {
       await increaseTime(ONE_DAY);
-      const soloDay = await rig.currentDay();
+      const soloDay = await rig.currentEpoch();
 
       // Only user0 donates
       await paymentToken.connect(user0).approve(rig.address, convert("50", 6));
@@ -517,7 +518,7 @@ describe("FundRig Business Logic Tests", function () {
 
       await increaseTime(ONE_DAY);
 
-      const dayEmission = await rig.getDayEmission(soloDay);
+      const dayEmission = await rig.getEpochEmission(soloDay);
       const user0BalBefore = await unitToken.balanceOf(user0.address);
 
       await rig.claim(user0.address, soloDay);
@@ -531,7 +532,7 @@ describe("FundRig Business Logic Tests", function () {
 
     it("Should handle many small donations correctly", async function () {
       await increaseTime(ONE_DAY);
-      const manyDonationsDay = await rig.currentDay();
+      const manyDonationsDay = await rig.currentEpoch();
 
       // Make 10 small donations
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
@@ -540,7 +541,7 @@ describe("FundRig Business Logic Tests", function () {
         await rig.connect(user0).fund(user0.address, convert("10", 6), "");
       }
 
-      const totalDonation = await rig.dayAccountToDonation(manyDonationsDay, user0.address);
+      const totalDonation = await rig.epochAccountToDonation(manyDonationsDay, user0.address);
       expect(totalDonation).to.equal(convert("100", 6));
     });
   });
@@ -557,7 +558,7 @@ describe("FundRig Business Logic Tests", function () {
 
     it("Should emit Claimed event on claim", async function () {
       await increaseTime(ONE_DAY);
-      const claimableDay = await rig.currentDay();
+      const claimableDay = await rig.currentEpoch();
 
       await paymentToken.connect(user2).approve(rig.address, convert("100", 6));
       await rig.connect(user2).fund(user2.address, convert("100", 6), "");

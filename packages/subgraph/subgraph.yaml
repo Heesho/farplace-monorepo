@@ -96,7 +96,7 @@ dataSources:
         - name: ERC20
           file: ./abis/ERC20.json
       eventHandlers:
-        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
+        - event: FundCore__Launched(indexed address,indexed address,indexed address,address,address,address,address,string,string,string,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)
           handler: handleFundCoreLaunched
       file: ./src/cores/fundCore.ts
 
@@ -247,7 +247,7 @@ templates:
         - name: FundCore
           file: ./abis/FundCore.json
       eventHandlers:
-        - event: FundRig__Funded(address,indexed address,uint256,uint256,string)
+        - event: FundRig__Funded(address,indexed address,indexed address,uint256,uint256,string)
           handler: handleFunded
         - event: FundRig__Claimed(indexed address,uint256,uint256)
           handler: handleFundClaimed
@@ -257,7 +257,7 @@ templates:
           handler: handleFundTeamFee
         - event: FundRig__ProtocolFee(indexed address,indexed uint256,uint256)
           handler: handleFundProtocolFee
-        - event: FundRig__RecipientSet(indexed address)
+        - event: FundRig__RecipientSet(indexed address,bool)
           handler: handleFundRecipientSet
         - event: FundRig__UriSet(string)
           handler: handleFundUriSet

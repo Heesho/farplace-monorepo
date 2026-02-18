@@ -5,7 +5,7 @@ import {
   CONTRACT_ADDRESSES,
   FUND_MULTICALL_ABI,
   type FundRigState,
-  type ClaimableDay,
+  type ClaimableEpoch,
 } from "@/lib/contracts";
 
 export function useFundRigState(
@@ -28,19 +28,19 @@ export function useFundRigState(
   });
 
   const fundState = rawState as FundRigState | undefined;
-  const currentDay = fundState?.currentDay ?? 0n;
+  const currentEpoch = fundState?.currentEpoch ?? 0n;
 
-  // Fetch claimable days (from day 0 to currentDay)
+  // Fetch claimable epochs (from epoch 0 to currentEpoch)
   const { data: rawClaimable } = useReadContract({
     address: multicallAddr,
     abi: FUND_MULTICALL_ABI,
-    functionName: "getClaimableDays",
+    functionName: "getClaimableEpochs",
     args: rigAddress && account
-      ? [rigAddress, account, 0n, currentDay]
+      ? [rigAddress, account, 0n, currentEpoch]
       : undefined,
     chainId: base.id,
     query: {
-      enabled: !!rigAddress && !!account && currentDay > 0n && enabled,
+      enabled: !!rigAddress && !!account && currentEpoch > 0n && enabled,
       refetchInterval: 30_000,
     },
   });
@@ -51,16 +51,16 @@ export function useFundRigState(
     abi: FUND_MULTICALL_ABI,
     functionName: "getTotalPendingRewards",
     args: rigAddress && account
-      ? [rigAddress, account, 0n, currentDay]
+      ? [rigAddress, account, 0n, currentEpoch]
       : undefined,
     chainId: base.id,
     query: {
-      enabled: !!rigAddress && !!account && currentDay > 0n && enabled,
+      enabled: !!rigAddress && !!account && currentEpoch > 0n && enabled,
       refetchInterval: 30_000,
     },
   });
 
-  const claimableDays = (rawClaimable as ClaimableDay[] | undefined)
+  const claimableEpochs = (rawClaimable as ClaimableEpoch[] | undefined)
     ?.filter(d => !d.hasClaimed && d.pendingReward > 0n) ?? [];
 
   // rawPending is a tuple: [totalPending, unclaimedDays[]]
@@ -70,7 +70,7 @@ export function useFundRigState(
 
   return {
     fundState,
-    claimableDays,
+    claimableEpochs,
     totalPending,
     refetch,
     isLoading,

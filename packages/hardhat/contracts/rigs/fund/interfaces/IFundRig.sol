@@ -8,7 +8,8 @@ pragma solidity 0.8.19;
  */
 interface IFundRig {
     // Constants
-    function DAY_DURATION() external view returns (uint256);
+    function MIN_EPOCH_DURATION() external view returns (uint256);
+    function MAX_EPOCH_DURATION() external view returns (uint256);
     function MIN_HALVING_PERIOD() external view returns (uint256);
     function MAX_HALVING_PERIOD() external view returns (uint256);
     function MIN_INITIAL_EMISSION() external view returns (uint256);
@@ -27,19 +28,20 @@ interface IFundRig {
     function initialEmission() external view returns (uint256);
     function minEmission() external view returns (uint256);
     function halvingPeriod() external view returns (uint256);
+    function epochDuration() external view returns (uint256);
 
     // State
     function recipient() external view returns (address);
     function treasury() external view returns (address);
     function team() external view returns (address);
-    function dayToTotalDonated(uint256 day) external view returns (uint256);
-    function dayAccountToDonation(uint256 day, address account) external view returns (uint256);
-    function dayAccountToHasClaimed(uint256 day, address account) external view returns (bool);
+    function epochToTotalDonated(uint256 epoch) external view returns (uint256);
+    function epochAccountToDonation(uint256 epoch, address account) external view returns (uint256);
+    function epochAccountToHasClaimed(uint256 epoch, address account) external view returns (bool);
     function uri() external view returns (string memory);
 
     // External functions
     function fund(address account, uint256 amount, string calldata _uri) external;
-    function claim(address account, uint256 day) external;
+    function claim(address account, uint256 epoch) external;
 
     // Restricted functions
     function setRecipient(address _recipient) external;
@@ -49,7 +51,7 @@ interface IFundRig {
     function transferOwnership(address newOwner) external;
 
     // View functions
-    function currentDay() external view returns (uint256);
-    function getDayEmission(uint256 day) external view returns (uint256);
-    function getPendingReward(uint256 day, address account) external view returns (uint256);
+    function currentEpoch() external view returns (uint256);
+    function getEpochEmission(uint256 epoch) external view returns (uint256);
+    function getPendingReward(uint256 epoch, address account) external view returns (uint256);
 }

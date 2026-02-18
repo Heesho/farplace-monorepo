@@ -783,7 +783,7 @@ describe("FundRig Invariants", function () {
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30, 86400], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
 
@@ -798,7 +798,7 @@ describe("FundRig Invariants", function () {
 
   describe("INV-FUND-1: dayToTotalDonated[day] == sum of all individual user donations for that day", function () {
     it("Day total equals sum of individual donations from multiple users", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
 
       const amounts = [convert("100", 18), convert("200", 18), convert("50", 18)];
       const users = [user0, user1, user2];
@@ -808,10 +808,10 @@ describe("FundRig Invariants", function () {
         await rig.connect(users[i]).fund(users[i].address, amounts[i], "");
       }
 
-      const dayTotal = await rig.dayToTotalDonated(currentDay);
+      const dayTotal = await rig.epochToTotalDonated(currentDay);
       let sumOfIndividual = ethers.BigNumber.from(0);
       for (let i = 0; i < users.length; i++) {
-        const donation = await rig.dayAccountToDonation(currentDay, users[i].address);
+        const donation = await rig.epochAccountToDonation(currentDay, users[i].address);
         sumOfIndividual = sumOfIndividual.add(donation);
       }
 
@@ -820,7 +820,7 @@ describe("FundRig Invariants", function () {
 
     it("Multiple donations from same user accumulate correctly in day total", async function () {
       await increaseTime(ONE_DAY);
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
 
       const amount1 = convert("75", 18);
       const amount2 = convert("125", 18);
@@ -829,8 +829,8 @@ describe("FundRig Invariants", function () {
       await rig.connect(user0).fund(user0.address, amount1, "");
       await rig.connect(user0).fund(user0.address, amount2, "");
 
-      const dayTotal = await rig.dayToTotalDonated(currentDay);
-      const user0Donation = await rig.dayAccountToDonation(currentDay, user0.address);
+      const dayTotal = await rig.epochToTotalDonated(currentDay);
+      const user0Donation = await rig.epochAccountToDonation(currentDay, user0.address);
 
       expect(dayTotal).to.equal(amount1.add(amount2));
       expect(user0Donation).to.equal(amount1.add(amount2));
@@ -840,7 +840,7 @@ describe("FundRig Invariants", function () {
   describe("INV-FUND-2: Sum of all claims for a day <= getDayEmission(day)", function () {
     it("Total claimed tokens for a day does not exceed day emission", async function () {
       await increaseTime(ONE_DAY);
-      const claimDay = await rig.currentDay();
+      const claimDay = await rig.currentEpoch();
 
       // Three users donate
       const amounts = [convert("300", 18), convert("200", 18), convert("100", 18)];
@@ -854,7 +854,7 @@ describe("FundRig Invariants", function () {
       // Move to next day to allow claiming
       await increaseTime(ONE_DAY);
 
-      const dayEmission = await rig.getDayEmission(claimDay);
+      const dayEmission = await rig.getEpochEmission(claimDay);
       let totalClaimed = ethers.BigNumber.from(0);
 
       for (let i = 0; i < users.length; i++) {
@@ -874,7 +874,7 @@ describe("FundRig Invariants", function () {
   describe("INV-FUND-3: No account claims twice for same day", function () {
     it("Second claim attempt reverts with FundRig__AlreadyClaimed", async function () {
       await increaseTime(ONE_DAY);
-      const testDay = await rig.currentDay();
+      const testDay = await rig.currentEpoch();
 
       await paymentToken.connect(user0).approve(rig.address, convert("100", 18));
       await rig.connect(user0).fund(user0.address, convert("100", 18), "");
@@ -894,14 +894,14 @@ describe("FundRig Invariants", function () {
   describe("INV-FUND-4: getDayEmission(day) >= minEmission for any day value", function () {
     it("Emission is at or above minEmission for day 0", async function () {
       const minEmission = await rig.minEmission();
-      const emission = await rig.getDayEmission(0);
+      const emission = await rig.getEpochEmission(0);
       expect(emission).to.be.gte(minEmission);
     });
 
     it("Emission is at or above minEmission for early days", async function () {
       const minEmission = await rig.minEmission();
       for (let day = 0; day < 10; day++) {
-        const emission = await rig.getDayEmission(day);
+        const emission = await rig.getEpochEmission(day);
         expect(emission).to.be.gte(minEmission);
       }
     });
@@ -911,7 +911,7 @@ describe("FundRig Invariants", function () {
       // Test far future days (after many halvings)
       const farDays = [100, 500, 1000, 5000, 10000];
       for (const day of farDays) {
-        const emission = await rig.getDayEmission(day);
+        const emission = await rig.getEpochEmission(day);
         expect(emission).to.be.gte(minEmission);
       }
     });

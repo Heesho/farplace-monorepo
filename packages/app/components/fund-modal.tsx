@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther, parseUnits } from "viem";
+import { useReadContract } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useFundRigState } from "@/hooks/useFundRigState";
 import { useTokenMetadata } from "@/hooks/useMetadata";
@@ -16,6 +17,7 @@ import {
 } from "@/hooks/useBatchedTransaction";
 import {
   CONTRACT_ADDRESSES,
+  ERC20_ABI,
   FUND_MULTICALL_ABI,
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
@@ -85,7 +87,7 @@ export function FundModal({
 
   const {
     fundState,
-    claimableDays,
+    claimableEpochs,
     totalPending,
     refetch: refetchFund,
     isLoading: isFundLoading,
@@ -102,6 +104,25 @@ export function FundModal({
     reset: resetTx,
   } = useBatchedTransaction();
 
+  // Allowance check — skip approve when sufficient
+  const fundMulticallAddress = CONTRACT_ADDRESSES.fundMulticall as `0x${string}`;
+  const fundAmountWei = (() => {
+    try {
+      const v = parseFloat(fundAmount);
+      if (!v || v <= 0) return 0n;
+      return parseUnits(fundAmount, QUOTE_TOKEN_DECIMALS);
+    } catch { return 0n; }
+  })();
+  const { data: currentAllowance } = useReadContract({
+    address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, fundMulticallAddress],
+    query: {
+      enabled: !!account && fundAmountWei > 0n,
+    },
+  });
+
   const {
     entries: leaderboardEntries,
     userRank,
@@ -115,12 +136,12 @@ export function FundModal({
 
   // ---------- Derived display values ----------
 
-  // Today's pool
+  // Current epoch's pool
   const todayTotalDonated = fundState
-    ? Number(formatUnits(fundState.todayTotalDonated, QUOTE_TOKEN_DECIMALS))
+    ? Number(formatUnits(fundState.currentEpochTotalDonated, QUOTE_TOKEN_DECIMALS))
     : 0;
   const todayEmission = fundState
-    ? Number(formatEther(fundState.todayEmission))
+    ? Number(formatEther(fundState.currentEpochEmission))
     : 0;
   const currentPricePerToken =
     todayTotalDonated > 0 ? todayTotalDonated / todayEmission : 0;
@@ -130,9 +151,9 @@ export function FundModal({
     ? Number(formatUnits(fundState.accountQuoteBalance, QUOTE_TOKEN_DECIMALS))
     : 0;
 
-  // User's today donation
+  // User's current epoch donation
   const userTodayDonation = fundState
-    ? Number(formatUnits(fundState.accountTodayDonation, QUOTE_TOKEN_DECIMALS))
+    ? Number(formatUnits(fundState.accountCurrentEpochDonation, QUOTE_TOKEN_DECIMALS))
     : 0;
 
   // User's unit balance
@@ -142,16 +163,17 @@ export function FundModal({
 
   // Pending claims
   const pendingTokens = Number(formatEther(totalPending));
-  const unclaimedDayCount = claimableDays.length;
+  const unclaimedDayCount = claimableEpochs.length;
 
-  // Day countdown from chain data
+  // Epoch countdown from chain data
   const startTime = fundState ? Number(fundState.startTime) : 0;
-  const currentDay = fundState ? Number(fundState.currentDay) : 0;
-  const dayEndTime = startTime > 0 ? startTime + (currentDay + 1) * 86400 : 0;
+  const currentEpoch = fundState ? Number(fundState.currentEpoch) : 0;
+  const epochDuration = subgraphRig?.fundRig?.epochDuration ? Number(subgraphRig.fundRig.epochDuration) : 86400;
+  const dayEndTime = startTime > 0 ? startTime + (currentEpoch + 1) * epochDuration : 0;
   const dayEndsIn = Math.max(0, dayEndTime - now);
 
-  // Recipient address (gets 50% of donations)
-  const recipientAddress = fundState?.recipient ?? null;
+  // Recipient address (gets 50% of donations) — from subgraph data
+  const recipientAddress = subgraphRig?.fundRig?.recipients?.[0]?.recipient ?? null;
 
   // Parsed amount from input
   const parsedAmount = parseFloat(fundAmount) || 0;
@@ -234,37 +256,40 @@ export function FundModal({
   };
 
   const handleFund = useCallback(async () => {
-    if (!account || !fundState || txStatus === "pending") return;
+    if (!account || !fundState || !recipientAddress || txStatus === "pending") return;
     const amount = parseUnits(fundAmount || "0", QUOTE_TOKEN_DECIMALS);
     if (amount <= 0n) return;
 
     const calls: Call[] = [];
 
-    // Approve quote token for fund multicall
-    calls.push(
-      encodeApproveCall(
-        CONTRACT_ADDRESSES.usdc as `0x${string}`,
-        CONTRACT_ADDRESSES.fundMulticall as `0x${string}`,
-        amount
-      )
-    );
+    // Approve quote token for fund multicall (skip if allowance is sufficient)
+    const needsApproval = currentAllowance === undefined || currentAllowance < amount;
+    if (needsApproval) {
+      calls.push(
+        encodeApproveCall(
+          CONTRACT_ADDRESSES.usdc as `0x${string}`,
+          fundMulticallAddress,
+          amount
+        )
+      );
+    }
 
     // Fund call
     calls.push(
       encodeContractCall(
-        CONTRACT_ADDRESSES.fundMulticall as `0x${string}`,
+        fundMulticallAddress,
         FUND_MULTICALL_ABI,
         "fund",
-        [rigAddress, account, amount, message || defaultMessage]
+        [rigAddress, account, recipientAddress, amount, message || defaultMessage]
       )
     );
 
     await execute(calls);
-  }, [account, fundState, fundAmount, rigAddress, execute, txStatus]);
+  }, [account, fundState, fundAmount, rigAddress, recipientAddress, execute, txStatus, currentAllowance, fundMulticallAddress]);
 
   const handleClaim = useCallback(async () => {
-    if (!account || claimableDays.length === 0 || txStatus === "pending") return;
-    const dayIds = claimableDays.map((d) => d.day);
+    if (!account || claimableEpochs.length === 0 || txStatus === "pending") return;
+    const dayIds = claimableEpochs.map((d) => d.epoch);
     const calls: Call[] = [
       encodeContractCall(
         CONTRACT_ADDRESSES.fundMulticall as `0x${string}`,
@@ -274,7 +299,7 @@ export function FundModal({
       ),
     ];
     await execute(calls);
-  }, [account, claimableDays, rigAddress, execute, txStatus]);
+  }, [account, claimableEpochs, rigAddress, execute, txStatus]);
 
   // ---------- Render ----------
 

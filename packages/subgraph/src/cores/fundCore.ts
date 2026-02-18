@@ -83,13 +83,13 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   // Create FundRig specialized entity
   let fundRig = new FundRig(rigAddress.toHexString())
   fundRig.rig = rig.id
-  fundRig.recipient = recipientAddress
   fundRig.initialEmission = event.params.initialEmission
   fundRig.minEmission = event.params.minEmission
   let fundRigContract = FundRigContract.bind(rigAddress)
   let minDonationResult = fundRigContract.try_MIN_DONATION()
   fundRig.minDonation = minDonationResult.reverted ? DEFAULT_MIN_DONATION : minDonationResult.value
   fundRig.halvingPeriod = event.params.halvingPeriod
+  fundRig.epochDuration = event.params.epochDuration
   let treasuryResult = fundRigContract.try_treasury()
   fundRig.treasury = treasuryResult.reverted ? Address.zero() : treasuryResult.value
   let teamResult = fundRigContract.try_team()
@@ -99,6 +99,9 @@ export function handleFundCoreLaunched(event: FundCoreLaunchedEvent): void {
   fundRig.totalMinted = ZERO_BD
   fundRig.uniqueDonors = ZERO_BI
   fundRig.save()
+
+  // Note: initial FundRecipient entity is created by the RecipientSet event handler
+  // (emitted from the FundRig constructor)
 
   // Link rig to fundRig
   rig.fundRig = fundRig.id

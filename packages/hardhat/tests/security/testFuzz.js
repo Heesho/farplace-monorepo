@@ -571,7 +571,7 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
         treasury.address,
         team.address,
         recipient.address,
-        [INITIAL_EMISSION, MIN_EMISSION, HALVING_PERIOD_DAYS], // Config
+        [INITIAL_EMISSION, MIN_EMISSION, HALVING_PERIOD_DAYS, 86400], // Config
         "" // uri
       );
 
@@ -598,7 +598,7 @@ describe("FUZZ Category 3: Random Timestamps - Time-Based Halving Emissions", fu
     for (let i = 0; i < testDays.length; i++) {
       const day = testDays[i];
       it(`Fuzz iteration ${i + 1}: emission correct for day ${day}`, async function () {
-        const emission = await rig.getDayEmission(day);
+        const emission = await rig.getEpochEmission(day);
         const halvings = Math.floor(day / HALVING_PERIOD_DAYS);
 
         let expectedEmission = INITIAL_EMISSION.shr(halvings);
@@ -799,7 +799,7 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
       treasury.address,
       team.address,
       recipient.address,
-      [INITIAL_EMISSION, MIN_EMISSION, 30], // Config
+      [INITIAL_EMISSION, MIN_EMISSION, 30, 86400], // Config
       "" // uri
     );
 
@@ -817,8 +817,8 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
       // Advance to a new day
       await increaseTime(ONE_DAY);
 
-      const currentDay = await rig.currentDay();
-      const dayEmission = await rig.getDayEmission(currentDay);
+      const currentDay = await rig.currentEpoch();
+      const dayEmission = await rig.getEpochEmission(currentDay);
 
       // Random number of users (2 to 5)
       const numUsers = 2 + Math.floor(Math.random() * 4);
@@ -841,7 +841,7 @@ describe("FUZZ Category 5: Random Donation Amounts - Proportional Claim Math", f
       }
 
       // Verify tracked total matches sum
-      const trackedTotal = await rig.dayToTotalDonated(currentDay);
+      const trackedTotal = await rig.epochToTotalDonated(currentDay);
       expect(trackedTotal).to.equal(totalDonated);
 
       // Advance to next day to enable claims
@@ -1086,8 +1086,8 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
     await rigContract.connect(user0).setEntropyEnabled(false);
   });
 
-  // Test capacities: 1, 2, 4, 8, 16, 32, 64, 128, 256
-  const capacityValues = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+  // Test capacities: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1000
+  const capacityValues = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1000];
   let prevCapacity = 1;
   let prevPerSlotUps = null;
 
@@ -1134,9 +1134,9 @@ describe("FUZZ Category 7: Random Capacity Values - UPS Division", function () {
     });
   }
 
-  it("Mining at max capacity (256): all slots should have consistent UPS", async function () {
+  it("Mining at max capacity (1000): all slots should have consistent UPS", async function () {
     const capacity = await rigContract.capacity();
-    expect(capacity).to.equal(256);
+    expect(capacity).to.equal(1000);
 
     const globalUps = await rigContract.getUps();
     const expectedPerSlot = globalUps.div(capacity);

@@ -15,6 +15,7 @@ import { FundCore as FundCoreContract } from '../../generated/templates/FundRig/
 import {
   Rig,
   FundRig,
+  FundRecipient,
   FundDayData,
   Donation,
   FundClaim,
@@ -90,7 +91,7 @@ export function handleFunded(event: FundedEvent): void {
   // Event params: sender, funder (indexed), amount, day
   let donorAddress = event.params.funder
   let amount = convertTokenToDecimal(event.params.amount, BI_6)
-  let day = event.params.day
+  let day = event.params.epoch
 
   // Get or create donor account
   let donor = getOrCreateAccount(donorAddress)
@@ -123,6 +124,7 @@ export function handleFunded(event: FundedEvent): void {
   let donation = new Donation(donationId)
   donation.fundRig = fundRig.id
   donation.donor = donor.id
+  donation.recipient = event.params.recipient
   donation.day = day
   donation.amount = amount
   donation.uri = event.params.uri
@@ -136,7 +138,7 @@ export function handleFunded(event: FundedEvent): void {
 
   // Update FundDayData
   let dayData = getOrCreateFundDayData(fundRig, day, event.block.timestamp)
-  let dayEmissionResult = fundRigContract.try_getDayEmission(day)
+  let dayEmissionResult = fundRigContract.try_getEpochEmission(day)
   if (!dayEmissionResult.reverted) {
     dayData.emission = convertTokenToDecimal(dayEmissionResult.value, BI_18)
   }
@@ -196,7 +198,7 @@ export function handleFundClaimed(event: ClaimedEvent): void {
   // Event params: account (indexed), amount, day
   let claimerAddress = event.params.account
   let amount = convertTokenToDecimal(event.params.amount, BI_18)
-  let day = event.params.day
+  let day = event.params.epoch
 
   // Get claimer account
   let claimer = getOrCreateAccount(claimerAddress)
@@ -291,8 +293,17 @@ export function handleFundRecipientSet(event: RecipientSetEvent): void {
   let fundRig = FundRig.load(rigAddress)
   if (fundRig === null) return
 
-  fundRig.recipient = event.params.recipient
-  fundRig.save()
+  let recipientId = rigAddress + '-' + event.params.recipient.toHexString()
+  let fundRecipient = FundRecipient.load(recipientId)
+  if (fundRecipient === null) {
+    fundRecipient = new FundRecipient(recipientId)
+    fundRecipient.fundRig = fundRig.id
+    fundRecipient.recipient = event.params.recipient
+    fundRecipient.totalReceived = ZERO_BD
+    fundRecipient.addedAt = event.block.timestamp
+  }
+  fundRecipient.isActive = event.params.active
+  fundRecipient.save()
 }
 
 export function handleFundUriSet(event: UriSetEvent): void {

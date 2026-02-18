@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { X, Loader2, CheckCircle, User } from "lucide-react";
 import { formatUnits, formatEther, zeroAddress } from "viem";
+import { useReadContract } from "wagmi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import { useRigState } from "@/hooks/useRigState";
@@ -20,6 +21,7 @@ import {
 import { useBatchProfiles } from "@/hooks/useBatchProfiles";
 import {
   CONTRACT_ADDRESSES,
+  ERC20_ABI,
   MULTICALL_ABI,
   RIG_ABI,
   QUOTE_TOKEN_DECIMALS,
@@ -244,6 +246,19 @@ export function MineModal({
     reset: resetTx,
   } = useBatchedTransaction();
 
+  // ---------- Allowance check (skip approve if sufficient) ----------
+  const quoteTokenAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
+  const maxPrice = rigState ? rigState.price + (rigState.price * 5n / 100n) : 0n;
+  const { data: currentAllowance } = useReadContract({
+    address: quoteTokenAddress,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, multicallAddr],
+    query: {
+      enabled: !!account && maxPrice > 0n,
+    },
+  });
+
   // ---------- Derived ----------
   const isSlotEmpty = rigState ? rigState.miner === zeroAddress : true;
   const isUserMiner =
@@ -391,17 +406,19 @@ export function MineModal({
     if (!account || !rigState) return;
 
     const slotState = rigState;
-    const maxPrice = slotState.price + (slotState.price * 5n / 100n); // 5% slippage
+    const slotMaxPrice = slotState.price + (slotState.price * 5n / 100n); // 5% slippage
     const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS);
     const slotUri = message || defaultMessage;
 
     const calls: Call[] = [];
 
-    // Approve quote token for multicall contract
-    const quoteTokenAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
-    calls.push(
-      encodeApproveCall(quoteTokenAddress, multicallAddr, maxPrice)
-    );
+    // Approve quote token for multicall contract (skip if allowance is sufficient)
+    const needsApproval = currentAllowance === undefined || currentAllowance < slotMaxPrice;
+    if (needsApproval) {
+      calls.push(
+        encodeApproveCall(quoteTokenAddress, multicallAddr, slotMaxPrice)
+      );
+    }
 
     // Mine call - include entropy fee as msg.value if needed
     const mineValue = slotState.needsEntropy ? slotState.entropyFee : 0n;
@@ -415,7 +432,7 @@ export function MineModal({
           BigInt(selectedSlotIndex),
           slotState.epochId,
           deadline,
-          maxPrice,
+          slotMaxPrice,
           slotUri,
         ],
         mineValue
@@ -423,7 +440,7 @@ export function MineModal({
     );
 
     await execute(calls);
-  }, [account, rigState, multicallAddr, rigAddress, selectedSlotIndex, message, execute]);
+  }, [account, rigState, multicallAddr, rigAddress, selectedSlotIndex, message, execute, currentAllowance, quoteTokenAddress]);
 
   const handleClaim = useCallback(async () => {
     if (!account) return;

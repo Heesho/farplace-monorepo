@@ -171,6 +171,12 @@
       {
         "indexed": false,
         "internalType": "uint256",
+        "name": "epochDuration",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "auctionInitPrice",
         "type": "uint256"
       },
@@ -337,6 +343,11 @@
           {
             "internalType": "uint256",
             "name": "halvingPeriod",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "epochDuration",
             "type": "uint256"
           },
           {

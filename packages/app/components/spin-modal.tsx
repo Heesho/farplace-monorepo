@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatUnits, formatEther } from "viem";
+import { useReadContract } from "wagmi";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Leaderboard } from "@/components/leaderboard";
 import { SpinHistoryItem } from "@/components/spin-history-item";
@@ -20,6 +21,7 @@ import {
 } from "@/hooks/useBatchedTransaction";
 import {
   CONTRACT_ADDRESSES,
+  ERC20_ABI,
   SPIN_MULTICALL_ABI,
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
@@ -53,6 +55,19 @@ export function SpinModal({
   refetchHistoryRef.current = refetchHistoryFn;
   const { entries: leaderboardEntries, userRank, isLoading: isLeaderboardLoading } = useSpinLeaderboard(rigAddress, account, 10);
   const { execute, status: txStatus, txHash, error: txError, reset: resetTx } = useBatchedTransaction();
+
+  // Allowance check — skip approve if sufficient
+  const spinMulticallAddress = CONTRACT_ADDRESSES.spinMulticall as `0x${string}`;
+  const spinMaxPrice = spinState ? spinState.price + (spinState.price * 5n / 100n) : 0n;
+  const { data: currentAllowance } = useReadContract({
+    address: CONTRACT_ADDRESSES.usdc as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, spinMulticallAddress],
+    query: {
+      enabled: !!account && spinMaxPrice > 0n,
+    },
+  });
 
   // Batch fetch Farcaster profiles for spinners + leaderboard
   const profileAddresses = useMemo(() => {
@@ -157,17 +172,21 @@ export function SpinModal({
     const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS);
     const calls: Call[] = [];
 
-    calls.push(
-      encodeApproveCall(
-        CONTRACT_ADDRESSES.usdc as `0x${string}`,
-        CONTRACT_ADDRESSES.spinMulticall as `0x${string}`,
-        maxPrice
-      )
-    );
+    // Skip approve if allowance is already sufficient
+    const needsApproval = currentAllowance === undefined || currentAllowance < maxPrice;
+    if (needsApproval) {
+      calls.push(
+        encodeApproveCall(
+          CONTRACT_ADDRESSES.usdc as `0x${string}`,
+          spinMulticallAddress,
+          maxPrice
+        )
+      );
+    }
 
     calls.push(
       encodeContractCall(
-        CONTRACT_ADDRESSES.spinMulticall as `0x${string}`,
+        spinMulticallAddress,
         SPIN_MULTICALL_ABI,
         "spin",
         [rigAddress, spinState.epochId, deadline, maxPrice, message || defaultMessage],
@@ -176,7 +195,7 @@ export function SpinModal({
     );
 
     await execute(calls);
-  }, [account, spinState, rigAddress, execute, miningState]);
+  }, [account, spinState, rigAddress, execute, miningState, currentAllowance, spinMulticallAddress]);
 
   // Tick-up animation for revealing mined amount
   useEffect(() => {

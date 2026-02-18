@@ -77,7 +77,8 @@ export type SubgraphRig = {
     minEmission: string;
     halvingPeriod: string;
     minDonation: string;
-    recipient: string;
+    epochDuration: string;
+    recipients: { recipient: string }[];
   } | null;
 };
 
@@ -229,7 +230,10 @@ const RIG_FIELDS = `
     minEmission
     halvingPeriod
     minDonation
-    recipient
+    epochDuration
+    recipients {
+      recipient
+    }
   }
 `;
 

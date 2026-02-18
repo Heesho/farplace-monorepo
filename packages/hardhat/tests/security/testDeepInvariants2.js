@@ -65,7 +65,7 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30, 86400], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
 
@@ -146,7 +146,7 @@ describe("Section 1: FundRig Fee Conservation Invariants", function () {
         treasury.address,
         AddressZero,           // team == address(0)
         recipient.address,
-        [convert("1000", 18), convert("10", 18), 30], // Config
+        [convert("1000", 18), convert("10", 18), 30, 86400], // Config
         "" // uri
       );
 
@@ -254,7 +254,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
       treasury.address,
       team.address,
       recipient.address,
-      [convert("1000", 18), convert("10", 18), 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [convert("1000", 18), convert("10", 18), 30, 86400], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
 
@@ -271,8 +271,8 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
     it("Donate on day 0 (emission=1000), day 30 (emission=500), day 60 (emission=250); verify claims", async function () {
       // Day 0: emission should be 1000
-      day0 = await rig.currentDay();
-      const emission0 = await rig.getDayEmission(day0);
+      day0 = await rig.currentEpoch();
+      const emission0 = await rig.getEpochEmission(day0);
       expect(emission0).to.equal(convert("1000", 18));
 
       // User0 donates on day 0
@@ -281,8 +281,8 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
       // Advance to day 30
       await increaseTime(30 * ONE_DAY);
-      day30 = await rig.currentDay();
-      const emission30 = await rig.getDayEmission(day30);
+      day30 = await rig.currentEpoch();
+      const emission30 = await rig.getEpochEmission(day30);
       expect(emission30).to.equal(convert("500", 18)); // First halving
 
       // User0 donates on day 30
@@ -291,8 +291,8 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
       // Advance to day 60
       await increaseTime(30 * ONE_DAY);
-      day60 = await rig.currentDay();
-      const emission60 = await rig.getDayEmission(day60);
+      day60 = await rig.currentEpoch();
+      const emission60 = await rig.getEpochEmission(day60);
       expect(emission60).to.equal(convert("250", 18)); // Second halving
 
       // User0 donates on day 60
@@ -327,7 +327,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
     it("Each user's claim per day is proportional to their share; total claimed <= dayEmission", async function () {
       // Record starting day
-      const startDay = await rig.currentDay();
+      const startDay = await rig.currentEpoch();
 
       // 5 consecutive days with different donation patterns
       const donationMatrix = [
@@ -342,7 +342,7 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
       const users = [user0, user1, user2];
 
       for (let d = 0; d < 5; d++) {
-        const currentDay = await rig.currentDay();
+        const currentDay = await rig.currentEpoch();
         testDays.push(currentDay);
 
         for (let u = 0; u < 3; u++) {
@@ -360,12 +360,12 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
       // Now all 5 days have ended; claim and verify
       for (let d = 0; d < 5; d++) {
         const day = testDays[d];
-        const dayEmission = await rig.getDayEmission(day);
-        const dayTotal = await rig.dayToTotalDonated(day);
+        const dayEmission = await rig.getEpochEmission(day);
+        const dayTotal = await rig.epochToTotalDonated(day);
         let totalClaimed = ethers.BigNumber.from(0);
 
         for (let u = 0; u < 3; u++) {
-          const userDonation = await rig.dayAccountToDonation(day, users[u].address);
+          const userDonation = await rig.epochAccountToDonation(day, users[u].address);
 
           if (userDonation.gt(0)) {
             const balBefore = await unitToken.balanceOf(users[u].address);
@@ -400,17 +400,17 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
     before("Set up three donation days", async function () {
       // Create donations on three separate days
-      dayA = await rig.currentDay();
+      dayA = await rig.currentEpoch();
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
       await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
       await increaseTime(ONE_DAY);
-      dayB = await rig.currentDay();
+      dayB = await rig.currentEpoch();
       await paymentToken.connect(user0).approve(rig.address, convert("200", 6));
       await rig.connect(user0).fund(user0.address, convert("200", 6), "");
 
       await increaseTime(ONE_DAY);
-      dayC = await rig.currentDay();
+      dayC = await rig.currentEpoch();
       await paymentToken.connect(user0).approve(rig.address, convert("300", 6));
       await rig.connect(user0).fund(user0.address, convert("300", 6), "");
 
@@ -420,9 +420,9 @@ describe("Section 2: FundRig Multi-Day Claiming Across Halving Boundaries", func
 
     it("Claiming out of order (C, A, B) gives correct amounts for each day", async function () {
       // Calculate expected rewards for each day
-      const emissionA = await rig.getDayEmission(dayA);
-      const emissionB = await rig.getDayEmission(dayB);
-      const emissionC = await rig.getDayEmission(dayC);
+      const emissionA = await rig.getEpochEmission(dayA);
+      const emissionB = await rig.getEpochEmission(dayB);
+      const emissionC = await rig.getEpochEmission(dayC);
 
       // Since user0 is sole donor on each day, they get 100% of emission
 

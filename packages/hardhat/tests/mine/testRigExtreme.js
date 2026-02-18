@@ -749,7 +749,7 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       expect(finalSlot.epochId).to.equal(102);
     });
 
-    it("STRESS: Mine all 256 slots (max capacity)", async function () {
+    it("STRESS: Mine first 50 slots at high capacity", async function () {
       this.timeout(300000);
 
       const result = await deployFreshRig();
@@ -1135,27 +1135,27 @@ describe("EXTREME RIG TESTING - TRY TO BREAK EVERYTHING", function () {
       await result.rig.connect(user2).mine(user2.address, 0, slot.epochId, getFutureDeadline(), convert("1", 18), "");
     });
 
-    it("BOUNDARY: Capacity at max (256)", async function () {
+    it("BOUNDARY: Capacity at max (10000)", async function () {
       const result = await deployFreshRig();
 
       // Try to set to max
-      await result.rig.connect(user0).setCapacity(256);
-      expect(await result.rig.capacity()).to.equal(256);
+      await result.rig.connect(user0).setCapacity(10000);
+      expect(await result.rig.capacity()).to.equal(10000);
 
       // Try to exceed max
       await expect(
-        result.rig.connect(user0).setCapacity(257)
+        result.rig.connect(user0).setCapacity(10001)
       ).to.be.revertedWith("Rig__CapacityExceedsMax()");
 
       // Mine last slot
       await ensureWeth(user1, convert("10", 18));
-      const slot = await result.rig.getSlot(255);
+      const slot = await result.rig.getSlot(9999);
       await weth.connect(user1).approve(result.rig.address, convert("1", 18));
       await result.rig.connect(user1).mine(
-        user1.address, 255, slot.epochId, getFutureDeadline(), convert("1", 18), ""
+        user1.address, 9999, slot.epochId, getFutureDeadline(), convert("1", 18), ""
       );
 
-      expect((await result.rig.getSlot(255)).miner).to.equal(user1.address);
+      expect((await result.rig.getSlot(9999)).miner).to.equal(user1.address);
     });
 
     // UPS multiplier bounds and duration are now set at deploy time via Config, no runtime setters

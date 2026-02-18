@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { X, Delete, Loader2, CheckCircle } from "lucide-react";
 import { parseUnits, parseEther, formatEther, formatUnits } from "viem";
+import { useReadContract } from "wagmi";
 import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   useBatchedTransaction,
@@ -12,6 +13,7 @@ import {
 } from "@/hooks/useBatchedTransaction";
 import {
   CONTRACT_ADDRESSES,
+  ERC20_ABI,
   UNIV2_ROUTER_ABI,
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
@@ -118,16 +120,39 @@ export function LiquidityModal({
   const isSuccess = txStatus === "success";
   const isError = txStatus === "error";
 
+  // Pre-compute amounts for allowance checks
+  const routerAddress = CONTRACT_ADDRESSES.uniV2Router as `0x${string}`;
+  const usdcAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
+  const tokenAmountWei = useMemo(() => {
+    try {
+      return tokenInputAmount > 0 ? parseEther(tokenInputAmount.toString()) : 0n;
+    } catch { return 0n; }
+  }, [tokenInputAmount]);
+  const usdcAmountWei = useMemo(() => {
+    try {
+      return requiredUsdc > 0 ? parseUnits(requiredUsdc.toFixed(QUOTE_TOKEN_DECIMALS), QUOTE_TOKEN_DECIMALS) : 0n;
+    } catch { return 0n; }
+  }, [requiredUsdc]);
+
+  // Allowance checks — skip approve when sufficient
+  const { data: unitAllowance } = useReadContract({
+    address: unitAddress,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, routerAddress],
+    query: { enabled: !!account && tokenAmountWei > 0n },
+  });
+  const { data: usdcAllowance } = useReadContract({
+    address: usdcAddress,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, routerAddress],
+    query: { enabled: !!account && usdcAmountWei > 0n },
+  });
+
   // Add liquidity handler
   const handleAddLiquidity = useCallback(async () => {
     if (!account || !canCreate) return;
-
-    const routerAddress = CONTRACT_ADDRESSES.uniV2Router as `0x${string}`;
-    const usdcAddress = CONTRACT_ADDRESSES.usdc as `0x${string}`;
-
-    // Parse amounts to wei
-    const tokenAmountWei = parseEther(tokenInputAmount.toString());
-    const usdcAmountWei = parseUnits(requiredUsdc.toFixed(QUOTE_TOKEN_DECIMALS), QUOTE_TOKEN_DECIMALS);
 
     // 1% slippage tolerance
     const tokenAmountMin = (tokenAmountWei * 99n) / 100n;
@@ -137,11 +162,15 @@ export function LiquidityModal({
 
     const calls: Call[] = [];
 
-    // Approve unit token for router
-    calls.push(encodeApproveCall(unitAddress, routerAddress, tokenAmountWei));
+    // Approve unit token for router (skip if allowance is sufficient)
+    if (unitAllowance === undefined || unitAllowance < tokenAmountWei) {
+      calls.push(encodeApproveCall(unitAddress, routerAddress, tokenAmountWei));
+    }
 
-    // Approve USDC for router
-    calls.push(encodeApproveCall(usdcAddress, routerAddress, usdcAmountWei));
+    // Approve USDC for router (skip if allowance is sufficient)
+    if (usdcAllowance === undefined || usdcAllowance < usdcAmountWei) {
+      calls.push(encodeApproveCall(usdcAddress, routerAddress, usdcAmountWei));
+    }
 
     // Call addLiquidity on Uniswap V2 Router
     calls.push(
@@ -164,7 +193,7 @@ export function LiquidityModal({
     );
 
     await execute(calls);
-  }, [account, canCreate, tokenInputAmount, requiredUsdc, unitAddress, execute]);
+  }, [account, canCreate, tokenAmountWei, usdcAmountWei, unitAddress, execute, unitAllowance, usdcAllowance, routerAddress, usdcAddress]);
 
   if (!isOpen) return null;
 

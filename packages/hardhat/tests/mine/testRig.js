@@ -472,7 +472,7 @@ describe("Rig Comprehensive Tests", function () {
 
     it("Should revert when capacity exceeds MAX_CAPACITY", async function () {
       await expect(
-        rigContract.connect(user0).setCapacity(257)
+        rigContract.connect(user0).setCapacity(10001)
       ).to.be.revertedWith("Rig__CapacityExceedsMax()");
     });
 

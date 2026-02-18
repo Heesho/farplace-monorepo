@@ -15,6 +15,7 @@ import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   CONTRACT_ADDRESSES,
   QUOTE_TOKEN_DECIMALS,
+  ERC20_ABI,
   UNIV2_ROUTER_ABI,
   UNIV2_FACTORY_ABI,
   UNIV2_PAIR_ABI,
@@ -139,6 +140,18 @@ export function TradeModal({
   const availableDisplay = isBuy
     ? `$${Number(displayBalance).toFixed(2)} available`
     : `${formatCoin(Number(displayBalance))} ${tokenSymbol} available`;
+
+  // ---- Allowance check (skip approve if sufficient) -----------------------
+  const routerAddress = CONTRACT_ADDRESSES.uniV2Router as `0x${string}`;
+  const { data: currentAllowance } = useReadContract({
+    address: sellToken,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [taker!, routerAddress],
+    query: {
+      enabled: !!taker && parsedInput > 0n,
+    },
+  });
 
   // ---- LP reserves for spot price -----------------------------------------
   const { data: pairAddress } = useReadContract({
@@ -284,16 +297,18 @@ export function TradeModal({
   const handleConfirm = useCallback(async () => {
     if (!buyAmountWei || !amountOutMin || !taker) return;
 
-    const routerAddress = CONTRACT_ADDRESSES.uniV2Router as `0x${string}`;
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200); // 20 min
     const path = [sellToken, buyToken] as readonly `0x${string}`[];
 
     const calls: Call[] = [];
 
-    // 1. Approve sell token to router
-    calls.push(
-      encodeApproveCall(sellToken, routerAddress, parsedInput)
-    );
+    // 1. Approve sell token to router (skip if allowance is already sufficient)
+    const needsApproval = currentAllowance === undefined || currentAllowance < parsedInput;
+    if (needsApproval) {
+      calls.push(
+        encodeApproveCall(sellToken, routerAddress, parsedInput)
+      );
+    }
 
     // 2. Swap via V2 Router
     calls.push(
@@ -310,7 +325,7 @@ export function TradeModal({
     } catch {
       // Error is captured by useBatchedTransaction
     }
-  }, [buyAmountWei, amountOutMin, taker, sellToken, buyToken, parsedInput, execute]);
+  }, [buyAmountWei, amountOutMin, taker, sellToken, buyToken, parsedInput, execute, currentAllowance, routerAddress]);
 
   // Auto-close on success after a short delay
   useEffect(() => {

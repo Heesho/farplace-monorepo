@@ -32,9 +32,10 @@ contract FundRig is ReentrancyGuard, Ownable {
 
     /*----------  CONSTANTS  --------------------------------------------*/
 
-    uint256 public constant DAY_DURATION = 1 days;
-    uint256 public constant MIN_HALVING_PERIOD = 7; // minimum 7 days
-    uint256 public constant MAX_HALVING_PERIOD = 365; // maximum 365 days
+    uint256 public constant MIN_EPOCH_DURATION = 1 hours;
+    uint256 public constant MAX_EPOCH_DURATION = 7 days;
+    uint256 public constant MIN_HALVING_PERIOD = 7; // minimum 7 epochs
+    uint256 public constant MAX_HALVING_PERIOD = 365; // maximum 365 epochs
 
     // Emission bounds (defense in depth - matches FundCore)
     uint256 public constant MIN_INITIAL_EMISSION = 1e18; // minimum 1 Unit per day
@@ -58,7 +59,8 @@ contract FundRig is ReentrancyGuard, Ownable {
     uint256 public immutable startTime;
     uint256 public immutable initialEmission;
     uint256 public immutable minEmission;
-    uint256 public immutable halvingPeriod; // in days
+    uint256 public immutable halvingPeriod; // in epochs
+    uint256 public immutable epochDuration; // in seconds
 
     /*----------  STATE  ------------------------------------------------*/
 
@@ -66,9 +68,9 @@ contract FundRig is ReentrancyGuard, Ownable {
     address public treasury;
     address public team;
 
-    mapping(uint256 => uint256) public dayToTotalDonated;
-    mapping(uint256 => mapping(address => uint256)) public dayAccountToDonation;
-    mapping(uint256 => mapping(address => bool)) public dayAccountToHasClaimed;
+    mapping(uint256 => uint256) public epochToTotalDonated;
+    mapping(uint256 => mapping(address => uint256)) public epochAccountToDonation;
+    mapping(uint256 => mapping(address => bool)) public epochAccountToHasClaimed;
 
     // Metadata URI for the rig
     string public uri;
@@ -79,29 +81,31 @@ contract FundRig is ReentrancyGuard, Ownable {
         uint256 initialEmission;
         uint256 minEmission;
         uint256 halvingPeriod;
+        uint256 epochDuration;
     }
 
     /*----------  ERRORS  -----------------------------------------------*/
 
     error FundRig__ZeroAddress();
-    error FundRig__DayNotEnded();
+    error FundRig__EpochNotEnded();
     error FundRig__AlreadyClaimed();
     error FundRig__NoDonation();
     error FundRig__RecipientNotSet();
     error FundRig__EmissionOutOfRange();
     error FundRig__BelowMinDonation();
     error FundRig__HalvingPeriodOutOfRange();
+    error FundRig__EpochDurationOutOfRange();
 
     /*----------  EVENTS  -----------------------------------------------*/
 
-    event FundRig__Funded(address sender, address indexed funder, uint256 amount, uint256 day, string uri);
-    event FundRig__Claimed(address indexed account, uint256 amount, uint256 day);
+    event FundRig__Funded(address sender, address indexed funder, uint256 amount, uint256 epoch, string uri);
+    event FundRig__Claimed(address indexed account, uint256 amount, uint256 epoch);
     event FundRig__RecipientSet(address indexed recipient);
     event FundRig__TreasurySet(address indexed treasury);
     event FundRig__TeamSet(address indexed team);
-    event FundRig__TreasuryFee(address indexed treasury, uint256 indexed day, uint256 amount);
-    event FundRig__TeamFee(address indexed team, uint256 indexed day, uint256 amount);
-    event FundRig__ProtocolFee(address indexed protocol, uint256 indexed day, uint256 amount);
+    event FundRig__TreasuryFee(address indexed treasury, uint256 indexed epoch, uint256 amount);
+    event FundRig__TeamFee(address indexed team, uint256 indexed epoch, uint256 amount);
+    event FundRig__ProtocolFee(address indexed protocol, uint256 indexed epoch, uint256 amount);
     event FundRig__UriSet(string uri);
 
     /*----------  CONSTRUCTOR  ------------------------------------------*/
@@ -138,6 +142,9 @@ contract FundRig is ReentrancyGuard, Ownable {
         if (_config.halvingPeriod < MIN_HALVING_PERIOD || _config.halvingPeriod > MAX_HALVING_PERIOD) {
             revert FundRig__HalvingPeriodOutOfRange();
         }
+        if (_config.epochDuration < MIN_EPOCH_DURATION || _config.epochDuration > MAX_EPOCH_DURATION) {
+            revert FundRig__EpochDurationOutOfRange();
+        }
 
         unit = _unit;
         quote = _quote;
@@ -148,6 +155,7 @@ contract FundRig is ReentrancyGuard, Ownable {
         initialEmission = _config.initialEmission;
         minEmission = _config.minEmission;
         halvingPeriod = _config.halvingPeriod;
+        epochDuration = _config.epochDuration;
         startTime = block.timestamp;
 
         // Set URI
@@ -168,7 +176,7 @@ contract FundRig is ReentrancyGuard, Ownable {
         if (amount < MIN_DONATION) revert FundRig__BelowMinDonation();
         if (recipient == address(0)) revert FundRig__RecipientNotSet();
 
-        uint256 day = currentDay();
+        uint256 epoch = currentEpoch();
 
         // Transfer tokens from msg.sender (payer)
         IERC20(quote).safeTransferFrom(msg.sender, address(this), amount);
@@ -180,54 +188,54 @@ contract FundRig is ReentrancyGuard, Ownable {
         uint256 protocolFee = protocol != address(0) ? amount * PROTOCOL_BPS / DIVISOR : 0;
         uint256 treasuryFee = amount - recipientAmount - teamFee - protocolFee;
 
-        // Distribute funds
+        // Transfer recipient share
         IERC20(quote).safeTransfer(recipient, recipientAmount);
         IERC20(quote).safeTransfer(treasury, treasuryFee);
-        emit FundRig__TreasuryFee(treasury, day, treasuryFee);
+        emit FundRig__TreasuryFee(treasury, epoch, treasuryFee);
         if (teamFee > 0) {
             IERC20(quote).safeTransfer(team, teamFee);
-            emit FundRig__TeamFee(team, day, teamFee);
+            emit FundRig__TeamFee(team, epoch, teamFee);
         }
         if (protocolFee > 0) {
             IERC20(quote).safeTransfer(protocol, protocolFee);
-            emit FundRig__ProtocolFee(protocol, day, protocolFee);
+            emit FundRig__ProtocolFee(protocol, epoch, protocolFee);
         }
 
         // Update state - credit the account, not msg.sender
-        dayToTotalDonated[day] += amount;
-        dayAccountToDonation[day][account] += amount;
+        epochToTotalDonated[epoch] += amount;
+        epochAccountToDonation[epoch][account] += amount;
 
-        emit FundRig__Funded(msg.sender, account, amount, day, _uri);
+        emit FundRig__Funded(msg.sender, account, amount, epoch, _uri);
     }
 
     /**
-     * @notice Claim Unit tokens for a completed day on behalf of an account.
-     * @dev Can only be called after the specified day has ended.
-     *      Mints Unit proportional to account's share of that day's donations.
+     * @notice Claim Unit tokens for a completed epoch on behalf of an account.
+     * @dev Can only be called after the specified epoch has ended.
+     *      Mints Unit proportional to account's share of that epoch's donations.
      * @param account The account to claim for (must have donated, receives Unit)
-     * @param day The day number to claim for
+     * @param epoch The epoch number to claim for
      */
-    function claim(address account, uint256 day) external nonReentrant {
+    function claim(address account, uint256 epoch) external nonReentrant {
         if (account == address(0)) revert FundRig__ZeroAddress();
-        if (day >= currentDay()) revert FundRig__DayNotEnded();
-        if (dayAccountToHasClaimed[day][account]) revert FundRig__AlreadyClaimed();
+        if (epoch >= currentEpoch()) revert FundRig__EpochNotEnded();
+        if (epochAccountToHasClaimed[epoch][account]) revert FundRig__AlreadyClaimed();
 
-        uint256 userDonation = dayAccountToDonation[day][account];
+        uint256 userDonation = epochAccountToDonation[epoch][account];
         if (userDonation == 0) revert FundRig__NoDonation();
 
-        uint256 dayTotal = dayToTotalDonated[day];
-        uint256 dayEmission = getDayEmission(day);
+        uint256 epochTotal = epochToTotalDonated[epoch];
+        uint256 epochEmission = getEpochEmission(epoch);
 
-        // Calculate user's share: (userDonation / dayTotal) * dayEmission
-        uint256 userReward = (userDonation * dayEmission) / dayTotal;
+        // Calculate user's share: (userDonation / epochTotal) * epochEmission
+        uint256 userReward = (userDonation * epochEmission) / epochTotal;
 
         // Mark as claimed before minting (CEI pattern)
-        dayAccountToHasClaimed[day][account] = true;
+        epochAccountToHasClaimed[epoch][account] = true;
 
         // Mint Unit to the account
         IUnit(unit).mint(account, userReward);
 
-        emit FundRig__Claimed(account, userReward, day);
+        emit FundRig__Claimed(account, userReward, epoch);
     }
 
     /*----------  RESTRICTED FUNCTIONS  ---------------------------------*/
@@ -274,21 +282,21 @@ contract FundRig is ReentrancyGuard, Ownable {
     /*----------  VIEW FUNCTIONS  ---------------------------------------*/
 
     /**
-     * @notice Get the current day number since contract deployment.
-     * @return The current day (0-indexed)
+     * @notice Get the current epoch number since contract deployment.
+     * @return The current epoch (0-indexed)
      */
-    function currentDay() public view returns (uint256) {
-        return (block.timestamp - startTime) / DAY_DURATION;
+    function currentEpoch() public view returns (uint256) {
+        return (block.timestamp - startTime) / epochDuration;
     }
 
     /**
-     * @notice Get the Unit emission for a specific day.
-     * @dev Emission halves every halvingPeriod days with a floor of minEmission.
-     * @param day The day number to query
-     * @return The Unit emission for that day
+     * @notice Get the Unit emission for a specific epoch.
+     * @dev Emission halves every halvingPeriod epochs with a floor of minEmission.
+     * @param epoch The epoch number to query
+     * @return The Unit emission for that epoch
      */
-    function getDayEmission(uint256 day) public view returns (uint256) {
-        uint256 halvings = day / halvingPeriod; // Number of halving periods
+    function getEpochEmission(uint256 epoch) public view returns (uint256) {
+        uint256 halvings = epoch / halvingPeriod; // Number of halving periods
         uint256 emission = initialEmission >> halvings; // Right shift = divide by 2^halvings
 
         if (emission < minEmission) {
@@ -298,23 +306,23 @@ contract FundRig is ReentrancyGuard, Ownable {
     }
 
     /**
-     * @notice Get pending Unit reward for a user on a specific day.
-     * @dev Returns 0 if day hasn't ended, already claimed, or no donation.
-     * @param day The day number to query
+     * @notice Get pending Unit reward for a user on a specific epoch.
+     * @dev Returns 0 if epoch hasn't ended, already claimed, or no donation.
+     * @param epoch The epoch number to query
      * @param account The user address to query
      * @return The pending Unit reward
      */
-    function getPendingReward(uint256 day, address account) external view returns (uint256) {
-        if (day >= currentDay()) return 0;
-        if (dayAccountToHasClaimed[day][account]) return 0;
+    function getPendingReward(uint256 epoch, address account) external view returns (uint256) {
+        if (epoch >= currentEpoch()) return 0;
+        if (epochAccountToHasClaimed[epoch][account]) return 0;
 
-        uint256 userDonation = dayAccountToDonation[day][account];
+        uint256 userDonation = epochAccountToDonation[epoch][account];
         if (userDonation == 0) return 0;
 
-        uint256 dayTotal = dayToTotalDonated[day];
-        uint256 dayEmission = getDayEmission(day);
+        uint256 epochTotal = epochToTotalDonated[epoch];
+        uint256 epochEmission = getEpochEmission(epoch);
 
-        return (userDonation * dayEmission) / dayTotal;
+        return (userDonation * epochEmission) / epochTotal;
     }
 
 }

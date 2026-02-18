@@ -19,6 +19,7 @@ interface IFundCore {
         uint256 initialEmission;
         uint256 minEmission;
         uint256 halvingPeriod;
+        uint256 epochDuration;
         uint256 auctionInitPrice;
         uint256 auctionEpochPeriod;
         uint256 auctionPriceMultiplier;

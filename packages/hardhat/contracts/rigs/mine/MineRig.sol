@@ -71,7 +71,7 @@ contract MineRig is IEntropyConsumer, ReentrancyGuard, Ownable {
     uint256 public constant MAX_UPS_MULTIPLIER_DURATION = 7 days;
 
     // Capacity bounds
-    uint256 public constant MAX_CAPACITY = 256;
+    uint256 public constant MAX_CAPACITY = 10_000;
 
     /*----------  IMMUTABLES  -------------------------------------------*/
 

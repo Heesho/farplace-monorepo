@@ -73,7 +73,8 @@ contract FundCore is Ownable, ReentrancyGuard {
         uint256 unitAmount; // Unit tokens minted for initial LP
         uint256 initialEmission; // starting Unit emission per day
         uint256 minEmission; // minimum Unit emission per day (floor)
-        uint256 halvingPeriod; // number of days between emission halvings
+        uint256 halvingPeriod; // number of epochs between emission halvings
+        uint256 epochDuration; // epoch duration in seconds (1 hour - 7 days)
         uint256 auctionInitPrice; // auction starting price
         uint256 auctionEpochPeriod; // auction epoch duration
         uint256 auctionPriceMultiplier; // auction price multiplier
@@ -107,6 +108,7 @@ contract FundCore is Ownable, ReentrancyGuard {
         uint256 initialEmission,
         uint256 minEmission,
         uint256 halvingPeriod,
+        uint256 epochDuration,
         uint256 auctionInitPrice,
         uint256 auctionEpochPeriod,
         uint256 auctionPriceMultiplier,
@@ -222,7 +224,8 @@ contract FundCore is Ownable, ReentrancyGuard {
         FundRig.Config memory rigConfig = FundRig.Config({
             initialEmission: params.initialEmission,
             minEmission: params.minEmission,
-            halvingPeriod: params.halvingPeriod
+            halvingPeriod: params.halvingPeriod,
+            epochDuration: params.epochDuration
         });
 
         FundRig fundRig = new FundRig(
@@ -269,6 +272,7 @@ contract FundCore is Ownable, ReentrancyGuard {
             params.initialEmission,
             params.minEmission,
             params.halvingPeriod,
+            params.epochDuration,
             params.auctionInitPrice,
             params.auctionEpochPeriod,
             params.auctionPriceMultiplier,

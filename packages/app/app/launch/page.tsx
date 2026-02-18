@@ -116,6 +116,7 @@ const DEFAULTS = {
     initialUps: 50000, // 50,000 tokens/day (expressed as daily)
     tailUps: 5000, // 5,000 tokens/day floor
     halvingPeriod: 30 * 24 * 3600, // 30 days
+    epochDuration: 86400, // 1 day
     auctionEpochPeriod: 86400, // 1 day
     auctionPriceMultiplier: 1.2, // 1.2x
     auctionTargetUsd: 100, // target $100 min auction price
@@ -1168,7 +1169,8 @@ export default function LaunchPage() {
       } else {
         const initialEmissionWei = parseUnits(initialUps.toString(), 18);
         const minEmissionWei = parseUnits(tailUps.toString(), 18);
-        const halvingPeriodDays = Math.max(1, Math.round(halvingPeriod / 86400));
+        const epochDurationSecs = (state as any).epochDuration ?? DEFAULTS.fund.epochDuration;
+        const halvingPeriodEpochs = Math.max(1, Math.round(halvingPeriod / epochDurationSecs));
 
         multicallAddress = CONTRACT_ADDRESSES.fundMulticall as `0x${string}`;
         multicallAbi = FUND_MULTICALL_ABI;
@@ -1183,7 +1185,8 @@ export default function LaunchPage() {
           unitAmount: unitAmountWei,
           initialEmission: initialEmissionWei,
           minEmission: minEmissionWei,
-          halvingPeriod: BigInt(halvingPeriodDays),
+          halvingPeriod: BigInt(halvingPeriodEpochs),
+          epochDuration: BigInt(epochDurationSecs),
           auctionInitPrice: auctionInitPriceWei,
           auctionEpochPeriod: auctionEpochPeriodWei,
           auctionPriceMultiplier: auctionPriceMultiplierWei,

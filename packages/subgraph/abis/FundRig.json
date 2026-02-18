@@ -47,6 +47,11 @@
             "internalType": "uint256",
             "name": "halvingPeriod",
             "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "epochDuration",
+            "type": "uint256"
           }
         ],
         "internalType": "struct FundRig.Config",
@@ -74,12 +79,17 @@
   },
   {
     "inputs": [],
-    "name": "FundRig__DayNotEnded",
+    "name": "FundRig__EmissionOutOfRange",
     "type": "error"
   },
   {
     "inputs": [],
-    "name": "FundRig__EmissionOutOfRange",
+    "name": "FundRig__EpochDurationOutOfRange",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "FundRig__EpochNotEnded",
     "type": "error"
   },
   {
@@ -94,7 +104,7 @@
   },
   {
     "inputs": [],
-    "name": "FundRig__RecipientNotSet",
+    "name": "FundRig__RecipientNotActive",
     "type": "error"
   },
   {
@@ -120,7 +130,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       }
     ],
@@ -143,6 +153,12 @@
         "type": "address"
       },
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      },
+      {
         "indexed": false,
         "internalType": "uint256",
         "name": "amount",
@@ -151,7 +167,7 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       },
       {
@@ -176,7 +192,7 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       },
       {
@@ -197,6 +213,12 @@
         "internalType": "address",
         "name": "recipient",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "active",
+        "type": "bool"
       }
     ],
     "name": "FundRig__RecipientSet",
@@ -214,7 +236,7 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       },
       {
@@ -252,7 +274,7 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       },
       {
@@ -312,7 +334,7 @@
   },
   {
     "inputs": [],
-    "name": "DAY_DURATION",
+    "name": "DIVISOR",
     "outputs": [
       {
         "internalType": "uint256",
@@ -325,7 +347,7 @@
   },
   {
     "inputs": [],
-    "name": "DIVISOR",
+    "name": "MAX_EPOCH_DURATION",
     "outputs": [
       {
         "internalType": "uint256",
@@ -365,6 +387,19 @@
   {
     "inputs": [],
     "name": "MIN_DONATION",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MIN_EPOCH_DURATION",
     "outputs": [
       {
         "internalType": "uint256",
@@ -444,12 +479,31 @@
     "inputs": [
       {
         "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "accountToIsRecipient",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "account",
         "type": "address"
       },
       {
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       }
     ],
@@ -473,7 +527,7 @@
   },
   {
     "inputs": [],
-    "name": "currentDay",
+    "name": "currentEpoch",
     "outputs": [
       {
         "internalType": "uint256",
@@ -497,7 +551,7 @@
         "type": "address"
       }
     ],
-    "name": "dayAccountToDonation",
+    "name": "epochAccountToDonation",
     "outputs": [
       {
         "internalType": "uint256",
@@ -521,7 +575,7 @@
         "type": "address"
       }
     ],
-    "name": "dayAccountToHasClaimed",
+    "name": "epochAccountToHasClaimed",
     "outputs": [
       {
         "internalType": "bool",
@@ -533,6 +587,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "epochDuration",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -540,7 +607,7 @@
         "type": "uint256"
       }
     ],
-    "name": "dayToTotalDonated",
+    "name": "epochToTotalDonated",
     "outputs": [
       {
         "internalType": "uint256",
@@ -556,6 +623,11 @@
       {
         "internalType": "address",
         "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "recipient",
         "type": "address"
       },
       {
@@ -578,11 +650,11 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       }
     ],
-    "name": "getDayEmission",
+    "name": "getEpochEmission",
     "outputs": [
       {
         "internalType": "uint256",
@@ -597,7 +669,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "day",
+        "name": "epoch",
         "type": "uint256"
       },
       {
@@ -684,19 +756,6 @@
   },
   {
     "inputs": [],
-    "name": "recipient",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "renounceOwnership",
     "outputs": [],
     "stateMutability": "nonpayable",
@@ -708,6 +767,11 @@
         "internalType": "address",
         "name": "_recipient",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "_active",
+        "type": "bool"
       }
     ],
     "name": "setRecipient",

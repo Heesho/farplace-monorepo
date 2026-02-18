@@ -467,11 +467,10 @@ export const FUND_MULTICALL_ABI = [
     outputs: [
       {
         components: [
-          { internalType: "uint256", name: "currentDay", type: "uint256" },
-          { internalType: "uint256", name: "todayEmission", type: "uint256" },
-          { internalType: "uint256", name: "todayTotalDonated", type: "uint256" },
+          { internalType: "uint256", name: "currentEpoch", type: "uint256" },
+          { internalType: "uint256", name: "currentEpochEmission", type: "uint256" },
+          { internalType: "uint256", name: "currentEpochTotalDonated", type: "uint256" },
           { internalType: "uint256", name: "startTime", type: "uint256" },
-          { internalType: "address", name: "recipient", type: "address" },
           { internalType: "address", name: "treasury", type: "address" },
           { internalType: "address", name: "team", type: "address" },
           { internalType: "uint256", name: "unitPrice", type: "uint256" },
@@ -479,9 +478,9 @@ export const FUND_MULTICALL_ABI = [
           { internalType: "uint256", name: "accountQuoteBalance", type: "uint256" },
           { internalType: "uint256", name: "accountUsdcBalance", type: "uint256" },
           { internalType: "uint256", name: "accountUnitBalance", type: "uint256" },
-          { internalType: "uint256", name: "accountTodayDonation", type: "uint256" },
+          { internalType: "uint256", name: "accountCurrentEpochDonation", type: "uint256" },
         ],
-        internalType: "struct FundMulticall.FundRigState",
+        internalType: "struct FundMulticall.RigState",
         name: "state",
         type: "tuple",
       },
@@ -494,6 +493,7 @@ export const FUND_MULTICALL_ABI = [
     inputs: [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
+      { internalType: "address", name: "recipient", type: "address" },
       { internalType: "uint256", name: "amount", type: "uint256" },
       { internalType: "string", name: "_uri", type: "string" },
     ],
@@ -502,49 +502,49 @@ export const FUND_MULTICALL_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // claim function - claim rewards for a specific day
+  // claim function - claim rewards for a specific epoch
   {
     inputs: [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
-      { internalType: "uint256", name: "day", type: "uint256" },
+      { internalType: "uint256", name: "epoch", type: "uint256" },
     ],
     name: "claim",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
-  // claimMultiple function - claim rewards for multiple days
+  // claimMultiple function - claim rewards for multiple epochs
   {
     inputs: [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
-      { internalType: "uint256[]", name: "dayIds", type: "uint256[]" },
+      { internalType: "uint256[]", name: "epochIds", type: "uint256[]" },
     ],
     name: "claimMultiple",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
-  // getClaimableDays function - get claimable day info for a range
+  // getClaimableEpochs function - get claimable epoch info for a range
   {
     inputs: [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
-      { internalType: "uint256", name: "startDay", type: "uint256" },
-      { internalType: "uint256", name: "endDay", type: "uint256" },
+      { internalType: "uint256", name: "startEpoch", type: "uint256" },
+      { internalType: "uint256", name: "endEpoch", type: "uint256" },
     ],
-    name: "getClaimableDays",
+    name: "getClaimableEpochs",
     outputs: [
       {
         components: [
-          { internalType: "uint256", name: "day", type: "uint256" },
+          { internalType: "uint256", name: "epoch", type: "uint256" },
           { internalType: "uint256", name: "donation", type: "uint256" },
           { internalType: "uint256", name: "pendingReward", type: "uint256" },
           { internalType: "bool", name: "hasClaimed", type: "bool" },
         ],
-        internalType: "struct FundMulticall.ClaimableDay[]",
-        name: "days",
+        internalType: "struct FundMulticall.ClaimableEpoch[]",
+        name: "epochs",
         type: "tuple[]",
       },
     ],
@@ -556,13 +556,13 @@ export const FUND_MULTICALL_ABI = [
     inputs: [
       { internalType: "address", name: "rig", type: "address" },
       { internalType: "address", name: "account", type: "address" },
-      { internalType: "uint256", name: "startDay", type: "uint256" },
-      { internalType: "uint256", name: "endDay", type: "uint256" },
+      { internalType: "uint256", name: "startEpoch", type: "uint256" },
+      { internalType: "uint256", name: "endEpoch", type: "uint256" },
     ],
     name: "getTotalPendingRewards",
     outputs: [
       { internalType: "uint256", name: "totalPending", type: "uint256" },
-      { internalType: "uint256[]", name: "unclaimedDays", type: "uint256[]" },
+      { internalType: "uint256[]", name: "unclaimedEpochs", type: "uint256[]" },
     ],
     stateMutability: "view",
     type: "function",
@@ -624,6 +624,7 @@ export const FUND_MULTICALL_ABI = [
           { internalType: "uint256", name: "initialEmission", type: "uint256" },
           { internalType: "uint256", name: "minEmission", type: "uint256" },
           { internalType: "uint256", name: "halvingPeriod", type: "uint256" },
+          { internalType: "uint256", name: "epochDuration", type: "uint256" },
           { internalType: "uint256", name: "auctionInitPrice", type: "uint256" },
           { internalType: "uint256", name: "auctionEpochPeriod", type: "uint256" },
           { internalType: "uint256", name: "auctionPriceMultiplier", type: "uint256" },
@@ -1037,11 +1038,10 @@ export type SpinRigState = {
 };
 
 export type FundRigState = {
-  currentDay: bigint;
-  todayEmission: bigint;
-  todayTotalDonated: bigint;
+  currentEpoch: bigint;
+  currentEpochEmission: bigint;
+  currentEpochTotalDonated: bigint;
   startTime: bigint;
-  recipient: `0x${string}`;
   treasury: `0x${string}`;
   team: `0x${string}`;
   unitPrice: bigint;
@@ -1049,11 +1049,11 @@ export type FundRigState = {
   accountQuoteBalance: bigint;
   accountUsdcBalance: bigint;
   accountUnitBalance: bigint;
-  accountTodayDonation: bigint;
+  accountCurrentEpochDonation: bigint;
 };
 
-export type ClaimableDay = {
-  day: bigint;
+export type ClaimableEpoch = {
+  epoch: bigint;
   donation: bigint;
   pendingReward: bigint;
   hasClaimed: boolean;

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { X, Loader2, CheckCircle } from "lucide-react";
 import { formatEther, formatUnits } from "viem";
+import { useReadContract } from "wagmi";
 import { useAuctionState } from "@/hooks/useAuctionState";
 import {
   useBatchedTransaction,
@@ -13,6 +14,7 @@ import {
 import { useFarcaster } from "@/hooks/useFarcaster";
 import {
   CONTRACT_ADDRESSES,
+  ERC20_ABI,
   MULTICALL_ABI,
   QUOTE_TOKEN_DECIMALS,
 } from "@/lib/contracts";
@@ -46,6 +48,19 @@ export function AuctionModal({
   );
 
   const { execute, status, txHash, error, reset } = useBatchedTransaction();
+
+  // Allowance check — skip approve when sufficient
+  const lpTokenAddress = auctionState?.lpToken;
+  const auctionPrice = auctionState?.price ?? 0n;
+  const { data: currentAllowance } = useReadContract({
+    address: lpTokenAddress!,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [account!, multicallAddr],
+    query: {
+      enabled: !!account && !!lpTokenAddress && auctionPrice > 0n,
+    },
+  });
 
   // Reset transaction state when modal opens/closes
   useEffect(() => {
@@ -94,14 +109,17 @@ export function AuctionModal({
       Math.floor(Date.now() / 1000) + DEADLINE_BUFFER_SECONDS
     );
 
-    // Approve LP token spending for the multicall contract
-    calls.push(
-      encodeApproveCall(
-        auctionState.lpToken,
-        multicallAddr,
-        auctionState.price
-      )
-    );
+    // Approve LP token spending (skip if allowance is sufficient)
+    const needsApproval = currentAllowance === undefined || currentAllowance < auctionState.price;
+    if (needsApproval) {
+      calls.push(
+        encodeApproveCall(
+          auctionState.lpToken,
+          multicallAddr,
+          auctionState.price
+        )
+      );
+    }
 
     // Buy call: buy(rig, epochId, deadline, maxPaymentTokenAmount)
     calls.push(
@@ -115,7 +133,7 @@ export function AuctionModal({
     );
 
     await execute(calls);
-  }, [auctionState, account, multicallAddr, rigAddress, execute]);
+  }, [auctionState, account, multicallAddr, rigAddress, execute, currentAllowance]);
 
   if (!isOpen) return null;
 

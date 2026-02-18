@@ -95,7 +95,8 @@ describe("FundCore Launch Tests", function () {
       unitAmount: convert("1000000", 18),
       initialEmission: convert("345600", 18), // 345,600 per day
       minEmission: convert("864", 18), // 864 per day
-      halvingPeriod: 30, // 30 days
+      halvingPeriod: 30, // 30 epochs
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400, // 1 day
       auctionPriceMultiplier: convert("1.5", 18),
@@ -182,6 +183,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -211,6 +213,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -240,6 +243,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -269,6 +273,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -298,6 +303,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -327,6 +333,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("345600", 18),
       minEmission: convert("864", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -357,6 +364,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("100", 18),
       minEmission: convert("200", 18), // greater than initial
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("1000", 6),
       auctionEpochPeriod: 86400,
       auctionPriceMultiplier: convert("1.5", 18),
@@ -418,6 +426,7 @@ describe("FundCore Launch Tests", function () {
       initialEmission: convert("172800", 18), // different emission
       minEmission: convert("432", 18),
       halvingPeriod: 30,
+      epochDuration: 86400, // 1 day
       auctionInitPrice: convert("2000", 6),
       auctionEpochPeriod: 86400 * 2,
       auctionPriceMultiplier: convert("2", 18),

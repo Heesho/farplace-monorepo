@@ -35,9 +35,9 @@ contract FundMulticall {
      */
     struct RigState {
         // Rig state
-        uint256 currentDay;
-        uint256 todayEmission;
-        uint256 todayTotalDonated;
+        uint256 currentEpoch;
+        uint256 currentEpochEmission;
+        uint256 currentEpochTotalDonated;
         uint256 startTime;
         address recipient;
         address treasury;
@@ -49,14 +49,14 @@ contract FundMulticall {
         uint256 accountQuoteBalance;
         uint256 accountUsdcBalance;
         uint256 accountUnitBalance;
-        uint256 accountTodayDonation;
+        uint256 accountCurrentEpochDonation;
     }
 
     /**
-     * @notice Claimable day info for a user.
+     * @notice Claimable epoch info for a user.
      */
-    struct ClaimableDay {
-        uint256 day;
+    struct ClaimableEpoch {
+        uint256 epoch;
         uint256 donation;
         uint256 pendingReward;
         bool hasClaimed;
@@ -115,37 +115,37 @@ contract FundMulticall {
     }
 
     /**
-     * @notice Claim rewards for a single day.
+     * @notice Claim rewards for a single epoch.
      * @param rig Rig contract address
      * @param account The account to claim for
-     * @param day The day to claim
+     * @param epoch The epoch to claim
      */
-    function claim(address rig, address account, uint256 day) external {
+    function claim(address rig, address account, uint256 epoch) external {
         if (!IFundCore(core).rigToIsRig(rig)) revert FundMulticall__InvalidRig();
-        IFundRig(rig).claim(account, day);
+        IFundRig(rig).claim(account, epoch);
     }
 
     /**
-     * @notice Claim rewards for multiple days in a single transaction.
-     * @dev Skips days that are already claimed, have no donation, or haven't ended.
+     * @notice Claim rewards for multiple epochs in a single transaction.
+     * @dev Skips epochs that are already claimed, have no donation, or haven't ended.
      * @param rig Rig contract address
      * @param account The account to claim for
-     * @param dayIds Array of days to claim
+     * @param epochIds Array of epochs to claim
      */
-    function claimMultiple(address rig, address account, uint256[] calldata dayIds) external {
+    function claimMultiple(address rig, address account, uint256[] calldata epochIds) external {
         if (!IFundCore(core).rigToIsRig(rig)) revert FundMulticall__InvalidRig();
-        uint256 length = dayIds.length;
+        uint256 length = epochIds.length;
         if (length == 0) revert FundMulticall__EmptyArray();
 
-        uint256 currentDay = IFundRig(rig).currentDay();
+        uint256 currentEpoch = IFundRig(rig).currentEpoch();
         for (uint256 i = 0; i < length;) {
-            // Skip if already claimed, no donation, or day hasn't ended
+            // Skip if already claimed, no donation, or epoch hasn't ended
             if (
-                !IFundRig(rig).dayAccountToHasClaimed(dayIds[i], account) &&
-                IFundRig(rig).dayAccountToDonation(dayIds[i], account) > 0 &&
-                dayIds[i] < currentDay
+                !IFundRig(rig).epochAccountToHasClaimed(epochIds[i], account) &&
+                IFundRig(rig).epochAccountToDonation(epochIds[i], account) > 0 &&
+                epochIds[i] < currentEpoch
             ) {
-                IFundRig(rig).claim(account, dayIds[i]);
+                IFundRig(rig).claim(account, epochIds[i]);
             }
             unchecked { ++i; }
         }
@@ -204,6 +204,7 @@ contract FundMulticall {
             initialEmission: params.initialEmission,
             minEmission: params.minEmission,
             halvingPeriod: params.halvingPeriod,
+            epochDuration: params.epochDuration,
             auctionInitPrice: params.auctionInitPrice,
             auctionEpochPeriod: params.auctionEpochPeriod,
             auctionPriceMultiplier: params.auctionPriceMultiplier,
@@ -222,11 +223,11 @@ contract FundMulticall {
      * @return state Aggregated rig state
      */
     function getRig(address rig, address account) external view returns (RigState memory state) {
-        uint256 day = IFundRig(rig).currentDay();
+        uint256 epoch = IFundRig(rig).currentEpoch();
 
-        state.currentDay = day;
-        state.todayEmission = IFundRig(rig).getDayEmission(day);
-        state.todayTotalDonated = IFundRig(rig).dayToTotalDonated(day);
+        state.currentEpoch = epoch;
+        state.currentEpochEmission = IFundRig(rig).getEpochEmission(epoch);
+        state.currentEpochTotalDonated = IFundRig(rig).epochToTotalDonated(epoch);
         state.startTime = IFundRig(rig).startTime();
         state.recipient = IFundRig(rig).recipient();
         state.treasury = IFundRig(rig).treasury();
@@ -251,106 +252,106 @@ contract FundMulticall {
         state.accountQuoteBalance = account == address(0) ? 0 : IERC20(quoteToken).balanceOf(account);
         state.accountUsdcBalance = account == address(0) ? 0 : IERC20(usdc).balanceOf(account);
         state.accountUnitBalance = account == address(0) ? 0 : IERC20(unitToken).balanceOf(account);
-        state.accountTodayDonation = account == address(0) ? 0 : IFundRig(rig).dayAccountToDonation(day, account);
+        state.accountCurrentEpochDonation = account == address(0) ? 0 : IFundRig(rig).epochAccountToDonation(epoch, account);
 
         return state;
     }
 
     /**
-     * @notice Get claimable days for a user within a range.
+     * @notice Get claimable epochs for a user within a range.
      * @param rig Rig contract address
      * @param account User address
-     * @param startDay First day to check (inclusive)
-     * @param endDay Last day to check (exclusive)
-     * @return claimableDays Array of claimable day info
+     * @param startEpoch First epoch to check (inclusive)
+     * @param endEpoch Last epoch to check (exclusive)
+     * @return claimableEpochs Array of claimable epoch info
      */
-    function getClaimableDays(
+    function getClaimableEpochs(
         address rig,
         address account,
-        uint256 startDay,
-        uint256 endDay
-    ) external view returns (ClaimableDay[] memory claimableDays) {
-        if (endDay <= startDay) {
-            return new ClaimableDay[](0);
+        uint256 startEpoch,
+        uint256 endEpoch
+    ) external view returns (ClaimableEpoch[] memory claimableEpochs) {
+        if (endEpoch <= startEpoch) {
+            return new ClaimableEpoch[](0);
         }
 
-        uint256 count = endDay - startDay;
-        claimableDays = new ClaimableDay[](count);
+        uint256 count = endEpoch - startEpoch;
+        claimableEpochs = new ClaimableEpoch[](count);
 
         for (uint256 i = 0; i < count;) {
-            uint256 day = startDay + i;
-            claimableDays[i] = ClaimableDay({
-                day: day,
-                donation: IFundRig(rig).dayAccountToDonation(day, account),
-                pendingReward: IFundRig(rig).getPendingReward(day, account),
-                hasClaimed: IFundRig(rig).dayAccountToHasClaimed(day, account)
+            uint256 epoch = startEpoch + i;
+            claimableEpochs[i] = ClaimableEpoch({
+                epoch: epoch,
+                donation: IFundRig(rig).epochAccountToDonation(epoch, account),
+                pendingReward: IFundRig(rig).getPendingReward(epoch, account),
+                hasClaimed: IFundRig(rig).epochAccountToHasClaimed(epoch, account)
             });
             unchecked { ++i; }
         }
 
-        return claimableDays;
+        return claimableEpochs;
     }
 
     /**
-     * @notice Get total pending rewards across a range of days.
+     * @notice Get total pending rewards across a range of epochs.
      * @param rig Rig contract address
      * @param account User address
-     * @param startDay First day to check (inclusive)
-     * @param endDay Last day to check (exclusive)
-     * @return totalPending Total unclaimed Unit tokens across all checked days
-     * @return unclaimedDays Array of day numbers that have unclaimed rewards
+     * @param startEpoch First epoch to check (inclusive)
+     * @param endEpoch Last epoch to check (exclusive)
+     * @return totalPending Total unclaimed Unit tokens across all checked epochs
+     * @return unclaimedEpochs Array of epoch numbers that have unclaimed rewards
      */
     function getTotalPendingRewards(
         address rig,
         address account,
-        uint256 startDay,
-        uint256 endDay
-    ) external view returns (uint256 totalPending, uint256[] memory unclaimedDays) {
-        if (endDay <= startDay) {
+        uint256 startEpoch,
+        uint256 endEpoch
+    ) external view returns (uint256 totalPending, uint256[] memory unclaimedEpochs) {
+        if (endEpoch <= startEpoch) {
             return (0, new uint256[](0));
         }
 
-        // First pass: count unclaimed days
+        // First pass: count unclaimed epochs
         uint256 unclaimedCount = 0;
-        for (uint256 day = startDay; day < endDay;) {
-            uint256 pending = IFundRig(rig).getPendingReward(day, account);
+        for (uint256 epoch = startEpoch; epoch < endEpoch;) {
+            uint256 pending = IFundRig(rig).getPendingReward(epoch, account);
             if (pending > 0) {
                 totalPending += pending;
                 unclaimedCount++;
             }
-            unchecked { ++day; }
+            unchecked { ++epoch; }
         }
 
-        // Second pass: collect unclaimed day numbers
-        unclaimedDays = new uint256[](unclaimedCount);
+        // Second pass: collect unclaimed epoch numbers
+        unclaimedEpochs = new uint256[](unclaimedCount);
         uint256 index = 0;
-        for (uint256 day = startDay; day < endDay;) {
-            if (IFundRig(rig).getPendingReward(day, account) > 0) {
-                unclaimedDays[index] = day;
+        for (uint256 epoch = startEpoch; epoch < endEpoch;) {
+            if (IFundRig(rig).getPendingReward(epoch, account) > 0) {
+                unclaimedEpochs[index] = epoch;
                 unchecked { ++index; }
             }
-            unchecked { ++day; }
+            unchecked { ++epoch; }
         }
 
-        return (totalPending, unclaimedDays);
+        return (totalPending, unclaimedEpochs);
     }
 
     /**
-     * @notice Get emission schedule for upcoming days.
+     * @notice Get emission schedule for upcoming epochs.
      * @param rig Rig contract address
-     * @param numDays Number of days to project
-     * @return emissions Array of daily emissions starting from current day
+     * @param numEpochs Number of epochs to project
+     * @return emissions Array of epoch emissions starting from current epoch
      */
-    function getEmissionSchedule(address rig, uint256 numDays)
+    function getEmissionSchedule(address rig, uint256 numEpochs)
         external
         view
         returns (uint256[] memory emissions)
     {
-        uint256 currentDay = IFundRig(rig).currentDay();
-        emissions = new uint256[](numDays);
+        uint256 currentEpoch = IFundRig(rig).currentEpoch();
+        emissions = new uint256[](numEpochs);
 
-        for (uint256 i = 0; i < numDays;) {
-            emissions[i] = IFundRig(rig).getDayEmission(currentDay + i);
+        for (uint256 i = 0; i < numEpochs;) {
+            emissions[i] = IFundRig(rig).getEpochEmission(currentEpoch + i);
             unchecked { ++i; }
         }
 

@@ -251,6 +251,7 @@ describe("Edge Case Security Audit Tests", function () {
       initialEmission: overrides.initialEmission || convert("1000", 18),
       minEmission: overrides.minEmission || convert("1", 18),
       halvingPeriod: overrides.halvingPeriod || 30,
+      epochDuration: overrides.epochDuration || 86400,
       auctionInitPrice: overrides.auctionInitPrice || convert("1", 18),
       auctionEpochPeriod: overrides.auctionEpochPeriod || ONE_HOUR,
       auctionPriceMultiplier: overrides.auctionPriceMultiplier || convert("2", 18),
@@ -326,7 +327,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       const MIN_DONATION = 10000;
 
-      const recipientAddr = await rigContract.recipient();
+      const recipientAddr = user1.address;
       const treasuryAddr = await rigContract.treasury();
       const teamAddr = await rigContract.team();
 
@@ -419,14 +420,14 @@ describe("Edge Case Security Audit Tests", function () {
       expect(newSlot.initPrice).to.equal(convert("1000", 18));
     });
 
-    it("MineRig capacity at MAX_CAPACITY (256): mine and verify UPS division", async function () {
+    it("MineRig capacity at MAX_CAPACITY (10000): mine and verify UPS division", async function () {
       const { rigContract, rig } = await launchMineRig(user0);
 
-      await rigContract.connect(user0).setCapacity(256);
-      expect(await rigContract.capacity()).to.equal(256);
+      await rigContract.connect(user0).setCapacity(10000);
+      expect(await rigContract.capacity()).to.equal(10000);
 
       const totalUps = await rigContract.getUps();
-      const expectedSlotUps = totalUps.div(256);
+      const expectedSlotUps = totalUps.div(10000);
 
       await increaseTime(ONE_HOUR + 1);
       const slot0 = await rigContract.getSlot(0);
@@ -436,11 +437,11 @@ describe("Edge Case Security Audit Tests", function () {
       const minedSlot0 = await rigContract.getSlot(0);
       expect(minedSlot0.ups).to.equal(expectedSlotUps);
 
-      const slot255 = await rigContract.getSlot(255);
-      await rigContract.connect(user2).mine(user2.address, 255, slot255.epochId, deadline, 0, "");
+      const slot9999 = await rigContract.getSlot(9999);
+      await rigContract.connect(user2).mine(user2.address, 9999, slot9999.epochId, deadline, 0, "");
 
-      const minedSlot255 = await rigContract.getSlot(255);
-      expect(minedSlot255.ups).to.equal(expectedSlotUps);
+      const minedSlot9999 = await rigContract.getSlot(9999);
+      expect(minedSlot9999.ups).to.equal(expectedSlotUps);
     });
 
     it("MineRig with MAX_INITIAL_UPS (1e24): mine, wait, mine again, verify no overflow", async function () {
@@ -541,14 +542,14 @@ describe("Edge Case Security Audit Tests", function () {
     it("Exact day boundary (FundRig): cannot claim current day, can claim after day ends", async function () {
       const { rigContract, rig, unitContract } = await launchFundRig(user0);
 
-      const currentDay = await rigContract.currentDay();
+      const currentDay = await rigContract.currentEpoch();
 
       await usdc.connect(user2).approve(rig, convert("100", 6));
       await rigContract.connect(user2).fund(user2.address, convert("100", 6), "");
 
       await expect(
         rigContract.connect(user2).claim(user2.address, currentDay)
-      ).to.be.revertedWith("FundRig__DayNotEnded()");
+      ).to.be.revertedWith("FundRig__EpochNotEnded()");
 
       await increaseTime(ONE_DAY + 1);
 
@@ -580,10 +581,10 @@ describe("Edge Case Security Audit Tests", function () {
       expect(newSlot.miner).to.equal(user1.address);
     });
 
-    it("Slot 0 vs slot 255: both work identically with capacity=256", async function () {
+    it("Slot 0 vs slot 9999: both work identically with capacity=10000", async function () {
       const { rigContract, rig, unitContract } = await launchMineRig(user0);
 
-      await rigContract.connect(user0).setCapacity(256);
+      await rigContract.connect(user0).setCapacity(10000);
       await increaseTime(ONE_HOUR + 1);
 
       const deadline = await getFutureDeadline();
@@ -591,16 +592,16 @@ describe("Edge Case Security Audit Tests", function () {
       const slot0 = await rigContract.getSlot(0);
       await rigContract.connect(user1).mine(user1.address, 0, slot0.epochId, deadline, 0, "");
 
-      const slot255 = await rigContract.getSlot(255);
-      await rigContract.connect(user2).mine(user2.address, 255, slot255.epochId, deadline, 0, "");
+      const slot9999 = await rigContract.getSlot(9999);
+      await rigContract.connect(user2).mine(user2.address, 9999, slot9999.epochId, deadline, 0, "");
 
       const newSlot0 = await rigContract.getSlot(0);
-      const newSlot255 = await rigContract.getSlot(255);
+      const newSlot9999 = await rigContract.getSlot(9999);
 
       expect(newSlot0.miner).to.equal(user1.address);
-      expect(newSlot255.miner).to.equal(user2.address);
-      expect(newSlot0.ups).to.equal(newSlot255.ups);
-      expect(newSlot0.initPrice).to.equal(newSlot255.initPrice);
+      expect(newSlot9999.miner).to.equal(user2.address);
+      expect(newSlot0.ups).to.equal(newSlot9999.ups);
+      expect(newSlot0.initPrice).to.equal(newSlot9999.initPrice);
     });
   });
 
@@ -729,7 +730,7 @@ describe("Edge Case Security Audit Tests", function () {
       this.timeout(30000);
       const { rigContract, rig, unitContract } = await launchFundRig(user0);
 
-      const day = await rigContract.currentDay();
+      const day = await rigContract.currentEpoch();
 
       const amounts = [
         convert("50", 6),
@@ -747,7 +748,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await increaseTime(ONE_DAY + 1);
 
-      const dayEmission = await rigContract.getDayEmission(day);
+      const dayEmission = await rigContract.getEpochEmission(day);
 
       let totalRewards = ethers.BigNumber.from(0);
       for (let i = 0; i < donors.length; i++) {
@@ -1097,7 +1098,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
-          halvingPeriod: 6,
+          halvingPeriod: 6, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1111,7 +1112,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
-          halvingPeriod: 366,
+          halvingPeriod: 366, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1126,7 +1127,7 @@ describe("Edge Case Security Audit Tests", function () {
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: ethers.BigNumber.from("999999999999999999"),
           minEmission: ethers.BigNumber.from("999999999999999999"),
-          halvingPeriod: 30,
+          halvingPeriod: 30, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1140,7 +1141,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("100", 18), minEmission: convert("200", 18),
-          halvingPeriod: 30,
+          halvingPeriod: 30, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1154,7 +1155,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
-          halvingPeriod: 30,
+          halvingPeriod: 30, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         };
@@ -1253,7 +1254,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
-          halvingPeriod: 30,
+          halvingPeriod: 30, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("FundCore__ZeroAddress()");
@@ -1292,7 +1293,7 @@ describe("Edge Case Security Audit Tests", function () {
           tokenName: "Bad", tokenSymbol: "BAD", uri: "https://example.com/rig",
           usdcAmount: convert("100", 6), unitAmount: convert("1000000", 18),
           initialEmission: convert("1000", 18), minEmission: convert("1", 18),
-          halvingPeriod: 30,
+          halvingPeriod: 30, epochDuration: 86400,
           auctionInitPrice: convert("1", 18), auctionEpochPeriod: ONE_HOUR,
           auctionPriceMultiplier: convert("2", 18), auctionMinInitPrice: convert("0.1", 18),
         })).to.be.revertedWith("FundCore__ZeroAddress()");
@@ -1406,7 +1407,7 @@ describe("Edge Case Security Audit Tests", function () {
     it("FundRig: double claim for same day should revert", async function () {
       const { rigContract, rig, unitContract } = await launchFundRig(user0);
 
-      const day = await rigContract.currentDay();
+      const day = await rigContract.currentEpoch();
 
       await usdc.connect(user2).approve(rig, convert("100", 6));
       await rigContract.connect(user2).fund(user2.address, convert("100", 6), "");
@@ -1423,7 +1424,7 @@ describe("Edge Case Security Audit Tests", function () {
     it("FundRig: claim with no donation should revert", async function () {
       const { rigContract, rig } = await launchFundRig(user0);
 
-      const day = await rigContract.currentDay();
+      const day = await rigContract.currentEpoch();
 
       await usdc.connect(user1).approve(rig, convert("100", 6));
       await rigContract.connect(user1).fund(user1.address, convert("100", 6), "");
@@ -1454,11 +1455,11 @@ describe("Edge Case Security Audit Tests", function () {
       ).to.be.revertedWith("Rig__CapacityBelowCurrent()");
     });
 
-    it("MineRig: capacity cannot exceed MAX_CAPACITY (256)", async function () {
+    it("MineRig: capacity cannot exceed MAX_CAPACITY (10000)", async function () {
       const { rigContract } = await launchMineRig(user0);
 
       await expect(
-        rigContract.connect(user0).setCapacity(257)
+        rigContract.connect(user0).setCapacity(10001)
       ).to.be.revertedWith("Rig__CapacityExceedsMax()");
     });
 
@@ -1598,7 +1599,7 @@ describe("Edge Case Security Audit Tests", function () {
 
       await increaseTime(ONE_DAY + 1);
 
-      const day = await rigContract.currentDay();
+      const day = await rigContract.currentEpoch();
       // Claim for a completed day (day - 1 or whatever day the donation was on)
       await expect(
         rigContract.connect(user1).claim(AddressZero, day.sub(1))
@@ -1644,7 +1645,7 @@ describe("Edge Case Security Audit Tests", function () {
         halvingPeriod: 7,
       });
 
-      const emission = await rigContract.getDayEmission(10000);
+      const emission = await rigContract.getEpochEmission(10000);
       const minEmission = await rigContract.minEmission();
       expect(emission).to.equal(minEmission);
     });

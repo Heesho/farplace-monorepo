@@ -436,7 +436,6 @@ type FundRig @entity(immutable: false) {
   rig: Rig!
 
   # Addresses
-  recipient: Bytes!                    # Recipient address (receives 50% of donations)
   treasury: Bytes!                     # Treasury address (receives ~45% of donations)
   team: Bytes!                         # Team address (receives 4%, zero = disabled)
 
@@ -444,7 +443,8 @@ type FundRig @entity(immutable: false) {
   initialEmission: BigInt!             # Starting daily emission
   minEmission: BigInt!                 # Minimum daily emission (floor)
   minDonation: BigInt!                 # Minimum donation amount
-  halvingPeriod: BigInt!               # Days between emission halvings
+  halvingPeriod: BigInt!               # Epochs between emission halvings
+  epochDuration: BigInt!               # Epoch duration in seconds
 
   # State
   currentDay: BigInt!                  # Current day number
@@ -491,6 +491,7 @@ type Donation @entity(immutable: true) {
   fundRig: FundRig!
 
   donor: Account!
+  recipient: Bytes!                    # Recipient address chosen by donor
 
   day: BigInt!                         # Day number
   amount: BigDecimal!                  # Donation amount

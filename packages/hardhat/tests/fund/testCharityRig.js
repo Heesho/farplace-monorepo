@@ -50,7 +50,7 @@ describe("FundRig Tests", function () {
       treasury.address,
       team.address,
       recipient.address, // recipient (required)
-      [INITIAL_EMISSION, MIN_EMISSION, 30], // Config: {initialEmission, minEmission, halvingPeriod}
+      [INITIAL_EMISSION, MIN_EMISSION, 30, ONE_DAY], // Config: {initialEmission, minEmission, halvingPeriod}
       "" // uri
     );
     console.log("- FundRig Initialized (with recipient)");
@@ -156,12 +156,13 @@ describe("FundRig Tests", function () {
       expect(await rig.recipient()).to.equal(recipient.address);
     });
 
-    it("Should allow owner to set recipient", async function () {
+    it("Should allow owner to change recipient", async function () {
       const newRecipient = user2.address;
       await rig.connect(owner).setRecipient(newRecipient);
       expect(await rig.recipient()).to.equal(newRecipient);
       // Reset for other tests
       await rig.connect(owner).setRecipient(recipient.address);
+      expect(await rig.recipient()).to.equal(recipient.address);
     });
 
     it("Should allow owner to update treasury address", async function () {
@@ -215,6 +216,8 @@ describe("FundRig Tests", function () {
   describe("Donation Tests", function () {
     it("Should revert donation without approval", async function () {
       console.log("\n*** Allowance Check ***");
+      // Clear any leftover approval from previous tests
+      await paymentToken.connect(user0).approve(rig.address, 0);
       await expect(
         rig.connect(user0).fund(user0.address, convert("100", 6), "")
       ).to.be.reverted;
@@ -232,7 +235,7 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           AddressZero, // zero recipient should fail
-          [INITIAL_EMISSION, MIN_EMISSION, 30], // Config
+          [INITIAL_EMISSION, MIN_EMISSION, 30, ONE_DAY], // Config
           "" // uri
         )
       ).to.be.revertedWith("FundRig__ZeroAddress()");
@@ -248,7 +251,7 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           recipient.address,
-          [INITIAL_EMISSION, MIN_EMISSION, 6], // Config: halvingPeriod too low (min is 7)
+          [INITIAL_EMISSION, MIN_EMISSION, 6, ONE_DAY], // Config: halvingPeriod too low (min is 7)
           "" // uri
         )
       ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
@@ -264,7 +267,7 @@ describe("FundRig Tests", function () {
           treasury.address,
           team.address,
           recipient.address,
-          [INITIAL_EMISSION, MIN_EMISSION, 366], // Config: halvingPeriod too high (max is 365)
+          [INITIAL_EMISSION, MIN_EMISSION, 366, ONE_DAY], // Config: halvingPeriod too high (max is 365)
           "" // uri
         )
       ).to.be.revertedWith("FundRig__HalvingPeriodOutOfRange()");
@@ -314,7 +317,7 @@ describe("FundRig Tests", function () {
       const donationAmount = convert("100", 6);
       await paymentToken.connect(user1).approve(rig.address, donationAmount);
 
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
 
       await expect(rig.connect(user1).fund(user1.address, donationAmount, ""))
         .to.emit(rig, "FundRig__Funded")
@@ -322,11 +325,11 @@ describe("FundRig Tests", function () {
     });
 
     it("Should track daily donations correctly", async function () {
-      const day = await rig.currentDay();
-      const user0Donation = await rig.dayAccountToDonation(day, user0.address);
-      const dayTotal = await rig.dayToTotalDonated(day);
+      const day = await rig.currentEpoch();
+      const user0Donation = await rig.epochAccountToDonation(day, user0.address);
+      const dayTotal = await rig.epochToTotalDonated(day);
 
-      expect(user0Donation).to.equal(convert("1000", 6));
+      expect(user0Donation).to.equal(convert("1000", 6)); // 1000 from split check
       expect(dayTotal).to.be.gt(0);
     });
 
@@ -378,22 +381,22 @@ describe("FundRig Tests", function () {
 
     it("Should allow anyone to donate on behalf of another account", async function () {
       // user2 donates on behalf of user0
-      const user0DonationBefore = await rig.dayAccountToDonation(await rig.currentDay(), user0.address);
+      const user0DonationBefore = await rig.epochAccountToDonation(await rig.currentEpoch(), user0.address);
 
       await paymentToken.connect(user2).approve(rig.address, convert("100", 6));
       await rig.connect(user2).fund(user0.address, convert("100", 6), "");
 
-      const user0DonationAfter = await rig.dayAccountToDonation(await rig.currentDay(), user0.address);
+      const user0DonationAfter = await rig.epochAccountToDonation(await rig.currentEpoch(), user0.address);
       expect(user0DonationAfter.sub(user0DonationBefore)).to.equal(convert("100", 6));
     });
   });
 
   describe("Claiming Tests", function () {
     it("Should prevent claiming before day ends", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
       await expect(
         rig.connect(user0).claim(user0.address, currentDay)
-      ).to.be.revertedWith("FundRig__DayNotEnded()");
+      ).to.be.revertedWith("FundRig__EpochNotEnded()");
     });
 
     it("Should distribute Unit proportionally (25%/75%)", async function () {
@@ -402,7 +405,7 @@ describe("FundRig Tests", function () {
       // Start fresh on a new day
       await increaseTime(ONE_DAY + 1);
 
-      const newDay = await rig.currentDay();
+      const newDay = await rig.currentEpoch();
       console.log("New day:", newDay.toString());
 
       // User A donates 100 tokens
@@ -417,7 +420,7 @@ describe("FundRig Tests", function () {
       await increaseTime(ONE_DAY + 1);
 
       // Get emission for that day
-      const dayEmission = await rig.getDayEmission(newDay);
+      const dayEmission = await rig.getEpochEmission(newDay);
       console.log("Day Emission:", divDec(dayEmission));
 
       // Calculate expected rewards
@@ -461,14 +464,14 @@ describe("FundRig Tests", function () {
     });
 
     it("Should prevent double claiming", async function () {
-      const previousDay = (await rig.currentDay()).sub(1);
+      const previousDay = (await rig.currentEpoch()).sub(1);
       await expect(
         rig.connect(user0).claim(user0.address, previousDay)
       ).to.be.revertedWith("FundRig__AlreadyClaimed()");
     });
 
     it("Should prevent claiming with no donation", async function () {
-      const previousDay = (await rig.currentDay()).sub(1);
+      const previousDay = (await rig.currentEpoch()).sub(1);
       await expect(
         rig.connect(user2).claim(user2.address, previousDay)
       ).to.be.revertedWith("FundRig__NoDonation()");
@@ -477,7 +480,7 @@ describe("FundRig Tests", function () {
     it("Should emit FundRig__Claimed event", async function () {
       // Setup a new day with donation
       await increaseTime(ONE_DAY + 1);
-      const newDay = await rig.currentDay();
+      const newDay = await rig.currentEpoch();
 
       await paymentToken.connect(user2).approve(rig.address, convert("100", 6));
       await rig.connect(user2).fund(user2.address, convert("100", 6), "");
@@ -493,14 +496,14 @@ describe("FundRig Tests", function () {
     });
 
     it("Should return 0 for pending reward if day not ended", async function () {
-      const currentDay = await rig.currentDay();
+      const currentDay = await rig.currentEpoch();
       const pending = await rig.getPendingReward(currentDay, user0.address);
       expect(pending).to.equal(0);
     });
 
     it("Should return 0 for pending reward if already claimed", async function () {
       // user0 already claimed for the day we tested proportional claiming
-      const claimedDay = (await rig.currentDay()).sub(2); // 2 days ago
+      const claimedDay = (await rig.currentEpoch()).sub(2); // 2 days ago
       const pending = await rig.getPendingReward(claimedDay, user0.address);
       expect(pending).to.equal(0);
     });
@@ -508,7 +511,7 @@ describe("FundRig Tests", function () {
     it("Should allow anyone to claim on behalf of another account", async function () {
       // Setup a new day with donation from user0
       await increaseTime(ONE_DAY + 1);
-      const newDay = await rig.currentDay();
+      const newDay = await rig.currentEpoch();
 
       await paymentToken.connect(user0).approve(rig.address, convert("200", 6));
       await rig.connect(user0).fund(user0.address, convert("200", 6), "");
@@ -528,30 +531,30 @@ describe("FundRig Tests", function () {
 
   describe("Emission Halving Tests", function () {
     it("Should return correct emission for day 0", async function () {
-      const emission = await rig.getDayEmission(0);
+      const emission = await rig.getEpochEmission(0);
       expect(emission).to.equal(INITIAL_EMISSION);
     });
 
     it("Should return same emission within first 30 days", async function () {
-      const emission0 = await rig.getDayEmission(0);
-      const emission15 = await rig.getDayEmission(15);
-      const emission29 = await rig.getDayEmission(29);
+      const emission0 = await rig.getEpochEmission(0);
+      const emission15 = await rig.getEpochEmission(15);
+      const emission29 = await rig.getEpochEmission(29);
 
       expect(emission0).to.equal(emission15);
       expect(emission0).to.equal(emission29);
     });
 
     it("Should halve emission after 30 days", async function () {
-      const emission0 = await rig.getDayEmission(0);
-      const emission30 = await rig.getDayEmission(30);
+      const emission0 = await rig.getEpochEmission(0);
+      const emission30 = await rig.getEpochEmission(30);
 
       expect(emission30).to.equal(emission0.div(2));
     });
 
     it("Should halve emission multiple times", async function () {
-      const emission0 = await rig.getDayEmission(0);
-      const emission60 = await rig.getDayEmission(60);
-      const emission90 = await rig.getDayEmission(90);
+      const emission0 = await rig.getEpochEmission(0);
+      const emission60 = await rig.getEpochEmission(60);
+      const emission90 = await rig.getEpochEmission(90);
 
       expect(emission60).to.equal(emission0.div(4)); // 2 halvings
       expect(emission90).to.equal(emission0.div(8)); // 3 halvings
@@ -559,8 +562,8 @@ describe("FundRig Tests", function () {
 
     it("Should respect minimum emission floor", async function () {
       // After many halvings, should hit floor
-      const emission720 = await rig.getDayEmission(720); // 24 halvings
-      const emission1000 = await rig.getDayEmission(1000);
+      const emission720 = await rig.getEpochEmission(720); // 24 halvings
+      const emission1000 = await rig.getEpochEmission(1000);
 
       expect(emission720).to.be.gte(MIN_EMISSION);
       expect(emission1000).to.equal(MIN_EMISSION);
@@ -569,28 +572,302 @@ describe("FundRig Tests", function () {
 
   describe("View Function Tests", function () {
     it("currentDay should track correctly", async function () {
-      const day = await rig.currentDay();
+      const day = await rig.currentEpoch();
 
       await increaseTime(ONE_DAY);
-      const nextDay = await rig.currentDay();
+      const nextDay = await rig.currentEpoch();
 
       expect(nextDay).to.equal(day.add(1));
     });
 
     it("getDayTotal should return total donations for a day", async function () {
-      const day = await rig.currentDay();
+      const day = await rig.currentEpoch();
 
       await paymentToken.connect(user0).approve(rig.address, convert("100", 6));
       await rig.connect(user0).fund(user0.address, convert("100", 6), "");
 
-      const total = await rig.dayToTotalDonated(day);
+      const total = await rig.epochToTotalDonated(day);
       expect(total).to.be.gt(0);
     });
 
     it("getUserDonation should return user donation for a day", async function () {
-      const day = await rig.currentDay();
-      const donation = await rig.dayAccountToDonation(day, user0.address);
+      const day = await rig.currentEpoch();
+      const donation = await rig.epochAccountToDonation(day, user0.address);
       expect(donation).to.equal(convert("100", 6));
+    });
+  });
+
+  describe("Custom Epoch Duration Tests", function () {
+    let shortRig, shortUnit;
+    const ONE_HOUR = 3600;
+
+    before(async function () {
+      // Deploy a FundRig with 1 hour epoch duration
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      shortUnit = await unitArtifact.deploy("Short Epoch Unit", "SUNIT", owner.address);
+
+      const mockCoreArtifact = await ethers.getContractFactory("MockCore");
+      const shortMockCore = await mockCoreArtifact.deploy(protocol.address);
+
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      shortRig = await rigArtifact.deploy(
+        shortUnit.address,
+        paymentToken.address,
+        shortMockCore.address,
+        treasury.address,
+        team.address,
+        recipient.address,
+        [INITIAL_EMISSION, MIN_EMISSION, 30, ONE_HOUR], // Config: 1 hour epochs
+        ""
+      );
+
+      await shortUnit.setRig(shortRig.address);
+
+      // Fund users
+      await paymentToken.mint(user0.address, convert("5000", 6));
+    });
+
+    it("Should have correct epoch duration", async function () {
+      expect(await shortRig.epochDuration()).to.equal(ONE_HOUR);
+    });
+
+    it("currentDay should advance after one epoch (1 hour)", async function () {
+      const day0 = await shortRig.currentEpoch();
+      expect(day0).to.equal(0);
+
+      await increaseTime(ONE_HOUR);
+      const day1 = await shortRig.currentEpoch();
+      expect(day1).to.equal(1);
+    });
+
+    it("Should allow claiming after epoch ends", async function () {
+      // Donate in current epoch
+      const epoch = await shortRig.currentEpoch();
+      await paymentToken.connect(user0).approve(shortRig.address, convert("100", 6));
+      await shortRig.connect(user0).fund(user0.address, convert("100", 6), "");
+
+      // Advance one epoch
+      await increaseTime(ONE_HOUR);
+
+      // Should be claimable now
+      const balBefore = await shortUnit.balanceOf(user0.address);
+      await shortRig.claim(user0.address, epoch);
+      const balAfter = await shortUnit.balanceOf(user0.address);
+      expect(balAfter).to.be.gt(balBefore);
+    });
+
+    it("Halving should work with epoch-based periods", async function () {
+      // halvingPeriod=30, so after 30 epochs emission should halve
+      const emission0 = await shortRig.getEpochEmission(0);
+      const emission30 = await shortRig.getEpochEmission(30);
+      expect(emission30).to.equal(emission0.div(2));
+    });
+
+    it("Should revert deployment with epoch duration too short", async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const tmpUnit = await unitArtifact.deploy("Tmp", "TMP", owner.address);
+
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      await expect(
+        rigArtifact.deploy(
+          tmpUnit.address,
+          paymentToken.address,
+          mockCore.address,
+          treasury.address,
+          team.address,
+          recipient.address,
+          [INITIAL_EMISSION, MIN_EMISSION, 30, 3599], // Config: less than 1 hour
+          ""
+        )
+      ).to.be.revertedWith("FundRig__EpochDurationOutOfRange()");
+    });
+
+    it("Should revert deployment with epoch duration too long", async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const tmpUnit = await unitArtifact.deploy("Tmp2", "TMP2", owner.address);
+
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      await expect(
+        rigArtifact.deploy(
+          tmpUnit.address,
+          paymentToken.address,
+          mockCore.address,
+          treasury.address,
+          team.address,
+          recipient.address,
+          [INITIAL_EMISSION, MIN_EMISSION, 30, 7 * 86400 + 1], // Config: more than 7 days
+          ""
+        )
+      ).to.be.revertedWith("FundRig__EpochDurationOutOfRange()");
+    });
+  });
+
+  describe("RecipientSet Event Tests", function () {
+    it("Should emit RecipientSet event when changing recipient", async function () {
+      await expect(rig.connect(owner).setRecipient(user2.address))
+        .to.emit(rig, "FundRig__RecipientSet")
+        .withArgs(user2.address);
+
+      // Cleanup
+      await rig.connect(owner).setRecipient(recipient.address);
+    });
+  });
+
+  describe("Funded Event Tests", function () {
+    it("Should include correct args in Funded event", async function () {
+      const amount = convert("100", 6);
+      await paymentToken.connect(user0).approve(rig.address, amount);
+
+      const epoch = await rig.currentEpoch();
+
+      await expect(rig.connect(user0).fund(user0.address, amount, "test-uri"))
+        .to.emit(rig, "FundRig__Funded")
+        .withArgs(user0.address, user0.address, amount, epoch, "test-uri");
+    });
+  });
+
+  describe("MIN_DONATION Boundary Tests", function () {
+    it("Should revert donation below MIN_DONATION (10000)", async function () {
+      await paymentToken.connect(user0).approve(rig.address, 9999);
+      await expect(
+        rig.connect(user0).fund(user0.address, 9999, "")
+      ).to.be.revertedWith("FundRig__BelowMinDonation()");
+    });
+
+    it("Should accept donation at exactly MIN_DONATION (10000)", async function () {
+      await paymentToken.connect(user0).approve(rig.address, 10000);
+      await expect(
+        rig.connect(user0).fund(user0.address, 10000, "")
+      ).to.not.be.reverted;
+    });
+  });
+
+  describe("Epoch Boundary Precision Tests", function () {
+    let precisionRig, precisionUnit;
+    const TWO_HOURS = 7200;
+
+    before(async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      precisionUnit = await unitArtifact.deploy("Precision Unit", "PUNIT", owner.address);
+
+      const mockCoreArtifact = await ethers.getContractFactory("MockCore");
+      const precMockCore = await mockCoreArtifact.deploy(protocol.address);
+
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      precisionRig = await rigArtifact.deploy(
+        precisionUnit.address,
+        paymentToken.address,
+        precMockCore.address,
+        treasury.address,
+        team.address,
+        recipient.address,
+        [INITIAL_EMISSION, MIN_EMISSION, 30, TWO_HOURS], // 2-hour epochs
+        ""
+      );
+
+      await precisionUnit.setRig(precisionRig.address);
+      await paymentToken.mint(user0.address, convert("5000", 6));
+    });
+
+    it("Should start at epoch 0", async function () {
+      expect(await precisionRig.currentEpoch()).to.equal(0);
+    });
+
+    it("Should stay in epoch 0 before epochDuration elapses", async function () {
+      // Advance 1 hour 59 minutes (just under 2 hours)
+      await increaseTime(TWO_HOURS - 60);
+      expect(await precisionRig.currentEpoch()).to.equal(0);
+    });
+
+    it("Should advance to epoch 1 at exactly epochDuration", async function () {
+      // Advance remaining 60 seconds to hit 2 hours
+      await increaseTime(60);
+      expect(await precisionRig.currentEpoch()).to.equal(1);
+    });
+
+    it("Should allow claiming epoch 0 after it ends", async function () {
+      // Go back to fresh state — donate in epoch 0 was not done, so deploy fresh
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const tmpUnit = await unitArtifact.deploy("Epoch Claim Unit", "ECUNIT", owner.address);
+
+      const mockCoreArtifact = await ethers.getContractFactory("MockCore");
+      const tmpCore = await mockCoreArtifact.deploy(protocol.address);
+
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      const tmpRig = await rigArtifact.deploy(
+        tmpUnit.address,
+        paymentToken.address,
+        tmpCore.address,
+        treasury.address,
+        team.address,
+        recipient.address,
+        [INITIAL_EMISSION, MIN_EMISSION, 30, TWO_HOURS],
+        ""
+      );
+      await tmpUnit.setRig(tmpRig.address);
+
+      // Donate in epoch 0
+      await paymentToken.connect(user0).approve(tmpRig.address, convert("100", 6));
+      await tmpRig.connect(user0).fund(user0.address, convert("100", 6), "");
+
+      // Still in epoch 0 — cannot claim
+      await expect(
+        tmpRig.claim(user0.address, 0)
+      ).to.be.revertedWith("FundRig__EpochNotEnded()");
+
+      // Advance past epoch boundary
+      await increaseTime(TWO_HOURS);
+
+      // Now can claim epoch 0
+      const balBefore = await tmpUnit.balanceOf(user0.address);
+      await tmpRig.claim(user0.address, 0);
+      const balAfter = await tmpUnit.balanceOf(user0.address);
+      expect(balAfter).to.be.gt(balBefore);
+    });
+
+    it("Should track multiple rapid epochs correctly", async function () {
+      const unitArtifact = await ethers.getContractFactory("Unit");
+      const tmpUnit = await unitArtifact.deploy("Rapid Unit", "RUNIT", owner.address);
+
+      const mockCoreArtifact = await ethers.getContractFactory("MockCore");
+      const tmpCore = await mockCoreArtifact.deploy(protocol.address);
+
+      const ONE_HOUR = 3600;
+      const rigArtifact = await ethers.getContractFactory("FundRig");
+      const tmpRig = await rigArtifact.deploy(
+        tmpUnit.address,
+        paymentToken.address,
+        tmpCore.address,
+        treasury.address,
+        team.address,
+        recipient.address,
+        [INITIAL_EMISSION, MIN_EMISSION, 30, ONE_HOUR], // 1-hour epochs
+        ""
+      );
+      await tmpUnit.setRig(tmpRig.address);
+
+      // Donate across 3 epochs
+      for (let i = 0; i < 3; i++) {
+        const epoch = await tmpRig.currentEpoch();
+        await paymentToken.connect(user0).approve(tmpRig.address, convert("50", 6));
+        await tmpRig.connect(user0).fund(user0.address, convert("50", 6), "");
+
+        const donation = await tmpRig.epochAccountToDonation(epoch, user0.address);
+        expect(donation).to.equal(convert("50", 6));
+
+        await increaseTime(ONE_HOUR);
+      }
+
+      // Should be at epoch 3 now
+      expect(await tmpRig.currentEpoch()).to.equal(3);
+
+      // Claim all 3 epochs
+      for (let i = 0; i < 3; i++) {
+        const balBefore = await tmpUnit.balanceOf(user0.address);
+        await tmpRig.claim(user0.address, i);
+        const balAfter = await tmpUnit.balanceOf(user0.address);
+        expect(balAfter).to.be.gt(balBefore);
+      }
     });
   });
 });

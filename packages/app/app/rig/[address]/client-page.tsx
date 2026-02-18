@@ -1024,7 +1024,7 @@ export default function RigDetailPage() {
                   </div>
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">Halving</div>
-                    <div className="font-semibold text-[14px]">{formatPeriod(String(parseInt(subgraphRig.fundRig.halvingPeriod) * 86400))}</div>
+                    <div className="font-semibold text-[14px]">{formatPeriod(String(parseInt(subgraphRig.fundRig.halvingPeriod) * parseInt(subgraphRig.fundRig.epochDuration)))}</div>
                   </div>
                   {metadata?.recipientName && (
                     <div>
@@ -1035,7 +1035,7 @@ export default function RigDetailPage() {
                   <div>
                     <div className="text-muted-foreground text-[12px] mb-0.5">{metadata?.recipientName ? "Recipient address" : "Recipient"}</div>
                     <div className="font-semibold text-[14px] font-mono">
-                      <AddressLink address={subgraphRig.fundRig.recipient} />
+                      <AddressLink address={subgraphRig.fundRig.recipients?.[0]?.recipient ?? null} />
                     </div>
                   </div>
                   {fundState?.treasury && (
@@ -1261,7 +1261,7 @@ export default function RigDetailPage() {
             entropyEnabled: (isEntropyEnabled as boolean) ?? false,
           }),
           ...(rigType === "fund" && {
-            recipient: subgraphRig?.fundRig?.recipient ?? null,
+            recipient: subgraphRig?.fundRig?.recipients?.[0]?.recipient ?? null,
           }),
         }}
       />
